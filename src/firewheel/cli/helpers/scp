@@ -1,0 +1,59 @@
+AUTHOR
+FIREWHEEL Team
+DONE
+DESCRIPTION
+
+SCP files to or from a VM that is currently running in the FIREWHEEL
+environment. All SCP options can be used.
+
+.. warning::
+    To use this, the following requirements MUST be met:
+        * The VM must be running an SSH server.
+        * The experiment must be run with the :ref:`control_network_mc` model component. For example: ``firewheel experiment tests.vm_gen:2 control_network minimega.launch``.
+        * This Helper *MUST* be run from the cluster head node.
+
+    If any of these conditions are not or cannot be met, use the
+    :ref:`helper_pull_file` Helper (i.e. ``firewheel file pull``) instead.
+
+Arguments
++++++++++
+
+Named Arguments
+^^^^^^^^^^^^^^^
+
+.. option:: -h, --help
+
+    Show help message and exit.
+
+Positional Arguments
+^^^^^^^^^^^^^^^^^^^^
+
+.. option:: <SCP command>
+
+    The remaining standard SCP options, which includes the the hostname of the VM to SCP to or from. An optional username can be specified before the hostname as well. (i.e. ubuntu@vm.net)
+
+Example
++++++++
+
+``firewheel scp ubuntu@host.root.net:/tmp/test.txt /tmp/myfile.txt``
+
+``firewheel scp -r ubuntu@host.root.net:/tmp/test /tmp/mydir``
+
+``firewheel scp /tmp/test.txt ubuntu@host.root.net:/tmp/test.txt``
+
+DONE
+RUN LocalPython ON control
+#!/usr/bin/env python
+
+import sys
+
+from firewheel.cli.utils import SCPManager
+
+if __name__ == "__main__":
+    # Parse the command line inputs as an SCP command
+    (target, *srcs), options = SCPManager.parse_cli_input(sys.argv)
+    # Copy the files to the destination from the source(s) using SCP
+    scp = SCPManager()
+    result = scp(target, *srcs, options=options)
+    sys.exit(result.returncode)
+DONE

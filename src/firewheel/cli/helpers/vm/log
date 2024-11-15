@@ -1,0 +1,115 @@
+AUTHOR
+FIREWHEEL Team
+DONE
+DESCRIPTION
+
+Retrieve a log for the given VM. This enables users to easily access log files for VMs
+without intimate knowledge of where the VM resource logs are stored. Additionally, it enables
+easy parsing and data analysis of logs.
+
+All log output is directly piped to standard out and can be further examined using common
+command line tools such as ``less``, ``tail``, or ``grep``, just to name a few.
+
+Arguments
++++++++++
+
+Named Arguments
+^^^^^^^^^^^^^^^
+
+.. option:: -h, --help
+
+    Show help message and exit.
+
+.. option:: -j, --json
+
+    Retrieve the JSON log rather than the standard log.
+
+Positional Arguments
+^^^^^^^^^^^^^^^^^^^^
+
+.. option:: <vm>
+
+    The name of the VM for which the log should be retrieved.
+
+
+Example
++++++++
+
+``firewheel vm log host.root.net``
+
+``firewheel vm log --json host.root.net``
+
+``firewheel vm log host.root.net | less``
+
+DONE
+RUN LocalPython ON control
+#!/usr/bin/env python
+
+import argparse
+import subprocess
+from pathlib import Path
+
+from firewheel.config import Config
+from firewheel.lib.minimega.api import minimegaAPI
+
+
+def vm_log(args):
+    """
+    Get the log from the specified VM.
+    This is typically in text format, but can also be in JSON format.
+
+    Args:
+        args (argparse.Namespace): The arguments for ``vm log``.
+
+    Raises:
+        RuntimeError: If the provided VM does not exist.
+    """
+    # Get the basic info.
+    mm_api = minimegaAPI()
+    basic_dict = mm_api.mm_vms()
+
+    if args.vm not in basic_dict:
+        raise RuntimeError(
+            f"No VM with name {args.vm} is found. " "Ensure a VM with that name exists."
+        )
+
+    config = Config().get_config()
+    pathname = Path(config["logging"]["root_dir"]) / Path(
+        config["logging"]["vmr_log_dir"]
+    )
+    filename = f"{args.vm}.log"
+    if args.json:
+        filename = f"{args.vm}.json"
+    pathname /= filename
+
+    command = ["ssh", basic_dict[args.vm]["hostname"], f"cat {pathname!s}"]
+    subprocess.run(command, check=True)
+
+
+def main():
+    """
+    Develop the CLI options and call the primary logging functions
+    for `vm log`.
+    """
+    parser = argparse.ArgumentParser(
+        description="Get the log for a given VM", prog="vm log"
+    )
+
+    # VMs
+    parser.add_argument(
+        "-j",
+        "--json",
+        action="store_true",
+        help="Get the JSON log for the given VM.",
+    )
+    parser.add_argument(
+        "vm", help="The name of the VM for which the logs are requested."
+    )
+
+    args = parser.parse_args()
+    vm_log(args)
+
+
+if __name__ == "__main__":
+    main()
+DONE

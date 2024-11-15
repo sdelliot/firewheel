@@ -1,0 +1,19 @@
+AUTHOR
+FIREWHEEL Team
+DONE
+DESCRIPTION
+This Helper troubleshoots various issues that can arise with FIREWHEEL
+deployments. This will execute ALL troubleshooting Helpers to assist in
+identifying potential problems. This Helper is also useful to run after an
+installation is complete.
+
+Example
++++++++
+
+``firewheel tshoot``
+DONE
+RUN Helpers ON control
+tshoot diskspace
+tshoot mtu
+tshoot check_nics
+DONE

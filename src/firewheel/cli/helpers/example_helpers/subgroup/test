@@ -1,0 +1,31 @@
+AUTHOR
+FIREWHEEL Team
+DONE
+DESCRIPTION
+
+Use this file as a template for new Helpers. If you retain the sections
+(and just update the content) then the Helper should execute properly.
+
+Arguments
++++++++++
+N/A
+
+Examples
+++++++++
+
+``firewheel example_helpers subgroup test``
+
+DONE
+RUN Shell ON compute
+#! /bin/bash
+echo "foo"
+DONE
+RUN Shell ON compute
+#! /bin/bash
+echo "bar"
+DONE
+RUN Shell ON control
+#!/bin/bash
+echo "Hello, Subgroup!"
+pwd
+DONE

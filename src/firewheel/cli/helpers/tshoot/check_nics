@@ -1,0 +1,33 @@
+AUTHOR
+FIREWHEEL Team
+DONE
+DESCRIPTION
+
+Check to see if the physical host control bridge is in a sane state. This includes
+ensuring that the control bridge is up (but doesn't necessarily have an IP address).
+
+Example
++++++++
+
+``firewheel tshoot network check_nics``
+
+DONE
+RUN Shell ON compute
+#!/bin/bash
+
+CONTROL_BRIDGE="$("$FIREWHEEL_PYTHON" "$FIREWHEEL" config get minimega.control_bridge)"
+ip addr | grep "scope .* $CONTROL_BRIDGE" &> /dev/null
+ret=$?
+if [ "$ret" -ne 0 ]; then
+    exit 1
+fi
+
+ethtool "$CONTROL_BRIDGE" | grep "Link detected: yes" &2> /dev/null
+ret=$?
+if [ "$ret" -ne 0 ]; then
+    exit 2
+fi
+
+echo "The control bridge exists!"
+
+DONE

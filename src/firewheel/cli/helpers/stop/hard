@@ -1,0 +1,186 @@
+AUTHOR
+FIREWHEEL Team
+DONE
+DESCRIPTION
+Aggressively clean up FIREWHEEL after an experiment. This will:
+ * Destroy all running VMs (regardless of whether FIREWHEEL/minimega created them).
+ * Restart all FIREWHEEL/minimega services
+ * Recreate minimega's mesh
+ * Kill all ``vm_resource_handler`` processes
+ * Set permissions on the ``mm_base`` directory (typically ``/tmp/minimega``)
+ * Remove all logs
+
+It is important to note that this will destroy all virtual machines
+found on the system and likely any networking that is not "standard".
+Only use this if you want to clear the system independent of what
+FIREWHEEL's state thinks it is.
+
+It is almost always better to use :ref:`helper_stop` instead.
+
+Example
++++++++
+
+``firewheel stop hard``
+DONE
+
+
+RUN Helpers ON control
+mm make_bridge
+DONE
+
+RUN Python ON control
+#!/usr/bin/env python
+
+import firewheel.vm_resource_manager.vm_resource_handler
+from firewheel.lib.minimega.api import minimegaAPI
+from firewheel.vm_resource_manager import api
+
+try:
+    api.destroy_all(ignore_grpc_connection_errors=True)
+    mm_api = minimegaAPI(skip_retry=True)
+    vm_resource_handler_path = firewheel.vm_resource_manager.vm_resource_handler.__file__
+    mm_api.ns_kill_processes(vm_resource_handler_path)
+except RuntimeError:
+    print("Minimega socket unavailable, proceeding with manually ending processes.")
+DONE
+
+RUN Shell ON compute
+#!/bin/bash
+
+function wait_for_minimega_shutdown() {
+    MINIMEGA_PID=$1
+    exit_code=0
+    pid_counter=0
+    waittime=60
+    echo "`hostname`: Waiting for minimega to shutdown for a maximum of ${waittime} seconds."
+    # `kill -0` will return exit code 1 if the process no longer exists
+    until [ $exit_code -eq 1 ];
+    do
+        sleep 1
+        ((pid_counter++))
+        if [ $pid_counter -ge $waittime ]; then
+            # Timeout after 1 minute (jump straight to killing the process)
+            echo "Minimega was not killed successfully, but the operation timed out."
+            echo "Killing minimega forcefully..."
+            sudo kill -9 $MM_PID 2> /dev/null
+            break
+        fi
+        sudo kill -0 $MINIMEGA_PID 2>/dev/null
+        exit_code=$?
+    done
+
+    MINIMEGA_PID=$(pgrep minimega 2> /dev/null)
+    exit_code=$?
+    pid_counter=0
+    # `pgrep` will return exit code 1 if the process no longer exists
+    until [ $exit_code -eq 1 ];
+    do
+        sleep 1
+        sudo killall -9 minimega 2>/dev/null
+        ((pid_counter++))
+        if [ $pid_counter -ge $waittime ]; then
+            # Timeout after 1 minute (jump straight to killing the process)
+            echo "Minimega was not killed successfully, but the operation timed out."
+            echo "Killing minimega forcefully..."
+            sudo kill -9 $MM_PID 2> /dev/null
+            break
+        fi
+        sudo kill -0 $MINIMEGA_PID 2>/dev/null
+        exit_code=$?
+    done
+}
+
+
+function aggressively_clean_minimega_directory() {
+    MINIMEGA_BASE=$1
+    pushd $MINIMEGA_BASE &> /dev/null
+    sudo rm -rf 1* 2* 3* 4* 5* 6* 7* 8* 9* 0* namespaces minimega.pid minimega
+    popd &> /dev/null
+    # Wait a second for the removal to complete
+    sleep 1
+}
+
+
+LOG_DIR="$("$FIREWHEEL_PYTHON" "$FIREWHEEL" config get logging.root_dir)"
+MM_BASE="$("$FIREWHEEL_PYTHON" "$FIREWHEEL" config get minimega.base_dir)"
+MM_PID=`cat $MM_BASE/minimega.pid 2> /dev/null`
+
+# Remove any lingering logs
+sudo rm -f "$LOG_DIR"/*.log
+sudo rm -f "$LOG_DIR"/*.mm
+
+# Try to stop and restart minimega (up to 5 times)
+counter=0
+until [ $counter -gt 5 ]
+do
+    sudo systemctl stop minimega
+
+    wait_for_minimega_shutdown $MM_PID
+    aggressively_clean_minimega_directory $MM_BASE
+
+    sudo systemctl restart minimega
+
+    if [ $? -eq 0 ]; then
+        break
+    fi
+    echo "Restarting minimega failed"
+
+    ((counter++))
+    sleep 5
+done
+
+# Sleeping to make sure mm is alive
+sleep 5
+
+counter=0
+until [ $counter -gt 5 ]
+do
+    pgrep minimega &> /dev/null
+    if [ $? -eq 0 ]; then
+        echo "Verified minimega started on $(hostname)!"
+        break
+    fi
+    echo "Trying to start minimega again: Count=$counter"
+    sudo systemctl restart minimega
+    ((counter++))
+    sleep 5
+done
+echo "$(hostname) logs cleaned"
+exit $?
+DONE
+
+RUN Helpers ON compute
+mm clean_bridge
+DONE
+
+RUN Shell ON control
+#!/bin/bash
+LOG_DIR="$("$FIREWHEEL_PYTHON" "$FIREWHEEL" config get logging.root_dir)"
+sudo rm -f "$LOG_DIR"/*.log
+sudo systemctl restart minimega
+MM_INSTALL_DIR="$("$FIREWHEEL_PYTHON" "$FIREWHEEL" config get minimega.install_dir)"
+MM_BASE_DIR="$("$FIREWHEEL_PYTHON" "$FIREWHEEL" config get minimega.base_dir)"
+MINIMEGA_BIN="$MM_INSTALL_DIR/bin/minimega -base=$MM_BASE_DIR"
+$MINIMEGA_BIN -e clear namespace firewheel
+DONE
+
+RUN Helpers ON control
+mm mesh quiet
+DONE
+
+RUN Shell ON compute
+#!/bin/bash
+
+## TODO: This shouldn't need to be done (should be taken care of by minimega)
+MM_BASE="$("$FIREWHEEL_PYTHON" "$FIREWHEEL" config get minimega.base_dir)"
+FW_GROUP="$("$FIREWHEEL_PYTHON" "$FIREWHEEL" config get system.default_group)"
+sudo chown -R :"$FW_GROUP" "$MM_BASE"
+sudo chmod -R g=u "$MM_BASE"
+sudo chmod  g+s  "$MM_BASE" "${MM_BASE}/minimega"
+sudo pkill -f ".*vm_resource_handler.py"
+DONE
+
+
+RUN Helpers ON compute
+mm flush_locks --clear --all
+DONE

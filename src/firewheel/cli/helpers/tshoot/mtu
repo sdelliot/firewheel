@@ -1,0 +1,59 @@
+AUTHOR
+FIREWHEEL Team
+DONE
+DESCRIPTION
+This Helper finds possible problems with MTU sizes. FIREWHEEL and minimega
+strongly recommend that Jumbo Frames are turned on. This feature enables packets
+with large MTUs (such as those needing to use GRE tunnels) to traverse the network.
+Therefore, we use this Helper to verify that Jumbo Frames (9000 MTU) are turned on.
+
+Example
++++++++
+
+``firewheel tshoot network mtu``
+DONE
+RUN Python ON control
+#!/usr/bin/env python
+
+import re
+import sys
+from subprocess import check_output
+
+from firewheel.config import config
+
+
+def check_mtu():
+    """Check the Maximum Transmission Unit (MTU) for the experiment interface.
+
+    This function retrieves and checks the MTU size of the specified experiment
+    interface. It prints the MTU size and warns if jumbo frames are not enabled
+    (i.e., if the MTU size is less than 9000).
+
+    Raises:
+        TypeError: If the MTU cannot be read from the interface due to a :py:exception:`TypeError`.
+        ValueError: If the MTU cannot be read from the interface due to a :py:exception:`ValueError`.
+        IndexError: If the MTU cannot be read from the interface due to an :py:exception:`IndexError`.
+    """
+    exp_interface = config["minimega"]["experiment_interface"]
+    print("Checking MTUs on experiment interface")
+    # Get MTUs
+    mtu = {}
+    cmd = ["ifconfig", exp_interface]
+    out = str(check_output(cmd), sys.getdefaultencoding())
+    for line in out.split("\n"):
+        match = re.search("MTU:[0-9]*", line)
+        if match:
+            try:
+                mtu[exp_interface] = int(match.group(0).split(":")[1])
+            except (TypeError, ValueError, IndexError) as exp:
+                print(f"The MTU could not be read: {exp}")
+                raise
+    for key, value in mtu.items():
+        print(f"MTU size interface {key} is ok")
+        if value < 9000:
+            print(f"WARNING: jumbo frames are not turned on for {key}.")
+
+
+if __name__ == "__main__":
+    check_mtu()
+DONE

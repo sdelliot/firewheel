@@ -1,0 +1,20 @@
+AUTHOR
+FIREWHEEL Team
+DONE
+DESCRIPTION
+Executes all of the Helpers in the test folder including:
+ * ``test unit``
+ * ``test functional minimal``
+
+This Helper is extremely valuable to test if a FIREWHEEL install is successful.
+
+Example
++++++++
+
+``firewheel test``
+
+DONE
+RUN Helpers ON control
+test unit
+test functional minimal
+DONE

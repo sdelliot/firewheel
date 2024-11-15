@@ -1,0 +1,9 @@
+from firewheel.control.experiment_graph import AbstractPlugin, Vertex
+
+class {{class_name}}(AbstractPlugin):
+    """{{mc_name}} plugin documentation."""
+
+    def run(self):
+        """Run method documentation."""
+        # TODO: Implement plugin actions here
+        pass

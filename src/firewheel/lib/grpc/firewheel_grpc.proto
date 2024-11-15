@@ -1,0 +1,183 @@
+syntax = "proto3";
+
+option java_multiple_files = true;
+option java_package = "firewheel_grpc";
+option java_outer_classname = "FirewheelProto";
+option objc_class_prefix = "fw";
+import "google/protobuf/timestamp.proto";
+
+package firewheel_grpc;
+
+
+service Firewheel {
+  // Set a repository.
+  rpc SetRepository(Repository) returns (SetRepositoryResponse) {}
+  // Remove a repository.
+  rpc RemoveRepository(Repository) returns (RemoveRepositoryResponse) {}
+  // List all repositories.
+  rpc ListRepositories(ListRepositoriesRequest) returns (stream Repository) {}
+  // Remove all repositories.
+  rpc RemoveAllRepositories(RemoveAllRepositoriesRequest) returns (RemoveAllRepositoriesResponse) {}
+
+  // Gets the gRPC server info.
+  rpc GetInfo(GetInfoRequest) returns (GetInfoResponse) {}
+
+  // Gets the vm_mapping associated with the given uuid.
+  rpc GetVMMappingByUUID(VMMappingUUID) returns (VMMapping) {}
+  // Destroys the vm_mapping associated with the given uuid.
+  rpc DestroyVMMappingByUUID(VMMappingUUID) returns (DestroyVMMappingResponse) {}
+  // Sets the time for the vm_mapping associated with the given uuid.
+  rpc SetVMTimeByUUID(SetVMTimeByUUIDRequest) returns (VMMapping) {}
+  // Sets the state for the vm_mapping associated with the given uuid.
+  rpc SetVMStateByUUID(SetVMStateByUUIDRequest) returns (VMMapping) {}
+  // Sets the given vm_mapping.
+  rpc SetVMMapping(VMMapping) returns (VMMapping) {}
+  // Iterates through all requested vm_mappings.
+  rpc ListVMMappings(ListVMMappingsRequest) returns (stream VMMapping) {}
+  // Returns the count of VMs that are not ready.
+  rpc CountVMMappingsNotReady(CountVMMappingsNotReadyRequest) returns (CountVMMappingsNotReadyResponse) {}
+  // Destroys all vm_mappings.
+  rpc DestroyAllVMMappings(DestroyAllVMMappingsRequest) returns (DestroyAllVMMappingsResponse) {}
+
+  // Gets the experiment start time.
+  rpc GetExperimentStartTime(GetExperimentStartTimeRequest) returns (ExperimentStartTime) {}
+  // Sets the experiment start time.
+  rpc SetExperimentStartTime(ExperimentStartTime) returns (ExperimentStartTime) {}
+  // Gets the experiment launch time.
+  rpc GetExperimentLaunchTime(GetExperimentLaunchTimeRequest) returns (ExperimentLaunchTime) {}
+  // Sets the experiment start time.
+  rpc SetExperimentLaunchTime(ExperimentLaunchTime) returns (ExperimentLaunchTime) {}
+  // Initializes the experiment launch time.
+  rpc InitializeExperimentStartTime(InitializeExperimentStartTimeRequest) returns (InitializeExperimentStartTimeResponse) {}
+
+}
+
+message Repository {
+    string db = 1;
+    string path = 2;
+}
+
+message SetRepositoryResponse {
+}
+
+message RemoveRepositoryResponse {
+    int32 removed_count = 1;
+}
+
+message ListRepositoriesRequest {
+    string db = 1;
+}
+message RemoveAllRepositoriesRequest {
+    string db = 1;
+}
+message RemoveAllRepositoriesResponse {
+    int32 removed_count = 1;
+}
+
+message GetInfoRequest {
+}
+
+message GetInfoResponse {
+    // The grpc server version.
+    string version = 1;
+    // The grpc server uptime.
+    float uptime = 2;
+    // Whether an experiment is running.
+    bool experiment_running = 3;
+}
+message DestroyAllVMMappingsResponse {
+}
+message DestroyVMMappingResponse {
+}
+message GetExperimentLaunchTimeRequest {
+    // The database to use. (e.g. "prod" or "test")
+    string db = 1;
+}
+
+message ExperimentLaunchTime {
+    // The database to use. (e.g. "prod" or "test")
+    string db = 1;
+    // The experiment launch time.
+    google.protobuf.Timestamp launch_time = 2;
+}
+
+message GetExperimentStartTimeRequest {
+    // The database to use. (e.g. "prod" or "test")
+    string db = 1;
+}
+
+message ExperimentStartTime {
+    // The database to use. (e.g. "prod" or "test")
+    string db = 1;
+    // The experiment start time.
+    google.protobuf.Timestamp start_time = 2;
+}
+
+message InitializeExperimentStartTimeRequest {
+    // The database to use. (e.g. "prod" or "test")
+    string db = 1;
+}
+
+message InitializeExperimentStartTimeResponse {
+}
+
+message VMMapping {
+    // The database to use. (e.g. "prod" or "test")
+    string db = 1;
+    // The uuid of the VM
+    string server_uuid = 2;
+    // The name of the VM
+    string server_name = 3;
+    // The IP of the VM on the control network.
+    string control_ip = 4;
+    // The state of the VM.
+    string state = 5;
+    // The current time in the VM.
+    string current_time = 6;
+    }
+
+message CountVMMappingsNotReadyResponse {
+    // The database to use. (e.g. "prod" or "test")
+    string db = 1;
+    // The count of not ready VMs
+    uint32 count = 2;
+}
+message CountVMMappingsNotReadyRequest {
+    // The database to use. (e.g. "prod" or "test")
+    string db = 1;
+}
+message ListVMMappingsRequest {
+    // The database to use. (e.g. "prod" or "test")
+    string db = 1;
+    // A json dictionary containing search criteria to match against.
+    string json_match_dict = 2;
+}
+message DestroyAllVMMappingsRequest {
+    // The database to use. (e.g. "prod" or "test")
+    string db = 1;
+}
+
+message VMMappingUUID {
+    // The database to use. (e.g. "prod" or "test")
+    string db = 1;
+    // The uuid of the VM
+    string server_uuid = 2;
+}
+
+message SetVMTimeByUUIDRequest {
+    // The database to use. (e.g. "prod" or "test")
+    string db = 1;
+    // The uuid of the VM
+    string server_uuid = 2;
+    // The time to update the VM with
+    string current_time = 3;
+}
+
+message SetVMStateByUUIDRequest {
+    // The database to use. (e.g. "prod" or "test")
+    string db = 1;
+    // The uuid of the VM
+    string server_uuid = 2;
+    // The state to update the VM with
+    string state = 3;
+}

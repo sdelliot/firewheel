@@ -1,0 +1,120 @@
+AUTHOR
+FIREWHEEL Team
+DONE
+DESCRIPTION
+Uses the compute lists to build tmux for the cluster. To join this tmux session
+use the command: ``tmux -S /tmp/cluster attach``.
+
+Example
++++++++
+
+``firewheel tmux cluster``
+
+``tmux -S /tmp/cluster attach``
+
+DONE
+RUN Python ON control
+#!/usr/bin/env python
+
+import os
+from subprocess import call
+
+from firewheel.config import config
+
+
+def setup_cluster_tmux():
+    """Set up a tmux session for managing compute servers in a cluster.
+
+    This function creates a new tmux session named 'control' and sets up
+    a window named 'compute'. It splits the window into panes for each
+    compute server specified in the configuration and establishes SSH
+    connections to each server. The panes are synchronized for simultaneous
+    command execution.
+    """
+
+    compute_servers = config["cluster"]["compute"]
+
+    # Set variables
+    socket = "/tmp/cluster"  # noqa: S108
+    session = "control"
+    window = "compute"
+
+    # Clean up previous sessions
+    if os.path.exists(socket):
+        os.remove(socket)
+
+    call(["/usr/bin/tmux", "-S", socket, "new-session", "-d", "-s", session])
+
+    call(["/usr/bin/tmux", "-S", socket, "rename-window", "-t", f"{session}:0", window])
+
+    for node in compute_servers:
+        call(
+            [
+                "/usr/bin/tmux",
+                "-S",
+                socket,
+                "split-window",
+                "-t",
+                f"{session}:{window}",
+                "-h",
+            ]
+        )
+        call(
+            [
+                "/usr/bin/tmux",
+                "-S",
+                socket,
+                "send-keys",
+                "-t",
+                f"{session}:{window}",
+                f"ssh {node}\n",
+            ]
+        )
+        call(
+            [
+                "/usr/bin/tmux",
+                "-S",
+                socket,
+                "select-layout",
+                "-t",
+                f"{session}:{window}",
+                "tiled",
+            ]
+        )
+
+    call(["/usr/bin/tmux", "-S", socket, "kill-pane", "-t", f"{session}:{window}.0"])
+
+    call(["/usr/bin/tmux", "-S", socket, "select-pane", "-t", f"{session}:{window}.0"])
+
+    call(
+        [
+            "/usr/bin/tmux",
+            "-S",
+            socket,
+            "select-layout",
+            "-t",
+            f"{session}:{window}",
+            "tiled",
+        ]
+    )
+
+    call(
+        [
+            "/usr/bin/tmux",
+            "-S",
+            socket,
+            "set-window-option",
+            "-t",
+            f"{session}:{window}",
+            "synchronize-panes",
+            "on",
+        ]
+    )
+
+
+if __name__ == "__main__":
+    setup_cluster_tmux()
+    print(
+        "Tmux session created. To join it use the command: tmux -S /tmp/cluster attach"
+    )
+DONE

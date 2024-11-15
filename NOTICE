@@ -1,0 +1,5 @@
+(notice)=
+**IMPORTANT NOTICE**: At installation, the FIREWHEEL accesses and installs certain open-source packages that are not part of the FIREWHEEL package as distributed.
+"Chardet," "ClusterShell," and "pyenchant" are governed by the GNU Lesser General Public License (LGPL) and "qemu.qmp" is governed by the GNU General Public License (GPL).
+By installing FIREWHEEL, you are accepting these licenses for these packages.
+We strongly advise consulting with a legal expert or attorney prior to any redistribution or modification of the FIREWHEEL software to ensure compliance with the applicable licensing terms.

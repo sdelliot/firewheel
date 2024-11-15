@@ -1,0 +1,103 @@
+AUTHOR
+FIREWHEEL Team
+DONE
+DESCRIPTION
+Run functional (i.e. end-to-end) test cases based on the input suite (`minimal`, `basic`, `windows`, or `all`). It is
+important to note that ``suite=all`` does *NOT* include windows test cases. In order
+to run ``suite=windows`` users must have the `windows` model component repository installed and all
+images downloaded.
+
+**Usage:** ``firewheel test functional [-h] [suite]``
+
+Arguments
++++++++++
+
+All arguments are optional.
+
+Positional Arguments
+^^^^^^^^^^^^^^^^^^^^
+.. option:: <suite>
+
+    :default: basic
+
+    Which test suite should be run. This is one of (``all``, ``minimal``, ``windows``, ``basic``).
+
+Named Arguments
+^^^^^^^^^^^^^^^
+
+.. option:: -h, --help
+
+    Show help message and exit.
+
+Example
++++++++
+
+``firewheel test functional``
+
+``firewheel test functional all``
+
+DONE
+RUN LocalPython ON control
+#!/usr/bin/env python
+import sys
+import argparse
+
+from firewheel.tests.functional.run_functional_tests import EndToEndTests
+
+
+class Testing:
+    """
+    The class which executes running the end-to-end tests.
+    """
+
+    def __init__(self, test_suite=None):
+        """
+        The constructor which initializes and runs the tests.
+
+        Args:
+            test_suite (str): Which tests should be run. One of (all, windows, basic, minimal).
+        """
+
+        if test_suite == "all":
+            test_obj = EndToEndTests()
+        elif test_suite == "windows":
+            test_obj = EndToEndTests(only_windows=True)
+        elif test_suite == "basic":
+            test_obj = EndToEndTests(only_basic=True)
+        elif test_suite == "minimal":
+            test_obj = EndToEndTests(minimal=True)
+        else:
+            print('Must provide a valid test suite. Defaulting to "basic".')
+            test_obj = EndToEndTests(only_basic=True)
+
+        result = test_obj.run_tests()
+
+        sys.exit(not result.wasSuccessful())
+
+
+def parse_command_line():
+    """Parse command-line arguments for the FIREWHEEL functional test suite.
+
+    This function sets up the argument parser for the FIREWHEEL program,
+    allowing users to specify which test suite to run. It provides a
+    default value and restricts the choices to predefined options.
+
+    Returns:
+        argparse.Namespace: The parsed command-line arguments, including
+            the selected test suite.
+    """
+    parser = argparse.ArgumentParser(prog="firewheel test functional")
+    parser.add_argument(
+        "suite",
+        default="basic",
+        nargs="?",
+        choices=("minimal", "basic", "all", "windows"),
+        help="Which test suite to run. Defaults to `basic`.",
+    )
+    return parser.parse_args()
+
+
+if __name__ == "__main__":
+    args = parse_command_line()
+    testing = Testing(test_suite=args.suite)
+DONE

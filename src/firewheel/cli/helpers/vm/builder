@@ -1,0 +1,122 @@
+AUTHOR
+FIREWHEEL Team
+DONE
+DESCRIPTION
+This Helper enables users to launch/modify a single VM based on a passed in image file using minimega.
+It is largely useful for preparing images for use with FIREWHEEL and as a testing ground for developing VM resources using the exact OS.
+
+This helper relies on `libvirt <https://libvirt.org/>`__ to provide automated networking to VMs, therefore, this is installed if it is not already.
+
+.. warning::
+
+    Currently, the automated installation of `libvirt <https://libvirt.org/>`__ only works on Debian-based systems (e.g. Ubuntu).
+
+If users would like to use `libvirt <https://libvirt.org/>`__ networking, via the ``-n`` flag, than that interface is automatically bridged to the host system.
+Within the VM, users will likely have to run ``sudo dhclient`` to ensure that their interfaces receive an IP address.
+However, after this point, the VM should have network access.
+
+.. note::
+
+    Users with corporate security features (e.g. proxies, firewalls, etc.) may need to manually configure the VM services to access the network.
+
+
+Ultimately, it calls :mod:`firewheel.control.utils.vm_builder` and if desired, users can call that script manually.
+
+**Usage:** ``firewheel vm builder [-h] (--modify | --launch) [-n] [-m MEMORY] [-c VCPUS] [-d CDROM] image``
+
+Arguments
++++++++++
+
+Users must provide a KVM-compatible image file and either ``--modify`` or ``--launch``.
+
+Positional Arguments
+^^^^^^^^^^^^^^^^^^^^
+
+.. option:: image
+
+    VM image file to work with. Must be KVM-compatible.
+
+Named Arguments
+^^^^^^^^^^^^^^^
+
+.. option:: -h, --help
+
+    Show a help message and exit.
+
+.. option:: --modify
+
+    Launch a VM image and save the changes.
+
+.. option:: --launch
+
+    Launch a VM image, discarding the changes on shutdown.
+
+.. option:: -n, --network
+
+    Include a network interface when launching the VM.
+
+.. option:: -m, --memory
+
+    :default: 2048
+
+    Memory allotted to the VM [MB].
+
+.. option:: -c, --vcpus
+
+    :default: 1
+
+    Number of VCPUs allotted to the VM.
+
+.. option:: -d, --cdrom
+
+    Include a CD-ROM ISO image when launching a VM. May be specified multiple times.
+
+Example
++++++++
+
+.. code-block:: bash
+
+    # Modify an image and provide 4096MB of memory
+    firewheel vm builder --modify -n -m 4096 /path/to/image.qcow2``
+
+.. code-block:: bash
+
+    # Launch (i.e. don't persist changes) an image with more VCPUs
+    firewheel vm builder --launch -n -c 4 /path/to/image.qcow2``
+
+.. code-block:: bash
+
+    # Modify an image and pass in a CD
+    firewheel vm builder --modify -n --cdrom /path/to/cd.iso /path/to/image.qcow2``
+
+DONE
+RUN Shell ON control
+#!/bin/bash
+
+# Install the dependencies and start the Libvirt default network
+code=$(lsb_release -c -s)
+if [[ ${code} = "xenial" || ${code} = "bionic" ]]; then
+    if  ! dpkg -l | grep -qw libvirt-bin; then
+        sudo apt-get update
+        sudo apt-get install -y libvirt-bin bridge-utils uml-utilities
+    fi
+else
+    if  ! dpkg -l | grep -qw libvirt-clients; then
+        sudo apt-get update
+        sudo apt-get install -y libvirt-daemon-system libvirt-clients bridge-utils uml-utilities
+    fi
+fi
+
+if ! brctl show | grep -qw virbr0; then
+    sudo virsh net-start default
+fi
+
+DONE
+RUN LocalPython ON control
+#!/usr/bin/env python
+
+from firewheel.control.utils.vm_builder import main
+
+if __name__ == "__main__":
+    main()
+DONE

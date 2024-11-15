@@ -1,0 +1,48 @@
+AUTHOR
+FIREWHEEL Team
+DONE
+DESCRIPTION
+This informs a user if the testbed is available for use or occupied by
+an existing experiment.
+
+Example
++++++++
+
+``firewheel status``
+
+DONE
+RUN Python ON control
+#!/usr/bin/env python
+
+import firewheel.vm_resource_manager.api as vrm_api
+from firewheel.lib.minimega.api import minimegaAPI
+
+
+def main():
+    """Check the status of the FIREWHEEL experiment and Minimega VMs.
+
+    This function initializes the Minimega API and checks if there is an
+    ongoing FIREWHEEL experiment or if any VMs are currently running in
+    Minimega. It prints appropriate messages based on the status of the
+    experiment and VMs.
+    """
+    mm_api = minimegaAPI()
+    if vrm_api.get_experiment_launch_time() is not None:
+        msg = (
+            "There is already a FIREWHEEL experiment running. To reset"
+            " the testbed use the command: 'firewheel restart'."
+        )
+        print(msg)
+    elif mm_api.mm_vms():
+        msg = (
+            "There are already VMs running in minimega. To reset"
+            " the testbed use the command: 'firewheel restart'."
+        )
+        print(msg)
+    else:
+        print("The testbed is ready to use!")
+
+
+if __name__ == "__main__":
+    main()
+DONE

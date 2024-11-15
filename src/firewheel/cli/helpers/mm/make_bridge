@@ -1,0 +1,96 @@
+AUTHOR
+FIREWHEEL Team
+DONE
+DESCRIPTION
+
+If the experiment interface is the loopback interface (single node installation),
+the cluster is configured to use GRE tunnels, or the `mega_bridge` interface
+already exists, this Helper does nothing.
+
+Otherwise, the following steps occur:
+
+1. An Open vSwitch bridge is created for the `mega_bridge`
+2. A port is added between the `mega_bridge` and the experiment interface
+3. The experiment interface has its IP flushed.
+4. The previous experiment interface IP address is added to the `mega_bridge`.
+
+DONE
+RUN Shell ON compute
+#!/bin/bash
+
+function ovs_status() {
+
+    # Check to see if the kernel modules are loaded
+    /sbin/lsmod | grep -q openvswitch
+    ret=$?
+    if [ ! $ret -eq 0 ]; then
+        echo "Open vSwitch is not running. Attempting to start it."
+        sudo systemctl restart openvswitch-switch
+    fi
+
+    # Check to
+    sudo ovs-vsctl show > /dev/null 2>&1
+    ret=$?
+    if [ ! $ret -eq 0 ]; then
+        echo "Open vSwitch is not running. Attempting to start it."
+        sudo systemctl restart openvswitch-switch
+    fi
+}
+
+NIC="$("$FIREWHEEL_PYTHON" "$FIREWHEEL" config get minimega.experiment_interface)"
+# If experiment NIC is "lo" (single node installation), we don't make a bridge
+if [ "$NIC" = "lo" ]; then
+    exit 0
+fi
+
+# If the cluster is configured to use GRE tunnels, this Helper does nothing.
+# The GRE bridge will be created during the `start` Helper.
+USE_GRE="$("$FIREWHEEL_PYTHON" "$FIREWHEEL" config get minimega.use_gre)"
+# We will be getting back a string of Python's truth values, True or False.
+if [ "$USE_GRE" = "True" ]; then
+    exit 0
+fi
+
+CONTROL_BRIDGE="$("$FIREWHEEL_PYTHON" "$FIREWHEEL" config get minimega.control_bridge)"
+ip -o -4 addr show up "$CONTROL_BRIDGE" | grep -q "inet"
+bridge_exists=$?
+if [ $bridge_exists -eq 0 ]; then
+    exit 0
+else
+    ovs_status
+    # Check if default route uses the experiment interface.
+    # If it does, we will need to save the default gateway so that
+    # we can reset it to use the newly created bridge.
+    default_route=$(route | grep default)
+    echo "$default_route" | grep -q "$NIC"
+    reset_default_gateway=$?
+    if [ $reset_default_gateway -eq 0 ]; then
+        default_gateway=$(echo "$default_route" | awk '{print $2}')
+    fi
+
+    IP_AD=$(ip -o -4 addr show "$NIC" | awk '{print $4}')
+    sudo ovs-vsctl del-br "$CONTROL_BRIDGE"
+    sudo ovs-vsctl add-br "$CONTROL_BRIDGE"
+    sudo ovs-vsctl add-port "$CONTROL_BRIDGE" "$NIC"
+    sudo ip addr flush dev "$NIC"
+    sudo ip addr add "$IP_AD" dev "$CONTROL_BRIDGE"
+    sudo ip link set "$CONTROL_BRIDGE" up
+
+    if [ $reset_default_gateway -eq 0 ]; then
+        echo "Resetting default route."
+        # Delete the current default route if one exists.
+        route | grep default
+        default_route_check=$?
+        if [ $default_route_check -eq 0 ]; then
+            echo "Deleting current default route."
+            sudo route delete default
+        fi
+        echo "Resetting default route to use gw=$default_gateway and interface $CONTROL_BRIDGE."
+        sudo route add default gw "$default_gateway" "$CONTROL_BRIDGE"
+    else
+        echo "Not resetting the default route."
+    fi
+
+    sudo systemctl restart minimega
+fi
+DONE

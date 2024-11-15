@@ -1,0 +1,29 @@
+AUTHOR
+FIREWHEEL Team
+DONE
+DESCRIPTION
+
+List the image and vm_resource cache directories which are found in the
+:class:`FileStore <firewheel.lib.minimega.file_store.FileStore>`. This enables
+users to identify if a file was correctly cached.
+
+Examples
+++++++++
+
+``firewheel mm show_caches``
+
+DONE
+RUN Shell ON control
+#!/bin/bash
+MM_INSTALL_DIR="$("$FIREWHEEL_PYTHON" "$FIREWHEEL" config get minimega.install_dir)"
+MM_BASE_DIR="$("$FIREWHEEL_PYTHON" "$FIREWHEEL" config get minimega.base_dir)"
+MINIMEGA_BIN="$MM_INSTALL_DIR/bin/minimega -base=$MM_BASE_DIR"
+
+HOST=$(hostname)
+echo "Cache contents from $HOST:vm_resources"
+$MINIMEGA_BIN -e file list vm_resources
+echo
+echo "Cache contents from $HOST:images"
+$MINIMEGA_BIN -e file list images
+echo
+DONE

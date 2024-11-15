@@ -1,0 +1,25 @@
+AUTHOR
+FIREWHEEL Team
+DONE
+DESCRIPTION
+Run all available unit test cases using :py:mod:`pytest`. Any extra arguments
+given to the helper will be passed to the :py:mod:`pytest` runner.
+
+Example
++++++++
+
+``firewheel test unit``
+
+DONE
+RUN LocalPython ON control
+#!/usr/bin/env python
+import sys
+
+import pytest
+
+from firewheel import FIREWHEEL_PACKAGE_DIR
+
+if __name__ == "__main__":
+    test_dir = FIREWHEEL_PACKAGE_DIR / "tests" / "unit"
+    pytest.main([str(test_dir), *sys.argv[1:]])
+DONE

@@ -1,0 +1,41 @@
+AUTHOR
+FIREWHEEL Team
+DONE
+DESCRIPTION
+This will request all FIREWHEEL services to stop and kill all
+``vm_resource_handler`` processes.
+
+This will not aggressively tear down everything. Use ``firewheel stop hard``
+for that.
+
+Example
++++++++
+
+``firewheel stop``
+DONE
+
+RUN Python ON control
+#!/usr/bin/env python
+
+import firewheel.vm_resource_manager.vm_resource_handler
+from firewheel.lib.minimega.api import minimegaAPI
+from firewheel.vm_resource_manager import api
+
+api.destroy_all(ignore_grpc_connection_errors=True)
+mm_api = minimegaAPI()
+vm_resource_handler_path = firewheel.vm_resource_manager.vm_resource_handler.__file__
+mm_api.ns_kill_processes(vm_resource_handler_path)
+DONE
+
+RUN Shell ON control
+#!/bin/bash
+
+MM_INSTALL_DIR="$("$FIREWHEEL_PYTHON" "$FIREWHEEL" config get minimega.install_dir)"
+MM_BASE_DIR="$("$FIREWHEEL_PYTHON" "$FIREWHEEL" config get minimega.base_dir)"
+MINIMEGA_BIN="$MM_INSTALL_DIR/bin/minimega -base=$MM_BASE_DIR"
+$MINIMEGA_BIN -e clear namespace firewheel
+DONE
+
+RUN Helpers ON compute
+mm flush_locks --clear --all
+DONE

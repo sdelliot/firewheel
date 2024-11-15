@@ -1,0 +1,18 @@
+AUTHOR
+FIREWHEEL Team
+DONE
+DESCRIPTION
+Executes all of the Helpers in the test folder including:
+ * ``test unit``
+ * ``test functional all``
+
+Example
++++++++
+
+``firewheel test all``
+
+DONE
+RUN Helpers ON control
+test unit
+test functional all
+DONE

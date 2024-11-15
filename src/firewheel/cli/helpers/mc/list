@@ -1,0 +1,356 @@
+AUTHOR
+FIREWHEEL Team
+DONE
+DESCRIPTION
+
+List information about the currently installed model components.
+Model components can be grouped by repository (default), or any of the ``provides``, ``depends``, ``precedes``, ``model_component_depends``, ``model_component_precedes``.
+fields in the model component's manifest.
+Filters can be used to reduce the MCs that are shown. Filters are independent and
+are greedily matching. If multiple filters are used then anything that matches **all**
+filters will be displayed. Filters will attempt substring matching so ensure that
+you provide enough of a substring to the filter to narrow down the displayed results.
+
+Arguments
++++++++++
+
+All arguments are optional.
+
+Named Arguments
+^^^^^^^^^^^^^^^
+
+.. option:: -h, --help
+
+    Show a help message and exit.
+
+.. option:: --paths, -p
+
+    Print additional paths information.
+
+.. option:: -g <group>, --group <group>
+
+    :default: ``repository``
+
+    Group model components by one of: ``repository``, ``provides``, ``depends``, ``model_component_depends``.
+
+.. option:: -m
+
+    Print without color, i.e. monochromatic.
+
+.. option:: -k <FIELDS [FIELDS ...]>
+
+    Space separated list of additional MANIFEST fields to display for each found MC, in the form field[=filter] where filter is an optional substring of the results being filtered on.
+    Example fields are in the following table, but any manifest fields should be valid.
+
+    .. tabularcolumns:: |\Y{.32}|\Y{.68}|
+
+    ============================   ==================================================================================================================================
+    Filter fields                  Description
+    ============================   ==================================================================================================================================
+    ``name``                       The name of the MC.
+    ``provides``                   The attributes provided by the MC.
+    ``depends``                    The attributes depended on by the MC.
+    ``precedes``                   The attributes preceded by the MC.
+    ``attributes``                 The dictionary of both provides and depends. Filters provided return true if found in either provides or depends.
+    ``model_component_depends``    The model components depended on by the MC.
+    ``model_component_precedes``   The model components preceded by the MC.
+    ``model_component_objects``    The model_component_objects provided by the MC.
+    ``vm_resources``               The VM Resources proved by the MC. This will not auto-expand any wildcards (e.g. ``vm_resources/**``).
+    ============================   ==================================================================================================================================
+
+
+Examples
+++++++++
+
+``firewheel mc list -p``
+
+``firewheel mc list -p -m -k provides=topology``
+
+``firewheel mc list -p -g provides -k name=ubuntu``
+
+``firewheel mc list -k vm_resources``
+
+
+
+DONE
+RUN LocalPython ON control
+#!/usr/bin/env python
+
+import sys
+import argparse
+from collections import OrderedDict
+
+import colorama
+
+from firewheel.control.repository_db import RepositoryDb
+from firewheel.control.model_component_iterator import ModelComponentIterator
+
+
+def check_field_filter(field_filter, elem):
+    """Check if an element matches the specified field filter.
+
+    This function evaluates whether the given element meets the criteria
+    defined in the field filter. It checks both top-level keys and nested
+    attributes within the element.
+
+    Args:
+        field_filter (dict): A dictionary containing the filter criteria
+            for the fields.
+        elem (dict): The element to be checked against the filter.
+
+    Returns:
+        bool: True if the element matches the filter criteria, False otherwise.
+    """
+    for k, v in elem.items():
+        if k == "attributes":
+            if field_filter[k] and field_filter[k] not in str(v):
+                return False
+            for k2, v2 in v.items():
+                if (filter_k2 := field_filter.get(k2)) and filter_k2 not in "".join(v2):
+                    return False
+        elif k in field_filter and field_filter[k] and field_filter[k] not in v:
+            return False
+    return True
+
+
+def group_by_key(group_key, paths=False, field_filter=None, fields=None):
+    """Group model components by a specified key.
+
+    This function iterates through a list of repositories and groups model
+    components based on the specified grouping key. It applies a field filter
+    to determine which elements to include in the grouping.
+
+    Args:
+        group_key (str): The key by which to group the model components.
+            Possible values include "repository", "depends", "provides",
+            "precedes", "model_component_depends", and "model_component_precedes".
+        paths (bool, optional): If :py:data:`True`, include paths in the output.
+            Defaults to :py:data:`False`.
+        field_filter (dict, optional): A dictionary of field filters to apply
+            to the elements. Defaults to :py:data:`None`.
+        fields (list, optional): A list of fields to include in the output.
+            Defaults to :py:data:`None`.
+    """
+    group_key_dict = {}
+    max_elem_name_len = 0
+    for repo in repo_list:
+        model_component_iter = ModelComponentIterator(iter([repo]))
+        for mc_src in model_component_iter:
+            elems = []
+            if group_key == "repository":
+                group_val = repo
+                elem = {
+                    "repository": repo["path"],
+                    "name": mc_src.name,
+                    "path": mc_src.path,
+                }
+                if fields:
+                    for field in fields:
+                        if field in mc_src.manifest:
+                            elem[field] = mc_src.manifest[field]
+                if not check_field_filter(field_filter, elem):
+                    continue
+                elems.append(elem)
+
+            elif group_key in {
+                "depends",
+                "provides",
+                "precedes",
+                "model_component_depends",
+                "model_component_precedes",
+            }:
+                if group_key in {"depends", "provides", "precedes"}:
+                    attribute_index = ["depends", "provides", "precedes"].index(
+                        group_key
+                    )
+                    group_vals = mc_src.get_attributes()[attribute_index]
+                elif group_key == "model_component_precedes":
+                    group_vals = mc_src.get_model_component_precedes()
+                else:
+                    group_vals = mc_src.get_model_component_depends()
+                for group_val in group_vals:
+                    elem = {
+                        group_key: group_val,
+                        "repo": repo["path"],
+                        "name": mc_src.name,
+                        "path": mc_src.path,
+                    }
+                    elems.append(elem)
+            for elem in elems:
+                group_val = elem[group_key]
+
+                if not check_field_filter(field_filter, elem):
+                    continue
+
+                max_elem_name_len = max(max_elem_name_len, len(elem["name"]))
+                if group_val not in group_key_dict:
+                    group_key_dict[group_val] = [elem]
+                else:
+                    group_key_dict[group_val].append(elem)
+    if max_elem_name_len == 0:
+        # No matching elements were found.
+        print("No model components found!")
+        sys.exit(1)
+    else:
+        print_output(group_key, group_key_dict, max_elem_name_len, paths, fields)
+
+
+def print_output(
+    group_key, group_key_dict, max_elem_name_len, paths=False, fields=None,
+):
+    """Print the grouped output of model components.
+
+    This function formats and prints the grouped model components based on
+    the specified grouping key and selected fields. It handles both
+    repository and other grouping keys, providing options for including
+    paths in the output.
+
+    Args:
+        group_key (str): The key by which the model components are grouped.
+        group_key_dict (dict): A dictionary containing the grouped model components.
+        max_elem_name_len (int): The maximum length of element names for formatting purposes.
+        paths (bool, optional): If :py:data:`True`, include paths in the output.
+            Defaults to :py:data:`False`.
+        fields (list, optional): A list of fields to include in the output.
+            Defaults to :py:data:`None`.
+    """
+    if group_key == "repository":
+        print_keys = [i for i in fields if i not in {"repository", "name"}]
+    else:
+        print_keys = [i for i in fields if i not in {group_key}]
+    if paths and "path" in print_keys:
+        print_keys.remove("path")
+    for group_val in sorted(group_key_dict):
+        style_index = 0
+        print(f"{BRIGHT}{YELLOW}{group_key} : {group_val}{RESET_ALL}")
+        for elem in group_key_dict[group_val]:
+            style_index = (style_index + 1) % len(colors)
+            if print_keys and group_key == "repository":
+                print(f"  {LIGHTBLUE_EX + BRIGHT}{elem['name']}")
+                print(RESET_ALL, end="")
+                if paths:
+                    print(f"    'path' : {elem['path']}")
+
+                for print_key in print_keys:
+                    if print_key in elem:
+                        if print_key == "attributes":
+                            print("    attributes:")
+                            attributes = elem[print_key]
+                            for k, v in attributes.items():
+                                print(f"      {k} : {v}")
+                        else:
+                            print(f"    {print_key} : {elem[print_key]}")
+            else:
+                print(RESET_ALL, end="")
+                if style_index % 2 == 0:
+                    print(LIGHTBLUE_EX + BRIGHT, end="")
+                if paths:
+                    # Left aligning the element name with some padding
+                    print(f"  {elem['name']:<{10 + max_elem_name_len}}\t{elem['path']}")
+                else:
+                    print(f"  {elem['name']:<{10 + max_elem_name_len}}")
+        print(RESET_ALL, end="")
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description="Enumerate all installed model components!",
+        prog="firewheel mc list",
+    )
+    parser.add_argument(
+        "--paths",
+        "-p",
+        required=False,
+        action="store_true",
+        dest="paths",
+        help="Print additional paths information.",
+        default=False,
+    )
+    parser.add_argument(
+        "-g",
+        "--group",
+        required=False,
+        choices={
+            "repository",
+            "provides",
+            "depends",
+            "precedes",
+            "model_component_depends",
+            "model_component_precedes",
+        },
+        dest="group",
+        help="Group model_components by.",
+        default="repository",
+    )
+    parser.add_argument(
+        "-k",
+        nargs="*",
+        required=False,
+        dest="fields",
+        help=(
+            "Space separated list of additional manifest fields to include. "
+            "Fields can be filtered by providing -k key=val e.g. -k provides=topology"
+        ),
+        default=None,
+    )
+
+    parser.add_argument(
+        "-m",
+        required=False,
+        dest="monochromatic",
+        action="store_true",
+        help="Print without color",
+        default=False,
+    )
+
+    repo_db = RepositoryDb()
+    repo_list = list(repo_db.list_repositories())
+    if len(repo_list) == 0:
+        print(
+            (
+                "There are no model component repositories installed!\n"
+                "Install one with `firewheel repository install <path>`."
+            ),
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    TAB = "  "
+    args = parser.parse_args()
+    if not args.monochromatic:
+        RESET_ALL = colorama.Style.RESET_ALL
+        NORMAL = colorama.Style.NORMAL
+        BRIGHT = colorama.Style.BRIGHT
+        YELLOW = colorama.Fore.YELLOW
+        LIGHTBLUE_EX = colorama.Fore.LIGHTBLUE_EX
+        colors = [colorama.Fore.GREEN, colorama.Fore.BLUE]
+        styles = [colorama.Style.BRIGHT, colorama.Style.NORMAL]
+    else:
+        BRIGHT = ""
+        YELLOW = ""
+        RESET_ALL = ""
+        NORMAL = ""
+        LIGHTBLUE_EX = ""
+        colors = ["", ""]
+        styles = ["", ""]
+
+    filters = OrderedDict()
+    if args.fields:
+        for argfield in args.fields:
+            field_vals = argfield.split("=")
+            field_name = field_vals[0]
+            if field_name in {"depends", "provides"}:
+                if "attributes" not in filters:
+                    filters["attributes"] = None
+            if len(field_vals) > 1:
+                filters[field_name] = field_vals[1]
+            elif field_name not in filters:
+                filters[field_name] = None
+    if args.group:
+        group_by_key(
+            args.group,
+            paths=args.paths,
+            field_filter=filters,
+            fields=list(filters.keys()),
+        )
+DONE

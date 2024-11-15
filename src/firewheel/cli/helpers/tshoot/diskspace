@@ -1,0 +1,88 @@
+AUTHOR
+FIREWHEEL Team
+DONE
+DESCRIPTION
+Troubleshoot possible issues with disk space. This Helper will inform
+a user if the disks are too full to run an experiment.
+DONE
+RUN Python ON compute
+#!/usr/bin/env python
+# pylint: disable=invalid-name
+
+import os
+from collections import namedtuple
+
+disk_ntuple = namedtuple("partition", "device mountpoint fstype")
+usage_ntuple = namedtuple("usage", "total used free percent")
+
+
+# This is based on https://gist.github.com/xamox/4711286
+def disk_partitions(all_disks=False):
+    """Return all mounted partitions as a named tuple.
+
+    Args:
+        all_disks (bool): If False return physical partitions only.
+
+    Returns:
+        list: The list of partitions (as a tuple).
+    """
+    phydevs = []
+    with open("/proc/filesystems", "r", encoding="utf8") as fhand:
+        for line in fhand:
+            if not line.startswith("nodev"):
+                phydevs.append(line.strip())
+
+    retlist = []
+    with open("/etc/mtab", "r", encoding="utf8") as fhand:
+        for line in fhand:
+            if not all_disks and line.startswith("none"):
+                continue
+            fields = line.split()
+            device = fields[0]
+            mountpoint = fields[1]
+            fstype = fields[2]
+            if not all_disks and fstype not in phydevs:
+                continue
+            if device == "none":
+                device = ""
+            ntuple = disk_ntuple(device, mountpoint, fstype)
+            retlist.append(ntuple)
+    return retlist
+
+
+def disk_usage(path, partition):
+    """Return disk usage associated with path.
+
+    Args:
+        path (str): The path of the disk.
+        partition (str): The disk partition.
+
+    Returns:
+        bool: True if the disk utilization was normal, False otherwise.
+    """
+    st = os.statvfs(path)
+    free = st.f_bavail * st.f_frsize
+    total = st.f_blocks * st.f_frsize
+    used = (st.f_blocks - st.f_bfree) * st.f_frsize
+    try:
+        percent = (float(used) / total) * 100
+    except ZeroDivisionError:
+        percent = 0
+
+    if round(percent, 1) > 90:
+        print(f"WARNING: Your disk is almost full for {partition}")
+
+        # NB: the percentage is -5% than what shown by df due to
+        # reserved blocks that we are currently not considering:
+        # http://goo.gl/sWGbH
+        print(str(usage_ntuple(total, used, free, round(percent, 1))))
+        return False
+
+    print(f"Disk utilization normal for {partition}")
+    return True
+
+
+if __name__ == "__main__":
+    for part in disk_partitions():
+        disk_usage(part.mountpoint, part)
+DONE

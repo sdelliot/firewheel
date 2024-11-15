@@ -1,0 +1,80 @@
+AUTHOR
+FIREWHEEL Team
+DONE
+DESCRIPTION
+Start the FIREWHEEL services (grpc and discovery) and set up the minimega environment.
+DONE
+
+RUN Shell ON compute
+#!/bin/bash
+
+# TODO This is temporary (maybe?)
+sudo systemctl start minimega
+DONE
+
+RUN Python ON compute
+#!/usr/bin/env python
+import os
+
+from firewheel.config import config
+
+vm_resource_logs = os.path.join(
+    config["logging"]["root_dir"], config["logging"]["vmr_log_dir"]
+)
+
+# Ensure that this directory exists and is owned by the correct user
+os.makedirs(vm_resource_logs, exist_ok=True)
+DONE
+
+RUN Helpers ON control
+mm mesh quiet
+mm make_bridge
+DONE
+
+
+RUN Shell ON control
+#!/bin/bash
+
+MM_INSTALL_DIR="$("$FIREWHEEL_PYTHON" "$FIREWHEEL" config get minimega.install_dir)"
+MM_BASE_DIR="$("$FIREWHEEL_PYTHON" "$FIREWHEEL" config get minimega.base_dir)"
+MINIMEGA_BIN="$MM_INSTALL_DIR/bin/minimega -base=$MM_BASE_DIR"
+$MINIMEGA_BIN -e clear all
+$MINIMEGA_BIN -e namespace firewheel
+$MINIMEGA_BIN -e ns add-hosts localhost
+$MINIMEGA_BIN -e ns queueing true
+
+CONTROL_BRIDGE="$("$FIREWHEEL_PYTHON" "$FIREWHEEL" config get minimega.control_bridge)"
+USE_GRE="$("$FIREWHEEL_PYTHON" "$FIREWHEEL" config get minimega.use_gre)"
+if [ "$USE_GRE" = "True" ]; then
+    $MINIMEGA_BIN -e ns bridge "$CONTROL_BRIDGE" gre
+fi
+
+if [ -d $MM_INSTALL_DIR/web/web ]; then
+    MINIWEB_ROOT="$MM_INSTALL_DIR/web/web"
+else
+    MINIWEB_ROOT="$MM_INSTALL_DIR/misc/web"
+fi
+
+MINIWEB_BIN="$MM_INSTALL_DIR/bin/miniweb -base=$MM_BASE_DIR -root=$MINIWEB_ROOT"
+if ! /usr/bin/pgrep -f "$MINIWEB_BIN" >/dev/null; then
+    $MINIMEGA_BIN -e "background $MINIWEB_BIN"
+fi
+
+if ! /usr/bin/pgrep -f "$FIREWHEEL_PYTHON $FIREWHEEL_GRPC_SERVER" >/dev/null; then
+    $MINIMEGA_BIN -e "background $FIREWHEEL_PYTHON $FIREWHEEL_GRPC_SERVER"
+fi
+
+DONE
+
+RUN Python ON control
+#!/usr/bin/env python
+import sys
+import errno
+
+from firewheel.lib.discovery.api import discoveryAPI
+
+discovery_api = discoveryAPI()
+if not discovery_api.start_discovery():
+    sys.exit(errno.ECONNREFUSED)
+discovery_api.delete_all()
+DONE

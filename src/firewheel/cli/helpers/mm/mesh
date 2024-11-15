@@ -1,0 +1,72 @@
+AUTHOR
+FIREWHEEL Team
+DONE
+DESCRIPTION
+Attempts to run mesh dial from the head node to all compute nodes.
+This command blocks until the expected degree of the cluster matches
+what is reported by minimega on the head node.
+Takes one optional argument, when equal to `quiet`, limits debug output.
+
+**Usage:**  ``firewheel mm mesh [quiet]``
+
+Arguments
++++++++++
+
+All arguments are optional.
+
+Positional Arguments
+^^^^^^^^^^^^^^^^^^^^
+
+.. option:: quiet
+
+    Do not print debug information.
+
+Example
++++++++
+
+``firewheel mm mesh``
+
+``firewheel mm mesh quiet``
+
+DONE
+
+RUN Shell ON control
+#!/bin/bash
+
+
+MM_INSTALL_DIR="$("$FIREWHEEL_PYTHON" "$FIREWHEEL" config get minimega.install_dir)"
+MM_BASE_DIR="$("$FIREWHEEL_PYTHON" "$FIREWHEEL" config get minimega.base_dir)"
+MINIMEGA_BIN="$MM_INSTALL_DIR/bin/minimega -base=$MM_BASE_DIR"
+
+if [ "$1" = "quiet" ];
+then
+    quiet=true
+else
+    quiet=false
+fi
+
+# Get space separated string of compute nodes
+compute_nodes="$("$FIREWHEEL_PYTHON" "$FIREWHEEL" config get cluster.compute)"
+
+for compute_node in $compute_nodes
+do
+    if $quiet; then
+        $MINIMEGA_BIN -e mesh dial "$compute_node" > /dev/null 2>&1
+    else
+        echo "attempting to dial $compute_node"
+        $MINIMEGA_BIN -e mesh dial "$compute_node"
+    fi
+done
+
+sleep 1
+MM_DEGREE="$("$FIREWHEEL_PYTHON" "$FIREWHEEL" config get minimega.degree)"
+CUR_DEGREE=$($MINIMEGA_BIN -e .annotate false .header false .columns size mesh status)
+while [ "$CUR_DEGREE" != "$MM_DEGREE" ]; do
+    sleep 2
+    CUR_DEGREE=$($MINIMEGA_BIN -e .annotate false .header false .columns size mesh status)
+    echo "Sleeping while waiting for entire minimega mesh to come up."
+    echo "CUR_DEGREE=$CUR_DEGREE; MM_DEGREE=$MM_DEGREE"
+done
+echo "Successfully connected to entire mesh."
+exit $?
+DONE

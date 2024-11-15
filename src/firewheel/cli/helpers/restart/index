@@ -1,0 +1,18 @@
+AUTHOR
+FIREWHEEL Team
+DONE
+DESCRIPTION
+Cleans up all of the virtual machines and virtual networks started by
+FIREWHEEL and ensures it is ready for another run. This is the same
+as running ``firewheel restart experiment``
+
+Example
++++++++
+
+``firewheel restart``
+
+DONE
+
+RUN Helpers ON control
+restart experiment
+DONE

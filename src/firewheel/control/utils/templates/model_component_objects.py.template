@@ -1,0 +1,10 @@
+"""This module contains all necessary Model Component Objects for {{mc_name}}."""
+
+from firewheel.control.experiment_graph import require_class
+
+class MyObject:
+    """MyObject Class documentation."""
+
+    def __init__(self):
+        # TODO: Implement Class constructor here
+        pass

@@ -1,0 +1,24 @@
+AUTHOR
+FIREWHEEL Team
+DONE
+DESCRIPTION
+Show all installed repositories.
+
+Example
++++++++
+
+``firewheel repository list``
+
+DONE
+RUN Python ON control
+#!/usr/bin/env python
+
+from firewheel.control.repository_db import RepositoryDb
+
+repo_db = RepositoryDb()
+repo_list = repo_db.list_repositories()
+
+print("Installed Model Component Repositories:")
+for entry in repo_list:
+    print(f"{entry['path']}")
+DONE

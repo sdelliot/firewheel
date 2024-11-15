@@ -1,0 +1,398 @@
+AUTHOR
+FIREWHEEL Team
+DONE
+DESCRIPTION
+
+Create a FIREWHEEL experiment using a set of model components.
+
+**Usage:**  ``firewheel experiment [-h] [--profile] [--dry-run] [-f] <model_component>[:<name1>=<value1>[:<name2>=<value2>]...] [<model_component2>[:<name1>=<value1>[:<name2>=<value2>]...]]``
+
+All of the experiment Helper's command line arguments, along with any named
+MC parameter value settings, must be included on a single line.
+
+Named parameter value settings are passed into the model component's plugin.
+If no name is provided, these arguments are treated as positional. Plugin
+arguments are separated from both the model component and additional arguments
+by a colon (:). (i.e. ``<mc>:<name1>=<value1>:<name2>=<value2>`` or a combination
+of positional and named arguments ``<mc>:<value1>:<value2>:<named1>=<value3>``).
+**No spaces are allowed.**
+
+The ordering of model components on the command line provides an explicit
+"depends" relationship among them. For example, ``firewheel experiment mc1 mc2``
+implies that *mc2* will run after *mc1*.
+
+For *most* experiments, users will want at least two model components: their
+topology and some method of "doing something" with the topology. This could
+include anything from exporting the topology (with the ``print_graph`` Model
+Component) or realizing the topology into an emulation. The current method to
+launch an experiment is to use the ``minimega.launch`` model component which uses
+`minimega <https://www.sandia.gov/minimega>`_ to instantiate the emulation. **NOTE: This is not required**.
+FIREWHEEL is extensible and enables users to create other experiment instantiation methods.
+
+Arguments
++++++++++
+
+Positional Arguments
+^^^^^^^^^^^^^^^^^^^^
+
+.. option:: <model_component[:<value1>[:<param2>=<value2>]]>
+
+    The model component to use in the experiment. More than one of these may be
+    specified. (required)
+
+    If the given Model Component's Plugin requires a parameter, the value can be passed to the MC by using a colon separated list (e.g. ``<model_component>:[value1]:[value2]``).
+    Keyword parameters can be specified as well, using the traditional keyword format of ``name=value``.
+    If no name is provided, these arguments are treated as positional.
+    No spaces are allowed when providing MC parameters.
+
+    Command-line examples:
+
+    .. code-block:: bash
+
+        $ # Single MC positional argument
+        $ firewheel experiment tests.router_tree:3 minimega.launch
+        $ # Muliple MC named arguments
+        $ firewheel experiment tests.router_tree:3 tests.large_resource:size=1024:location_dir=/tmp:preload=True minimega.launch
+
+
+Named Arguments
+^^^^^^^^^^^^^^^
+
+.. option:: -h, --help
+
+    Print this experiment Helper description then exit. (optional)
+
+.. option:: -f, --force
+
+    Force the experiment to launch even if there is an existing experiment. This essentially clears the testbed by running ``firewheel restart``. (optional)
+
+.. option:: -r, --restart
+
+    Similar to :option:`-f`, but only restarts if an active experiment is detected. If an experiment is detected, runs ``firewheel restart`` before starting the experiment. (optional)
+
+.. option:: --profile
+
+    Output profiling info for experiment graph construction. It creates a ``firewheel_profile.prof`` file in the current working directory. (optional)
+
+.. option:: --dry-run
+
+    Output the ModelComponent sequence that would be evaluated, but don't actually evaluate the components. (optional)
+
+.. option:: -ni, --no-install
+
+    Continue regardless of if Model Components within the experiment have been "installed" (i.e., the ``INSTALL`` file executed). Defaults to None. (optional)
+
+
+Examples
+++++++++
+``firewheel experiment acme.run minimega.launch``
+
+``firewheel experiment tests.vm_gen:3 minimega.launch``
+
+``firewheel experiment tests.vm_gen:size=3 minimega.launch``
+
+``firewheel experiment -r tests.vm_gen:size=3 tests.connect_all tests.ping_all minimega.launch``
+
+DONE
+RUN LocalPython ON control
+#!/usr/bin/env python
+
+import sys
+import errno
+import argparse
+import cProfile
+import traceback
+from datetime import datetime
+
+from rich.align import Align
+from rich.console import Console
+
+import firewheel.vm_resource_manager.api as vrm_api
+from firewheel.cli.utils import RichDefaultTable, cli_output_theme
+from firewheel.lib.minimega.api import minimegaAPI
+from firewheel.cli.firewheel_cli import FirewheelCLI
+from firewheel.control.model_component import ModelComponent
+from firewheel.control.dependency_graph import UnsatisfiableDependenciesError
+from firewheel.control.model_component_manager import ModelComponentManager
+
+
+def get_mc_list(cli_args, install_mcs=None):
+    """
+    Get the list of model components and their arguments from the command line.
+
+    Args:
+        cli_args (list): A list of command line-input model components.
+        install_mcs (bool): A flag indicating whether to install model components automatically.
+            By default, this method will defer to the default defined by the model component
+            object's constructor. If set to :py:data:`False`, model components will not
+            be installed.
+
+    Returns:
+        list: A list of model component objects.
+    """
+    initial_mc_list = []
+    for init_mc in cli_args:
+        sp = init_mc.split(":")
+        init_mc_name = sp[0]
+
+        args = {"plugin": {}}
+        anon_args = []
+        for arg in sp[1:]:
+            arg_sp = arg.split("=")
+            if len(arg_sp) == 2:
+                args["plugin"][arg_sp[0]] = arg_sp[1]
+            elif len(arg_sp) == 1:
+                anon_args.append(arg_sp[0])
+            else:
+                print(f"ERROR: Malformed argument for ModelComponent {init_mc_name}.")
+                sys.exit(errno.EDEADLK)
+        if len(anon_args) > 0:
+            args["plugin"][""] = anon_args
+
+        mc = ModelComponent(name=init_mc_name, arguments=args, install=install_mcs)
+        initial_mc_list.append(mc)
+    return initial_mc_list
+
+
+def create_cli_parser():
+    """
+    Create an :py:class:`argparse.ArgumentParser` for the ``experiment`` Helper.
+
+    Returns:
+        argparse.ArgumentParser: The ``experiment`` Helper parser.
+    """
+    parser = argparse.ArgumentParser(
+        description="Start a FIREWHEEL experiment.",
+        prog="firewheel experiment",
+    )
+    parser.add_argument(
+        "--profile",
+        action="store_true",
+        default=False,
+        required=False,
+        help=(
+            "Output profiling information for experiment graph construction. "
+            "It creates a firewheel_profile.prof file in the current working directory."
+        ),
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        default=False,
+        required=False,
+        help=(
+            "Output the ModelComponent sequence that would be evaluated, "
+            "but don't actually evaluate the components."
+        ),
+    )
+    parser.add_argument(
+        "-f",
+        "--force",
+        action="store_true",
+        default=False,
+        required=False,
+        help=(
+            "Force the experiment to launch even if there is an existing experiment. "
+            "This essentially clears the testbed by running `firewheel restart`."
+        ),
+    )
+    parser.add_argument(
+        "-r",
+        "--restart",
+        action="store_true",
+        default=False,
+        required=False,
+        help=(
+            "Similar to -f or --force, but only restarts if an active experiment is detected. "
+            "If an experiment is detected, runs `firewheel restart` before starting the experiment."
+        ),
+    )
+    parser.add_argument(
+        "-ni",
+        "--no-install",
+        action="store_false",
+        default=None,
+        required=False,
+        help=(
+            "Continue regardless of if Model Components within the experiment have been "
+            "'installed' (i.e., the INSTALL file executed). Defaults to None."
+        ),
+    )
+    parser.add_argument(
+        "model_component",
+        nargs="+",
+        help=(
+            "The model component to use in the experiment. More than one of these may be "
+            "specified. If the given Model Component's Plugin requires a parameter, "
+            "the value can be passed to the MC by using a colon separated list "
+            "(e.g. `<model_component>:[value1]:[value2]`). Keyword parameters can be "
+            "specified as well, using the traditional keyword format of `name=value`. "
+            "If no name is provided, these arguments are treated as positional. "
+            "No spaces are allowed when providing MC parameters."
+        ),
+    )
+
+    return parser
+
+
+def print_output(dependency_time=0.0, total_time=0.0, exp_result=None):
+    """
+    Print the output from this Helper in an easy-to-read format.
+
+    Args:
+        dependency_time (float): The time it took to generate the dependency graph.
+        total_time (float): The total time for this Helper to run.
+        exp_result (list): A list of results from the execution of each MC.
+
+    Returns:
+        int: An exit code indicating how many MC failed, or zero if all succeeded.
+    """
+    console = Console()
+    caption = f"Dependency resolution took [cyan]{dependency_time:.3f}[/ cyan] seconds"
+
+    table = RichDefaultTable(
+        title="Model Components Executed",
+        show_lines=False,
+        show_footer=True,
+        caption=caption,
+    )
+    table.add_column(Align("Model Component Name", "center"))
+    table.add_column(
+        Align("Result", "center"), justify="right", footer="[b magenta]Total Time"
+    )
+    table.add_column(
+        Align("Timing", "center"),
+        justify="right",
+        footer=f"[b cyan]{total_time:.3f}[/] seconds",
+    )
+
+    exit_code = 0
+
+    for res in exp_result:
+        if res["errors"]:
+            exit_code += 1
+            result_str = "[red]FAILED"
+        else:
+            result_str = "[green]OK"
+        table.add_row(
+            f"[yellow]{res['model_component']}",
+            result_str,
+            f"[cyan]{res['time']:.3f}[/] seconds",
+        )
+
+    console.print("\n", table, "\n")
+    return exit_code
+
+
+def run_experiment(mcm, dry_run=False, is_profile=False):
+    """
+    Execute all model components which have been included within the dependency graph.
+
+    Args:
+        mcm (firewheel.control.model_component_manager.ModelComponentManager): The
+            ModelComponentManager used to execute the experiment graph.
+        dry_run (bool): If this is a dry run. Defaults to False.
+        is_profile (bool): If the execution should be profiled. Defaults to False.
+
+    Returns:
+        list: A list of the experimental results.
+    """
+    exp_result = []
+    if dry_run is True:
+        for mc in mcm.get_ordered_model_component_list():
+            exp_result.append(
+                {"model_component": mc.name, "time": 0.0, "errors": False}
+            )
+    else:
+        try:
+            # Check if the experiment should be profiled
+            if is_profile:
+                profile = cProfile.Profile()
+                profile.enable()
+
+            # Build the experiment graph and execute model components
+            # per the dependency graph
+            exp_result = mcm.build_experiment_graph()
+
+            # Stop the profiler (if any)
+            if is_profile:
+                profile.disable()
+                profile.dump_stats("firewheel_profile.prof")
+        except TypeError:
+            exc_type, exc_value, exc_traceback = sys.exc_info()
+            # It turns out the traceback only gives infrastructure functions here,
+            # not any indication of which plugin class was the root of the error.
+            exc_str = "".join(
+                traceback.format_exception(exc_type, exc_value, exc_traceback)
+            )
+            Console(theme=cli_output_theme).print(
+                "\nAborting experiment graph processing!"
+                "\n[error]ERROR:[/error] Invalid arguments to experiment graph plugin."
+            )
+            print(f"\nDetails: {exc_str}")
+            sys.exit(errno.EINVAL)
+    return exp_result
+
+
+def main():
+    """
+    Execute the main logic of this Helper.
+    """
+
+    # Get the start time
+    total_start = datetime.now()
+
+    # Create the argparse parser and get CLI input
+    parser = create_cli_parser()
+    cmd_args = parser.parse_args()
+
+    # Execute various CLI options
+    active_exp_present = False
+    if cmd_args.restart:
+        mm_api = minimegaAPI()
+        if vrm_api.get_experiment_launch_time() is not None or mm_api.mm_vms():
+            active_exp_present = True
+
+    # Should we cleanup running experiments?
+    if cmd_args.force is True or (cmd_args.restart and active_exp_present is True):
+        print("Cleaning up any running experiments.")
+        FirewheelCLI().onecmd("restart")
+        print("All running experiments have been cleared.")
+
+    # Get the MC names passed in via command line
+    initial_mc_list = get_mc_list(cmd_args.model_component, install_mcs=cmd_args.no_install)
+
+    # Build the model component dependency graph
+    ds = datetime.now()
+    mcm = ModelComponentManager()
+    try:
+        mcm.build_dependency_graph(initial_mc_list, install_mcs=cmd_args.no_install)
+    except UnsatisfiableDependenciesError as exp:
+        print(
+            "Unable to build model component dependency graph due to the following "
+            f" error: {exp}\n\nNo Model Components were evaluated and no restart is "
+            "required. "
+        )
+        sys.exit(1)
+
+    # Calculate the time it takes to generate the dependency graph
+    de = datetime.now()
+    dependency_time = (de - ds).total_seconds()
+
+    # Execute the Model Components (i.e. run the experiment)
+    exp_result = run_experiment(mcm, cmd_args.dry_run, cmd_args.profile)
+
+    # Get the total experiment time
+    total_end = datetime.now()
+    total_time = (total_end - total_start).total_seconds()
+
+    # Print output for the user
+    exit_code = print_output(dependency_time, total_time, exp_result)
+
+    # Exit with the provided exit code
+    sys.exit(exit_code)
+
+
+if __name__ == "__main__":
+    main()
+DONE

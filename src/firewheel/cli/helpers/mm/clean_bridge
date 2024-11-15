@@ -1,0 +1,56 @@
+AUTHOR
+FIREWHEEL Team
+DONE
+DESCRIPTION
+
+In the rare case that when minimega is shut down it does not clean up all of its Open vSwitch interfaces, these interfaces should then be removed.
+This Helper will enable a user to manually remove **all** interfaces created by minimega and restore the ``control_bridge`` to the original state (prior the experiment running).
+When run, this Helper identifies the ``control_bridge``, finds all ports which start with the phrase ``mega_tap``, and then removes them via both the ``ovs-vsctl`` and ``ip link`` commands.
+
+.. seealso::
+
+    For more information on the ``control_bridge`` see :ref:`config-minimega`.
+
+.. warning::
+
+    Do not run this Helper while your experiment is running!
+    It will have unintended consequences!
+
+Arguments
++++++++++
+
+This Helper takes no arguments.
+
+Example
++++++++
+
+``firewheel mm clean_bridge``
+
+DONE
+RUN Shell ON compute
+#!/bin/bash
+
+CONTROL_BRIDGE="$("$FIREWHEEL_PYTHON" "$FIREWHEEL" config get minimega.control_bridge)"
+ip -o -4 addr show up "$CONTROL_BRIDGE" | grep -q "inet"
+bridge_exists=$?
+if [ $bridge_exists -eq 1 ]; then
+    echo "The control_bridge=${CONTROL_BRIDGE} does not yet exist."
+    echo "Please run 'firewheel mm make_bridge'!"
+    exit 0
+else
+    # Iterate over all the ports from the control bridge
+    echo "Cleaning up the control_bridge..."
+    sudo systemctl restart openvswitch-switch
+    for port in $(sudo ovs-vsctl list-ports $CONTROL_BRIDGE)
+    do
+        # If the port starts with "mega_tap" it should be removed/deleted
+        if [[ $port = mega_tap* ]]
+        then
+            echo "Removing port=$port"
+            sudo ovs-vsctl del-port $port
+            sudo ip link delete dev $port
+        fi
+    done
+fi
+echo "The control_bridge=$CONTROL_BRIDGE is now clean!"
+DONE

@@ -1,0 +1,57 @@
+.. {{mc_name}} documentation file, created by FIREWHEELs Model Component generation.
+   You can adapt this file completely to your liking.
+
+.. _{{mc_name}}_mc:
+
+{{name_heading}}
+{{mc_name}}
+{{name_heading}}
+
+TODO: Describe {{mc_name}} here
+
+{% if attr_provides is defined %}
+**Attribute Provides:**
+{{attr_provides}}
+{% endif %}
+{% if attr_depends is defined %}
+**Attribute Depends:**
+{{attr_depends}}
+{% endif %}
+{% if attr_precedes is defined %}
+**Attribute Precedes:**
+{{attr_precedes}}
+{% endif %}
+{% if mc_depends is defined %}
+**Model Component Dependencies:**
+{{mc_depends}}
+{% endif %}
+{% if mc_precedes is defined %}
+**Model Component Precedes:**
+{{mc_precedes}}
+{% endif %}
+{% if plugin is defined %}
+******
+Plugin
+******
+
+.. automodule:: {{mc_name}}_plugin
+    :members:
+    :undoc-members:
+    :special-members:
+    :private-members:
+    :show-inheritance:
+    :exclude-members: __dict__,__weakref__,__module__
+{% endif %}
+{% if model_component_objects is defined %}
+*****************
+Available Objects
+*****************
+
+.. automodule:: {{mc_name}}
+    :members:
+    :undoc-members:
+    :special-members:
+    :private-members:
+    :show-inheritance:
+    :exclude-members: __dict__,__weakref__,__module__
+{% endif %}

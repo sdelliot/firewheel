@@ -1,0 +1,114 @@
+AUTHOR
+FIREWHEEL Team
+DONE
+DESCRIPTION
+Get the time (in UTC) of when the experiment will start
+(i.e. when experiment positive time will start). To get the
+time in UTC on your control/compute nodes (to compare) you can
+use the command ``date --utc``.
+
+If the experiment has started, the number of seconds since the experiment
+started is also printed.
+
+Arguments
++++++++++
+All arguments are optional.
+
+Named Arguments
+^^^^^^^^^^^^^^^
+
+.. option:: -h, --help
+
+    Show help message and exit.
+
+.. option:: --json
+
+    Dump output as JSON-formatted dictionary in the form of ``{start_time: <datetime>, seconds_since_start: <int>}``
+
+Example
++++++++
+
+``firewheel time``
+
+``firewheel time --json``
+
+DONE
+RUN Python ON control
+#!/usr/bin/env python
+
+import json
+import argparse
+
+import firewheel.vm_resource_manager.api as vm_resource_api
+
+
+def start_time(args):
+    """Display the start time of the experiment and the elapsed time since it started.
+
+    This function retrieves the experiment's start time and the number of seconds
+    since the experiment began. It prints the information in either a human-readable
+    format or as a JSON object, depending on the command-line arguments provided.
+
+    Args:
+        args (argparse.Namespace): The command-line arguments parsed by the
+            argparse module. Should include a flag ``--json`` to determine
+            the output format.
+    """
+    experiment_time = vm_resource_api.get_experiment_start_time()
+    seconds_since_start = vm_resource_api.get_experiment_time_since_start()
+
+    # Time zone is UTC by definition.
+    if experiment_time:
+        experiment_time = experiment_time.strftime("%m-%d-%Y %H:%M:%S")
+
+    if seconds_since_start:
+        seconds_since_start = int(seconds_since_start)
+
+    if args.json:
+        print_obj = {"start_time": None, "seconds_since_start": None}
+        if experiment_time is not None:
+            print_obj["start_time"] = f"{experiment_time} UTC"
+        if seconds_since_start is not None:
+            print_obj["seconds_since_start"] = seconds_since_start
+        print(json.dumps(print_obj, indent=0))
+    else:
+        if experiment_time is not None:
+            print(f"Experiment start time: {experiment_time} UTC")
+        if seconds_since_start is not None:
+            if seconds_since_start > 0:
+                print(f"Experiment started {seconds_since_start} seconds ago")
+            else:
+                print(f"Experiment will start in {abs(seconds_since_start)} seconds")
+        else:
+            print("Experiment start time not yet determined.")
+
+
+def main():
+    """Parse command-line arguments and execute the start_time function.
+
+    This function sets up the command-line interface for the FIREWHEEL
+    Experiment Start Time tool. It defines the available arguments, including
+    an option to output results in JSON format. Upon parsing the arguments,
+    it calls the `start_time` function with the parsed arguments.
+    """
+    parser = argparse.ArgumentParser(description="FIREWHEEL Experiment Start Time")
+
+    # VMs
+    parser.set_defaults(command=start_time)
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        default=False,
+        help=(
+            "Dump output as JSON-formatted dictionary in the form "
+            "of ``{start_time: <datetime>, seconds_since_start: <int>}``"  # noqa: FS003
+        ),
+    )
+
+    args = parser.parse_args()
+    args.command(args)
+
+
+if __name__ == "__main__":
+    main()
+DONE

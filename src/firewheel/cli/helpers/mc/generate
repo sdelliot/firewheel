@@ -1,0 +1,95 @@
+AUTHOR
+FIREWHEEL Team
+DONE
+DESCRIPTION
+This Helper is used to generate a new model component.
+It can be used in "interactive" mode or via CLI arguments.
+Ultimately, it calls :mod:`firewheel.control.utils.new_model_component`.
+
+**Usage:** ``firewheel mc generate [-h] --name NAME --location LOCATION [--attribute_depends ATTRIBUTE_DEPENDS [ATTRIBUTE_DEPENDS ...]] [--attribute_provides ATTRIBUTE_PROVIDES [ATTRIBUTE_PROVIDES ...]] [--attribute_precedes ATTRIBUTE_PRECEDES [ATTRIBUTE_PRECEDES ...]] [--model_component_depends MODEL_COMPONENT_DEPENDS [MODEL_COMPONENT_DEPENDS ...]] [--model_component_precedes MODEL_COMPONENT_PRECEDES [MODEL_COMPONENT_PRECEDES ...]] [--plugin PLUGIN] [--model_component_objects MODEL_COMPONENT_OBJECTS] [--plugin_class PLUGIN_CLASS] [--vm_resource VM_RESOURCES [VM_RESOURCES ...]] [--image IMAGE] [--arch ARCH] [--non-interactive] [--template_dir TEMPLATE_DIR] [--no_templates]``
+
+
+Arguments
++++++++++
+
+Named Arguments
+^^^^^^^^^^^^^^^
+
+**MANIFEST-related Arguments:**
+
+.. option:: --name <NAME>
+
+    The Model Component name.
+
+.. option:: --attribute_depends <ATTRIBUTE_DEPENDS [ATTRIBUTE_DEPENDS ...]>
+
+    Graph Attribute(s) depended on by the new Model Component as space-separated-strings.
+
+.. option:: --attribute_provides <ATTRIBUTE_PROVIDES [ATTRIBUTE_PROVIDES ...]>
+
+    Graph Attribute(s) provided by the new Model Component as space-separated-strings.
+
+.. option:: --attribute_precedes <ATTRIBUTE_PRECEDES [ATTRIBUTE_PRECEDES ...]>
+
+    Graph Attribute(s) preceded by the new Model Component as space-separated-strings.
+
+.. option:: --model_component_depends <MC_DEPENDS [MC_DEPENDS ...]>
+
+    Model Component names required by the new MC. These should be space-separated-strings.
+
+.. option:: --model_component_precedes <MC_PRECEDES [MC_PRECEDES ...]>
+
+    Model Component names that will be preceded by the new MC. These should be space-separated-strings.
+
+.. option:: --plugin <PLUGIN>
+
+    File name for a Plugin. If this is needed, we recommend using ``plugin.py``.
+
+.. option:: --model_component_objects <MODEL_COMPONENT_OBJECTS>
+
+    File name for Model Component Objects file. If this is needed, we recommend using ``model_component_objects.py``.
+
+.. option:: --location <LOCATION>
+
+    Location for the new Model Component (i.e Where should the newly generated MC files go?).
+    Include the directory of the MC itself. That is, if you would like the new MC to be placed in ``/opt/firewheel/model_components/`` your location should be ``/opt/firewheel/model_components/<MC dir name>``.
+
+.. option:: --plugin_class <PLUGIN_CLASS>
+
+    Name for the new Plugin class.
+
+.. option:: --vm_resource <VM_RESOURCES [VM_RESOURCES ...]>
+
+    File(s) to be used as VM Resources as space-separated-strings.
+
+.. option:: --image <IMAGE>
+
+    Specify a file to be used as a VM disk.
+
+.. option:: --arch <ARCH>
+
+    Specify the architecture of the supplied image (x86_64, x86, etc). Defaults to ``x86_64`` if an image is provided but the ``--arch`` option is not.
+
+**Configuration-related Arguments:**
+
+.. option:: --non-interactive
+
+    Require minimum parameters as arguments and do not prompt for any values
+
+.. option:: --no_templates
+
+    Do not generate files from templates. Only generate a MANIFEST file.
+
+.. option:: --template_dir <TEMPLATE_DIR>
+
+    Override the configured templates directory.
+
+DONE
+RUN LocalPython ON control
+#!/usr/bin/env python
+
+from firewheel.control.utils.new_model_component import main
+
+if __name__ == "__main__":
+    main()
+DONE

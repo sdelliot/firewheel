@@ -1,0 +1,103 @@
+AUTHOR
+FIREWHEEL Team
+DONE
+DESCRIPTION
+
+Print out a Graphviz dependency graph between all model components in currently installed repositories.
+
+Arguments
++++++++++
+
+All arguments are optional.
+
+Named Arguments
+^^^^^^^^^^^^^^^
+
+.. option:: -h, --help
+
+    Show a help message and exit
+
+.. option:: -o
+
+    Output file name to print to. Print to ``stdout`` if not provided.
+
+
+Example
++++++++
+
+``firewheel mc dep_graph``
+
+``firewheel mc dep_graph -o /tmp/test.txt``
+
+
+DONE
+RUN Python ON control
+#!/usr/bin/env python
+
+import argparse
+
+from firewheel.control.repository_db import RepositoryDb
+from firewheel.control.model_component_iterator import ModelComponentIterator
+
+# May need to update if there are any other names/dependencies that are keywords
+KEYWORD_LOOKUP = {"graph": "exgraph"}
+
+
+def run(run_args):
+    """Generate and print the Graphviz dependency graph.
+
+    This function retrieves model components from the repository database,
+    constructs a dependency graph in DOT format, and either prints it to
+    stdout or writes it to a specified output file.
+
+    Args:
+        run_args (argparse.Namespace): The parsed command-line arguments,
+            including the output file option.
+    """
+    repo_db = RepositoryDb()
+    repo_list = repo_db.list_repositories()
+    model_component_iter = ModelComponentIterator(repo_list)
+    deps = {}
+    for mc in model_component_iter:
+        mc_name = mc.name
+        clean_name = str(mc_name.replace(".", "_"))
+        mc_depends, _mc_provides, _mc_precedes = mc.get_attributes()
+        if mc_name not in deps:
+            deps[mc_name] = []
+        for dep in mc_depends:
+            dep_str = (
+                "\t"
+                + KEYWORD_LOOKUP.get(clean_name, clean_name)
+                + " -> "
+                + KEYWORD_LOOKUP.get(dep, dep)
+            )
+            deps[mc_name].append(dep_str)
+    output_str = "digraph G{\n"
+    for value in deps.values():
+        for dep_str in value:
+            output_str += dep_str + "\n"
+    output_str += "}\n"
+    if run_args.output:
+        with open(run_args.output, "w", encoding="utf8") as output_file:
+            output_file.write(output_str)
+    else:
+        print(output_str)
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description=(
+            "Print a graphviz dependency graph between all model "
+            "components in currently installed repositories."
+        )
+    )
+    parser.add_argument(
+        "-o",
+        dest="output",
+        required=False,
+        help="Output file to print to. Print to stdout if not provided",
+    )
+
+    args = parser.parse_args()
+    run(args)
+DONE

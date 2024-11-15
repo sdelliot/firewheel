@@ -1,0 +1,316 @@
+AUTHOR
+FIREWHEEL Team
+DONE
+DESCRIPTION
+
+List running state information about the currently deployed virtual machines.
+Filters can be used to reduce the VMs that are shown. Filters result in the union
+of all filters. If multiple filters are used then anything that matches **all**
+of filters will be displayed. Filters will attempt substring matching so ensure that
+you provide enough of a substring to the filter to narrow down the displayed results.
+
+Arguments
++++++++++
+
+All arguments are optional.
+
+Named Arguments
+^^^^^^^^^^^^^^^
+
+.. option:: -h, --help
+
+    Show help message and exit.
+
+.. option:: --csv
+
+    Output in CSV format.
+
+Positional Arguments
+^^^^^^^^^^^^^^^^^^^^
+
+.. option:: <field[=filter]>
+
+    A field to display for each found VM, in the form field[=filter] where filter is a substring of the results being filtered on. Available fields are in the following table.
+
+    .. tabularcolumns:: |\Y{.15}|\Y{.85}|
+
+    =============  ==================================================================================================================================
+    Filter fields  Description
+    =============  ==================================================================================================================================
+    ``uuid``       Unique number for each VM instance
+    ``name``       The name of the VM
+    ``state``      State of VM QEMU process and vm_resource run status
+    ``image``      Full name of the base image of the VM
+    ``hostname``   The hostname as it was assigned in the experiment
+    ``vnc``        The shortened port number used to connect to the VM through VNC. Note, the real port number is 5900 + that shown
+    ``time``       If VM is configuring, this displays the time of the vm_resource currently running within a VM. If VM has not started configuring, this displays N/A. If VM is configured, this displays 0, unless an experiment start time has been determined, in which case all VMs return :)
+    ``ip``         The VMs :ref:`control_network_mc` IP address, if the experiment included the :ref:`control_network_mc` MC
+    =============  ==================================================================================================================================
+
+Example
++++++++
+
+``firewheel vm list vnc hostname image``
+
+``firewheel vm list name=host.root.net vnc hostname``
+
+``firewheel vm list name=root image=vyos vnc hostname``
+
+``firewheel vm list name=root --csv``
+
+``firewheel vm list image=vyos state``
+
+DONE
+RUN LocalPython ON control
+#!/usr/bin/env python
+
+import argparse
+from collections import OrderedDict
+
+from rich.console import Console
+
+import firewheel.vm_resource_manager.api as vm_resource_api
+from firewheel.cli.utils import RichDefaultTable
+from firewheel.lib.minimega.api import minimegaAPI
+
+
+def _parse_image(entity):
+    for dev in entity["devices"]:
+        if dev["name"] == "drive":
+            try:
+                return dev["db_path"]
+            except KeyError:
+                pass
+    return ""
+
+
+def _parse_vnc_port(entity):
+    for dev in entity["devices"]:
+        if dev["name"] == "vnc":
+            try:
+                return str(int(dev["port"]) + 5900)
+            except KeyError:
+                pass
+    return ""
+
+
+def vm_list(args):
+    """
+    List VMs, including the given fields in output. Possible fields are:
+        uuid
+        state
+        image
+        hostname
+        VNC port
+        name
+        time
+        ip
+
+    Args:
+        args (argparse.Namespace): The arguments for ``vm list``.
+    """
+    # Figure out our filters for the database.
+    valid_db_filters = [
+        "uuid",
+        "state",
+        "image",
+        "hostname",
+        "vnc",
+        "name",
+        "time",
+        "ip",
+    ]
+    filters = OrderedDict()
+    for field in args.fields:
+        field_vals = field.split("=")
+        if field_vals[0] in valid_db_filters:
+            if len(field_vals) > 1:
+                filters[field_vals[0]] = field_vals[1]
+            elif field_vals[0] not in filters:
+                filters[field_vals[0]] = None
+
+    # Get the basic info.
+    mm_api = minimegaAPI()
+    basic_dict = mm_api.mm_vms()
+
+    # Build a list of basic fields to print (their list index value).
+    # Also build the table header while we do this.
+    # The code construction for this processing creates the table with the
+    #  columns in the order specified by the user as a deliberate side effect.
+    basic_fields = []
+    vm_resource_fields = {"state", "time"}
+    table_header = ["Name"]
+    # If state is in our included fields, get the vm_resource state info too.
+    filtered_dict = {}
+    if not filters or all(value is None for value in filters.values()):
+        filtered_dict = basic_dict
+    else:
+        # Only add vms that contain all set filter values
+        for vm, vm_dict in basic_dict.items():
+            vm_obeys_filters = True
+            for key, value in filters.items():
+                if value is None:
+                    continue
+                if key not in vm_resource_fields:
+                    if value.lower() not in vm_dict[key].lower():
+                        vm_obeys_filters = False
+                        break
+            if vm_obeys_filters:
+                filtered_dict[vm] = vm_dict
+
+    # Determine whether experiment has started.
+    experiment_time = vm_resource_api.get_experiment_start_time()
+
+    # Have a sensible default field if none are given.
+    if len(filters) == 0:
+        filters = {"state": None}
+
+    for field, filter_val in filters.items():
+        new_filtered_dict = None
+
+        if field == "time":
+            basic_fields.append("time")
+            table_header.append("Time")
+
+            vm_resource_dict = vm_resource_api.get_vm_times(filter_val)
+            if filter_val:
+                filtered_dict = {
+                    k: v for k, v in filtered_dict.items() if k in vm_resource_dict
+                }
+            for vm in filtered_dict:
+                if vm in vm_resource_dict:
+                    if not vm_resource_dict[vm]:
+                        filtered_dict[vm]["time"] = "N/A"
+                    elif experiment_time:
+                        # experiment has started, so we overwrite vm time.
+                        filtered_dict[vm]["time"] = " :)"
+                    else:
+                        # report time of most recently run vm_resource (should be negative).
+                        filtered_dict[vm]["time"] = vm_resource_dict[vm]
+                else:
+                    filtered_dict[vm]["time"] = "N/A"
+
+        if field == "uuid":
+            basic_fields.append("uuid")
+            table_header.append("UUID")
+
+        if field == "state":
+            basic_fields.append("state")
+            table_header.append("State")
+
+            if filter_val:
+                filtered_vm_resource_dict = vm_resource_api.get_vm_states(filter_val)
+                # By filtering on vm_resource state, we need to remove any vm
+                # in filtered_dict that is not returned in filtered_vm_resource_dict
+                filtered_dict = {
+                    k: v
+                    for k, v in filtered_dict.items()
+                    if k in filtered_vm_resource_dict or filter_val.lower() in v["state"].lower()
+                }
+
+            # Format for printing
+            vm_resource_dict = vm_resource_api.get_vm_states()
+            for vm in filtered_dict:
+                if vm in vm_resource_dict:
+                    state_string = (
+                        f"{filtered_dict[vm]['state']}/{vm_resource_dict[vm]}"
+                    )
+                else:
+                    state_string = f"{filtered_dict[vm]['state']}/ERROR"
+                if "configuring" in state_string.lower():
+                    state_string = f"[yellow]{state_string}"
+                if "configured" in state_string.lower():
+                    state_string = f"[green]{state_string}"
+                if "uninitialized" in state_string.lower():
+                    state_string = f"[yellow]{state_string}"
+                if "error" in state_string.lower():
+                    state_string = f"[red]{state_string}"
+                filtered_dict[vm]["state"] = state_string
+        if field == "hostname":
+            basic_fields.append("hostname")
+            table_header.append("Hostname")
+
+        if field == "vnc":
+            basic_fields.append("vnc")
+            table_header.append("VNC Port")
+
+        if field == "image":
+            basic_fields.append("image")
+            table_header.append("Image")
+
+        if field == "ip":
+            basic_fields.append("control_ip")
+            table_header.append("Control IP")
+
+        # Must explicitly compare to None, otherwise this will also match an
+        # empty dictionary, causing us to find everything for queries that
+        # should return nothing.
+        if new_filtered_dict is not None:
+            filtered_dict = new_filtered_dict
+
+    # Build the table rows.
+    rows = []
+    for vm in sorted(filtered_dict):
+        current_row = []
+        current_row.append(vm)
+        for field in basic_fields:
+            current_row.append(filtered_dict[vm][field])
+        rows.append(current_row)
+
+    # Print the result in either CSV format or in a table.
+    if args.csv:
+        console = Console(no_color=True)
+        console.print(",".join(table_header))
+        for row in rows:
+            console.print(",".join(row))
+    else:
+        _draw_table(table_header, rows, len(filtered_dict))
+
+
+def _draw_table(header, rows, num_vms):
+    console = Console()
+    table = RichDefaultTable(
+        title="Current VMs",
+        caption_style="bold magenta",
+        caption=f"Found [cyan]{num_vms}[/] VMs",
+    )
+    for head in header:
+        table.add_column(head)
+    for row in rows:
+        table.add_row(*row)
+    console.print("\n", table, "\n")
+
+
+def main():
+    """
+    List all virtual machines.
+
+    This function sets up a command-line interface for listing virtual machines.
+    It allows users to specify which fields to display and whether to output the
+    results in CSV format.
+    """
+    parser = argparse.ArgumentParser(description="List all virtual machines", prog="vm list")
+
+    # VMs
+    parser.set_defaults(command=vm_list)
+    parser.add_argument(
+        "--csv",
+        action="store_true",
+        help="Print the result into CSV-formatted" " rows instead of a pretty table.",
+    )
+    parser.add_argument(
+        "fields",
+        metavar="fields",
+        nargs="*",
+        help="A field to display for each found VM, in the form field[=filter]."
+        " Available fields are: uuid, state, image, hostname, "
+        "vnc, name, time",
+    )
+
+    args = parser.parse_args()
+    args.command(args)
+
+
+if __name__ == "__main__":
+    main()
+DONE

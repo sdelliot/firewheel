@@ -1,0 +1,25 @@
+AUTHOR
+FIREWHEEL Team
+DONE
+DESCRIPTION
+
+This is an example of an index file. If no sub-Helper is called, the
+Helper group's index file is automatically called.
+Use this file as a template for new index Helpers. If you retain the sections
+(and just update the content) then the index Helper should execute properly.
+
+Arguments
++++++++++
+N/A
+
+Examples
+++++++++
+
+``firewheel example_helpers subgroup``
+
+DONE
+RUN Shell ON control
+#!/bin/bash
+echo "Hello, Index!"
+pwd
+DONE

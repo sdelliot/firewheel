@@ -1,0 +1,31 @@
+AUTHOR
+FIREWHEEL Team
+DONE
+DESCRIPTION
+
+Use this file as a template for new Python Helpers. If you retain the sections
+(and just update the content) then the Helper should execute properly.
+
+Arguments
++++++++++
+When executed, this Helper will print out any passed in arguments.
+
+Examples
+++++++++
+
+``firewheel example_helpers pytest``
+
+DONE
+RUN Python ON control
+#!/usr/bin/env python
+
+import sys
+
+if __name__ == "__main__":
+    if len(sys.argv) > 1:
+        print("Arguments:")
+        for arg in sys.argv:
+            print(arg)
+    else:
+        print("No arguments.")
+DONE
