@@ -5,6 +5,8 @@ FIREWHEEL
 .. image:: https://img.shields.io/badge/Contributor%20Covenant-2.1-4baaaa.svg
     :target: CODE_OF_CONDUCT.md
 
+.. image:: https://img.shields.io/badge/python-3.8%20%7C%203.9%20%7C%203.10%7C%203.11%7C%203.12%7C%203.13-blue
+
 .. readme-inclusion-marker
 
 FIREWHEEL is an experiment orchestration tool that assists a user in building and controlling, repeatable experiments of distributed network systems at any scale.
@@ -21,11 +23,11 @@ Therefore, it is trivial to run hundreds of experiments and collect results on t
 Getting Started
 ***************
 
-* For a crash course on key FIREWHEEL concepts and on using FIREWHEEL please see our :ref:`quickstart-guide` guide.
-* To learn why experimentation may be the right tool to answer certain kinds of questions (and when it is probably the wrong tool) see :ref:`emulytics-introduction`.
-* An overview of FIREWHEEL including how FIREWHEEL can help a researcher implement high-quality emulation-based experiments, hardware requirements, software architecture, and known security security concerns is provided in :ref:`FIREWHEEL-introduction`.
-* An in-depth review of important FIREWHEEL concepts, is located in :ref:`FIREWHEEL-concepts`.
-* The CLI reference documentation can be found in :ref:`cli`.
+* For a crash course on key FIREWHEEL concepts and on using FIREWHEEL please see our `quickstart-guide <https://sandialabs.github.io/firewheel/quickstart.html>`_ guide.
+* To learn why experimentation may be the right tool to answer certain kinds of questions (and when it is probably the wrong tool) review our documentation on `Cyber Experimentation <https://sandialabs.github.io/firewheel/emulytics.html>`_.
+* An overview of FIREWHEEL including how FIREWHEEL can help a researcher implement high-quality emulation-based experiments, hardware requirements, software architecture, and known security security concerns is provided in our `System Overview <https://sandialabs.github.io/firewheel/system/index.html>`_.
+* An in-depth review of important FIREWHEEL concepts, is located `here <https://sandialabs.github.io/firewheel/concepts.html>`__.
+* The CLI reference documentation can be found `here <https://sandialabs.github.io/firewheel/cli/index.html>`__.
 
 
 ****************************
@@ -36,9 +38,9 @@ If you have questions you'd like to ask the developers which our documentation d
 
 Please report any bugs that you find on our GitHub page.
 We happily accept pull requests (PR), big or small.
-Please see the :ref:`contributing` for more information.
+Please see the `Contributor Guide <https://sandialabs.github.io/firewheel/developer/contributing.html>`_ for more information.
 
-Any security-related issues should be reported directly to the developers at: ``firewheel AT sandia DOT gov`` (see :ref:`SECURITY <security>`) for more information.
+Any security-related issues should be reported directly to the developers at: ``firewheel AT sandia DOT gov`` (see `SECURITY.md <https://sandialabs.github.io/firewheel/developer/security.html>`_) for more information.
 
 *******
 License
@@ -46,7 +48,7 @@ License
 Copyright 2024 National Technology & Engineering Solutions of Sandia, LLC (NTESS).
 Under the terms of Contract DE-NA0003525 with NTESS, the U.S. Government retains certain rights in this software.
 
-Please see :ref:`LICENSE <license>` for more information.
+Please see `LICENSE <https://sandialabs.github.io/firewheel/developer/license.html>`_ for more information.
 
 ************************
 Research Using FIREWHEEL
