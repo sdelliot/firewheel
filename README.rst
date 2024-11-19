@@ -2,10 +2,12 @@
 FIREWHEEL
 #########
 
-.. image:: https://img.shields.io/badge/Contributor%20Covenant-2.1-4baaaa.svg
-    :target: CODE_OF_CONDUCT.md
+.. image:: https://sandialabs.github.io/firewheel/_static/logo_horizontal.png
 
 .. image:: https://img.shields.io/badge/python-3.8%20%7C%203.9%20%7C%203.10%7C%203.11%7C%203.12%7C%203.13-blue
+    :target: https://pypi.org/project/firewheel/
+.. image:: https://img.shields.io/badge/Contributor%20Covenant-2.1-4baaaa.svg
+    :target: https://sandialabs.github.io/firewheel/developer/code_of_conduct.html
 
 .. readme-inclusion-marker
 
