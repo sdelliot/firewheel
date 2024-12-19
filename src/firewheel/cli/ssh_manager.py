@@ -7,18 +7,11 @@ from time import sleep
 from pathlib import Path
 from itertools import chain
 
-from rich.theme import Theme
 from rich.syntax import Syntax
 from rich.console import Console
 
+from firewheel.cli.utils import cli_output_theme
 from firewheel.lib.minimega.api import minimegaAPI
-
-# Add theme for consistent CLI output formatting
-cli_theme_styles = {
-    "error": "bold red",
-    "inline_code": "bold",
-}
-cli_output_theme = Theme(cli_theme_styles)
 
 
 def parse_destination(remote_name):
