@@ -108,6 +108,7 @@ class _SSHProtocolManager(ABC):
             ("-o", "LogLevel=error"),
             ("-o", "UserKnownHostsFile=/dev/null"),
             ("-o", "StrictHostKeyChecking=no"),
+            ("-o", "HostKeyAlgorithms=+ssh-rsa"),
             ("-o", f"ProxyCommand ssh -o BatchMode=yes {self.local_hostname} -W %h:%p"),
         ]
         return options
