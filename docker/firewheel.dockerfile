@@ -74,7 +74,7 @@ RUN cp /usr/bin/ssh /usr/bin/ssh-old && \
     cp /usr/bin/sudo /usr/bin/sudo-old && \
     cp /usr/bin/chgrp /usr/bin/chgrp-old
 
-COPY ./fsroot/ /
+COPY docker/fsroot/ /
 RUN chmod +x /usr/local/bin/entry && \
     chmod +x /usr/bin/ssh && \
     chmod +x /usr/bin/scp && \
