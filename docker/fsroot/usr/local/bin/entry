@@ -8,17 +8,6 @@ function gr() {
     echo -e "\033[32;1m" "$@" "\033[m"
 }
 
-# Function to display a waiting symbol
-wait_for_process() {
-    while kill -0 $1 2>/dev/null; do
-        for i in / - \\ \|; do
-            grn "\rWaiting... $i"
-            sleep 0.1
-        done
-    done
-    grn "\r\n"
-}
-
 export HOME=/root
 
 HN="$(hostname)"
@@ -44,10 +33,8 @@ gr "done"
 
 grn "Starting FIREWHEEL...      "
 
-firewheel restart hard &
-pid=$!
-gr $pid
-# wait_for_process $pid
+firewheel restart hard &>/dev/null
+
 gr "done"
 
 if [ "$#" -eq 0 ]; then
