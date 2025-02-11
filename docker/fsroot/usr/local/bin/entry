@@ -3,7 +3,6 @@
 function grn() {
     echo -ne "\033[32;1m" "$@" "\033[m"
 }
-
 function gr() {
     echo -e "\033[32;1m" "$@" "\033[m"
 }
@@ -14,6 +13,10 @@ HN="$(hostname)"
 
 FILEPATH="/tmp/minimega/files"
 mkdir -p $FILEPATH
+
+grn "Starting minimega...       "
+/start-minimega.sh &>/dev/null
+gr "done"
 
 grn "Setting up FIREWHEEL...    "
 mkdir -p /tmp/firewheel
@@ -32,9 +35,7 @@ firewheel sync &>/dev/null
 gr "done"
 
 grn "Starting FIREWHEEL...      "
-
 firewheel restart hard
-
 gr "done"
 
 if [ "$#" -eq 0 ]; then
