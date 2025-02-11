@@ -3,8 +3,20 @@
 function grn() {
     echo -ne "\033[32;1m" "$@" "\033[m"
 }
+
 function gr() {
     echo -e "\033[32;1m" "$@" "\033[m"
+}
+
+# Function to display a waiting symbol
+wait_for_process() {
+    while kill -0 $1 2>/dev/null; do
+        for i in / - \\ \|; do
+            grn "\rWaiting... $i"
+            sleep 0.1
+        done
+    done
+    grn "\r\n"
 }
 
 export HOME=/root
@@ -13,9 +25,6 @@ HN="$(hostname)"
 
 FILEPATH="/tmp/minimega/files"
 mkdir -p $FILEPATH
-grn "Starting minimega...       "
-/start-minimega.sh
-gr "done"
 
 grn "Setting up FIREWHEEL...    "
 mkdir -p /tmp/firewheel
@@ -28,14 +37,16 @@ firewheel config set -s grpc.hostname localhost &>/dev/null
 firewheel config set -s minimega.use_gre True
 firewheel config set -s minimega.files_dir $FILEPATH
 
-firewheel init
-firewheel sync
+firewheel init &>/dev/null
+firewheel sync &>/dev/null
 
 gr "done"
 
 grn "Starting FIREWHEEL...      "
-firewheel restart hard &>/dev/null
 
+firewheel restart hard &
+pid=$!
+wait_for_process $pid
 gr "done"
 
 if [ "$#" -eq 0 ]; then
