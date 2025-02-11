@@ -79,13 +79,9 @@ RUN chmod +x /usr/local/bin/entry && \
     chmod +x /usr/bin/ssh && \
     chmod +x /usr/bin/scp && \
     chmod +x /usr/bin/sudo && \
-    chmod +x /usr/bin/chgrp
+    chmod +x /usr/bin/chgrp && \
+    chmod +x /start-minimega.sh
 
 # --#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#-- #
 
-
-COPY ./start-minimega.sh /
-RUN chmod +x /start-minimega.sh
-
-VOLUME ["/tmp"]
 ENTRYPOINT ["/usr/local/bin/entry"]
