@@ -1,0 +1,31 @@
+name: Publish FIREWHEEL Docker Image
+on: [push]
+jobs:
+  push-to-ghcr:
+    name: Push Docker image to GitHub Packages
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+      contents: read
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v4
+      - name: Get metadata
+        id: build_metadata
+        run: |
+          echo "sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+      - name: Log in to GitHub Docker Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build container image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/sandialabs/firewheel:${{ steps.build_metadata.outputs.sha }}
+            ghcr.io/sandialabs/firewheel:latest

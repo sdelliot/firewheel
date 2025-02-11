@@ -1,0 +1,73 @@
+#!/bin/bash
+
+function grn() {
+    echo -ne "\033[32;1m" "$@" "\033[m"
+}
+function gr() {
+    echo -e "\033[32;1m" "$@" "\033[m"
+}
+
+export HOME=/root
+
+HN="$(hostname)"
+
+FILEPATH="/tmp/minimega/files"
+mkdir -p $FILEPATH
+grn "Starting minimega...       "
+/start-minimega.sh
+gr "done"
+
+grn "Setting up FIREWHEEL...    "
+mkdir -p /tmp/firewheel
+firewheel config set -s system.default_group root &>/dev/null
+firewheel config set -s cluster.control "$HN" &>/dev/null
+firewheel config set -s cluster.compute "" &>/dev/null
+firewheel config set -s cluster.compute "$HN" &>/dev/null
+firewheel config set -s discovery.hostname localhost &>/dev/null
+firewheel config set -s grpc.hostname localhost &>/dev/null
+firewheel config set -s minimega.use_gre True
+firewheel config set -s minimega.files_dir $FILEPATH
+echo $DPORT >> /tmp/dport
+
+firewheel init
+firewheel sync
+
+gr "done"
+
+grn "Starting FIREWHEEL...      "
+firewheel start &>/dev/null
+
+gr "done"
+
+if [ "$#" -eq 0 ]; then
+    tmux
+else
+    /bin/bash "$@"
+fi
+
+grn "Stopping experiment...     "
+ct=0
+while ps aux | grep -e tmux -e minimega -e miniweb -e discovery -e fwpy -e qemu | grep -v grep >/dev/null; do
+    ps aux | grep -e tmux -e minimega -e miniweb -e discovery -e fwpy -e qemu | grep -v grep | awk '{print $2}' | xargs kill 2>/dev/null || true
+    ((++ct))
+    if [ "$ct" -gt 5 ]; then
+        break
+    fi
+    sleep 0.5
+done
+sync
+sleep 2
+gr "done"
+
+grn "Cleanup...                 "
+ct=0
+until rm -rf /tmp/*; do
+    ((++ct))
+    if [ "$ct" -gt 5 ]; then
+        break
+    fi
+    sleep 0.5
+done
+gr "done"
+
+gr "Container shutdown."
