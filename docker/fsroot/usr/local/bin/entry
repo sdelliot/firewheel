@@ -34,7 +34,7 @@ firewheel sync
 gr "done"
 
 grn "Starting FIREWHEEL...      "
-firewheel start &>/dev/null
+firewheel restart hard &>/dev/null
 
 gr "done"
 
