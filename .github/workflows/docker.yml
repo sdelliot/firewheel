@@ -27,5 +27,5 @@ jobs:
           file: docker/firewheel.dockerfile
           push: true
           tags: |
-            ghcr.io/sandialabs/firewheel:${{ steps.build_metadata.outputs.sha }}
-            ghcr.io/sandialabs/firewheel:latest
+            ghcr.io/${{ github.repository }}:${{ steps.build_metadata.outputs.sha }}
+            ghcr.io/${{ github.repository }}:latest
