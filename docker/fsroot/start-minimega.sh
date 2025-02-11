@@ -3,7 +3,6 @@
 /usr/share/openvswitch/scripts/ovs-ctl start
 if [ $? -ne 0 ]; then
     echo "Failed to start Open vSwitch" >&2
-    exit 1
 fi
 
 # Check if Minimega is already running

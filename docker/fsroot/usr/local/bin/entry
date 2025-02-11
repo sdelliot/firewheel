@@ -27,7 +27,6 @@ firewheel config set -s discovery.hostname localhost &>/dev/null
 firewheel config set -s grpc.hostname localhost &>/dev/null
 firewheel config set -s minimega.use_gre True
 firewheel config set -s minimega.files_dir $FILEPATH
-echo $DPORT >> /tmp/dport
 
 firewheel init
 firewheel sync
