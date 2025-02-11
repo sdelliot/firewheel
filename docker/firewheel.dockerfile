@@ -41,7 +41,8 @@ RUN cd /usr/local/bin && for x in /opt/discovery/bin/*; do echo $x ; ln -s $x .;
 ## Firewheel installation
 RUN bash -c "python3.10 -m venv /fwpy \
     && source /fwpy/bin/activate \
-    && python3 -m pip install --upgrade wheel setuptools pip firewheel \
+    && python3 -m pip install --upgrade wheel setuptools pip \
+    && python3 -m pip install --upgrade firewheel \
     && ln -s /fwpy/bin/firewheel /usr/local/bin/firewheel"
 
 
@@ -60,7 +61,7 @@ RUN bash -c "source /fwpy/bin/activate  && \
 # Set up Bash completion
 RUN bash -c "source /fwpy/bin/activate  && \
     prep_fw_tab_completion && \
-    completion_script=`/fwpy/bin/prep_fw_tab_completion --print-path` && \
+    completion_script='\$(/fwpy/bin/prep_fw_tab_completion --print-path)' && \
     cp $completion_script /usr/share/bash-completion/completions/firewheel"
 
 # Add some supported model components
