@@ -35,7 +35,7 @@ firewheel sync &>/dev/null
 gr "done"
 
 grn "Starting FIREWHEEL...      "
-firewheel restart hard
+firewheel restart hard &>/dev/null
 gr "done"
 
 if [ "$#" -eq 0 ]; then
