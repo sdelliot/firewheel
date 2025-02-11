@@ -84,7 +84,7 @@ RUN chmod +x /usr/local/bin/entry && \
 # --#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#-- #
 
 
-COPY start-minimega.sh /start-minimega.sh
+COPY ./start-minimega.sh /
 RUN chmod +x /start-minimega.sh
 
 VOLUME ["/tmp"]
