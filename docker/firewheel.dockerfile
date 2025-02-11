@@ -61,7 +61,7 @@ RUN bash -c "source /fwpy/bin/activate  && \
 # Set up Bash completion
 RUN bash -c "source /fwpy/bin/activate  && \
     prep_fw_tab_completion && \
-    completion_script=\$(/fwpy/bin/prep_fw_tab_completion --print-path)' && \
+    completion_script=\$(/fwpy/bin/prep_fw_tab_completion --print-path) && \
     env && \
     cp \$completion_script /usr/share/bash-completion/completions/firewheel"
 
