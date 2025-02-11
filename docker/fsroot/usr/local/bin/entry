@@ -33,7 +33,7 @@ gr "done"
 
 grn "Starting FIREWHEEL...      "
 
-firewheel restart hard &>/dev/null
+firewheel restart hard
 
 gr "done"
 
