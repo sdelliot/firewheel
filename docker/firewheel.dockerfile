@@ -16,7 +16,8 @@ RUN export DEBIAN_FRONTEND=noninteractive \
     && apt-get install -y sudo git git-lfs build-essential tar net-tools procps tmux \
                           ethtool libpcap-dev openvswitch-switch qemu-kvm qemu-utils \
                           dnsmasq ntfs-3g iproute2 qemu-system-x86 software-properties-common \
-                          dosfstools openssh-server locales locales-all python3.10 python3.10-venv
+                          dosfstools openssh-server locales locales-all python3.10 python3.10-venv \
+                          vim
 
 ### Locale support ###
 ENV LANG=en_US.UTF-8
