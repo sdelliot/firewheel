@@ -24,7 +24,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: docker/Dockerfile
+          file: docker/firewheel.dockerfile
           push: true
           tags: |
             ghcr.io/sandialabs/firewheel:${{ steps.build_metadata.outputs.sha }}
