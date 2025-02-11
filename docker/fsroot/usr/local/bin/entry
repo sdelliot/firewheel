@@ -46,7 +46,8 @@ grn "Starting FIREWHEEL...      "
 
 firewheel restart hard &
 pid=$!
-wait_for_process $pid
+gr $pid
+# wait_for_process $pid
 gr "done"
 
 if [ "$#" -eq 0 ]; then
