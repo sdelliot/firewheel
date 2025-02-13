@@ -39,7 +39,6 @@ firewheel restart hard > /dev/null 2>&1
 gr "done"
 
 source /fwpy/bin/activate
-source $(/fwpy/bin/prep_fw_tab_completion --print-path)
 
 if [ "$#" -eq 0 ]; then
     tmux
