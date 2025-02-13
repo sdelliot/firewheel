@@ -38,6 +38,9 @@ grn "Starting FIREWHEEL...      "
 firewheel restart hard &>/dev/null
 gr "done"
 
+source /fwpy/bin/activate
+source $(/fwpy/bin/prep_fw_tab_completion --print-path)
+
 if [ "$#" -eq 0 ]; then
     tmux
 else
