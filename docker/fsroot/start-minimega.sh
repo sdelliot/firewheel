@@ -49,6 +49,6 @@ echo "miniweb started on ${MINIWEB_HOST}:${MINIWEB_PORT}"
   -level=${MM_LOGLEVEL} \
   -logfile=${MM_LOGFILE} \
   -cgroup=${MM_CGROUP} \
-  ${MM_APPEND} &)
+  ${MM_APPEND} 1>/tmp/mm.log 2>/tmp/mm.err &)
 
 echo "minimega successfully started."
