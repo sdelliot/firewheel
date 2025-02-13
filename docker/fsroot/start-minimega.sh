@@ -1,13 +1,13 @@
 #!/bin/bash
 
-/usr/share/openvswitch/scripts/ovs-ctl start 1>/tmp/mm.log 2>/tmp/mm.err
+/usr/share/openvswitch/scripts/ovs-ctl start 1>/var/log/minimega.log 2>/var/log/minimega.log
 if [ $? -ne 0 ]; then
-    echo "Failed to start Open vSwitch" 1> /tmp/mm.err
+    echo "Failed to start Open vSwitch" 1> /var/log/minimega.log
 fi
 
 # Check if Minimega is already running
 if pgrep -f "/opt/minimega/bin/minimega" > /dev/null; then
-    echo "Minimega is already running. Exiting script." 1> /tmp/mm.log
+    echo "Minimega is already running. Exiting script." 1> /var/log/minimega.log
     exit 0
 fi
 
@@ -22,7 +22,7 @@ fi
 : "${MM_PORT:=9000}"
 : "${MM_DEGREE:=1}"
 : "${MM_CONTEXT:=minimega}"
-: "${MM_LOGLEVEL:=info}"
+: "${MM_LOGLEVEL:=debug}"
 : "${MM_LOGFILE:=/var/log/minimega.log}"
 : "${MM_FORCE:=true}"
 : "${MM_RECOVER:=false}"
@@ -49,6 +49,6 @@ echo "miniweb started on ${MINIWEB_HOST}:${MINIWEB_PORT}"
   -level=${MM_LOGLEVEL} \
   -logfile=${MM_LOGFILE} \
   -cgroup=${MM_CGROUP} \
-  ${MM_APPEND} 1>/tmp/mm.log 2>/tmp/mm.err &)
+  ${MM_APPEND} &)
 
 echo "minimega successfully started."
