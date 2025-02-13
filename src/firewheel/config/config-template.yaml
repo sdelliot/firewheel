@@ -38,6 +38,9 @@ python:
     venv: ""
 ssh:
     user: null
+    scp_path: null
+    ssh_path: null
+    pssh_path: null
 system:
     default_group: minimega
     default_output_dir: /tmp/firewheel

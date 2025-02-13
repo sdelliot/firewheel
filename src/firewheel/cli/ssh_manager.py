@@ -10,6 +10,7 @@ from itertools import chain
 from rich.syntax import Syntax
 from rich.console import Console
 
+from firewheel.config import Config
 from firewheel.cli.utils import cli_output_theme
 from firewheel.lib.minimega.api import minimegaAPI
 
@@ -78,6 +79,10 @@ class _SSHProtocolManager(ABC):
         self.max_call_attempts = max_call_attempts
         self._capture_output = capture_output
         self._test_connections = test_connections
+        
+        self.bin_path = "ssh"
+        if config["ssh"]["ssh_path"]:
+            self.bin_path = config["ssh"]["ssh_path"]
 
     @property
     @abstractmethod
@@ -109,7 +114,7 @@ class _SSHProtocolManager(ABC):
             ("-o", "UserKnownHostsFile=/dev/null"),
             ("-o", "StrictHostKeyChecking=no"),
             ("-o", "HostKeyAlgorithms=+ssh-rsa"),
-            ("-o", f"ProxyCommand ssh -o BatchMode=yes {self.local_hostname} -W %h:%p"),
+            ("-o", f"ProxyCommand {self.bin_path} -o BatchMode=yes {self.local_hostname} -W %h:%p"),
         ]
         return options
 
@@ -291,7 +296,7 @@ class _SSHProtocolManager(ABC):
         all_options = filter(
             None, chain.from_iterable(self.default_options + list(options))
         )
-        return shlex.join(all_options)  # pylint: disable=no-member
+        return shlex.join(all_options)
 
     @classmethod
     def _assemble_shortopts_string(cls):
@@ -342,6 +347,7 @@ class SSHManager(_SSHProtocolManager):
     # Parameters for testing an SSH connection
     _connection_test_command = "ping -w 1 -c 1"
     _connection_test_interval = 2
+    config = Config().get_config()
 
     def __init__(
         self, max_call_attempts=10, capture_output=False, test_connections=True
@@ -422,7 +428,7 @@ class SSHManager(_SSHProtocolManager):
             str: The complete SSH instruction.
         """
         instruction_options = self._prepare_options(options)
-        return f"ssh {instruction_options} {destination} {command}"
+        return f"{self.bin_path} {instruction_options} {destination} {command}"
 
     @classmethod
     def parse_cli_input(cls, argv):
@@ -462,6 +468,10 @@ class ParallelSSHManager(_SSHProtocolManager):
     # Parameters for testing an SSH connection
     _connection_test_command = "ping -w 1 -c 1"
     _connection_test_interval = 2
+    
+    self.bin_path = "parallel-ssh"
+    if config["ssh"]["pssh_path"]:
+        self.bin_path = config["ssh"]["pssh_path"]
 
     def __init__(
         self,
@@ -598,7 +608,7 @@ class ParallelSSHManager(_SSHProtocolManager):
             str: The complete parallel-ssh instruction.
         """
         instruction_options = self._prepare_options(options)
-        return f"parallel-ssh {instruction_options} '{command}'"
+        return f"{self.bin_path} {instruction_options} '{command}'"
 
     def _prepare_options(self, options):
         """
@@ -616,7 +626,7 @@ class ParallelSSHManager(_SSHProtocolManager):
         Returns:
             str: A string containing all the options to use in the instruction
             (including defaults).
-        """  # pylint: disable=useless-super-delegation
+        """
         return super()._prepare_options(options)
 
     @classmethod
@@ -657,6 +667,12 @@ class SCPManager(_SSHProtocolManager):
     # Parameters for testing an SCP connection
     _connection_test_command = "ping -c 1"
     _connection_test_interval = 4
+    
+    config = Config().get_config()
+    
+    self.bin_path = "scp"
+    if config["ssh"]["scp_path"]:
+        self.bin_path = config["ssh"]["scp_path"]
 
     @property
     def default_options(self):
@@ -751,7 +767,7 @@ class SCPManager(_SSHProtocolManager):
             str: The complete SSH instruction.
         """
         instruction_options = self._prepare_options(options)
-        return f"scp {instruction_options} {' '.join(sources)} {target}"
+        return f"{self.bin_path} {instruction_options} {' '.join(sources)} {target}"
 
     @classmethod
     def parse_cli_input(cls, argv):
