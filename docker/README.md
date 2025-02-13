@@ -1,0 +1,75 @@
+# FIREWHEEL Docker
+
+> [!WARNING]
+> This feature is currently in beta testing! Use at your own risk! 
+
+> [!NOTE]
+> The FIREWHEEL docker container is based on the [minimega](https://github.com/sandia-minimega/minimega/) container image!
+
+## Install Docker
+
+Follow the official installation instructions: [Install Docker Engine](https://docs.docker.com/engine/install/)
+
+For development purposes, it maybe helpful to add your user to the `docker` group: `sudo usermod -aG docker $USER`
+
+## Getting Started
+The easiest way to get started is to use the existing pre-built container provided by GitHub's container registry (found [here](https://github.com/sandialabs/firewheel/pkgs/container/firewheel/)).
+
+If building the image is necessary, than it must be built from the base directory of the FIREWHEEL repository.
+
+```bash
+docker build -t firewheel -f docker/firewheel.dockerfile .
+```
+
+### Low-Permissioned Enviornments
+If the container is running in a low-permissioned environment (e.g., volumes cannot be mounted or additional software cannot be installed on the host) than the container will still run, but lack the ability to launch VMs.
+Effectivily, this breaks minimega, but still enables the user to design and code the topology.
+That is, building new model components and topologies is still possible as is checking for dependency issues, syntax errors, etc.
+Model Components such as [`misc.print_graph`](https://sandialabs.github.io/firewheel/model_components/misc.print_graph.html) can be further leveraged to verify the network topology and scheduled events will occur as expected.
+To run the FIREWHEEL container in low-permissioned mode, use:
+
+```bash
+sudo docker run --rm -it ghcr.io/sandialabs/firewheel:main
+```
+
+### High-Permissioned Environments
+To access the full range of capabilities (including launching VMs), this docker container needs various system privileges and mounted volumes.
+
+> [!IMPORTANT] 
+> Host Requirements:
+> * The host running the docker container must have Open vSwitch installed.
+> * The host running the docker container must have QEMU/KVM installed.
+
+Once the prerequisits have been met, the FIREWHEEL container can be started via:
+
+```bash
+sudo docker run --rm -it --privileged --cap-add ALL -v /dev:/dev -v /lib/modules:/lib/modules:ro ghcr.io/sandialabs/firewheel:main
+```
+
+The additional privileges and system mounts (e.g. `/dev`) are required for the Open vSwitch process to run inside the container and to allow minimega to perform file injections.
+Optionally, users can add `-p 9001:9001` to expose the [miniweb](https://sandialabs.github.io/firewheel/tutorials/router_tree.html#using-miniweb) port to the host system for easy access.
+
+## Docker Environment
+Once the container is launched, it will kick off a script which ensures that a new FIREWHEEL environment is ready to go and "drop" the user into a new [tmux](https://github.com/tmux/tmux/wiki) session.
+
+> [!NOTE]
+> The tmux default prefix key is `C-a`, which means the <kbd>Ctrl</kbd> key and <kbd>a</kbd> (e.g., <kbd>Ctrl</kbd>+<kbd>a</kbd>).
+
+Users will need to install any extra images or load any new model components that need to be placed into the environment.
+It is also possible to mount a new volume with those pre-loaded model components, for example `-v /opt/firewheel/model_components:/models`.
+Then once the envionment is started, simply add that path as a new model component repository (e.g., `firewheel repository install /models`).
+
+## FIREWHEEL, minimega, and miniweb configuration
+
+By default, this container sets a number of configuration values for the user.
+Rather than describing them here, we refer to the following places:
+* FIREWHEEL settings are provided in both [firewheel.dockerfile](./firewheel.dockerfile) and [entry](./fsroot/usr/local/bin/entry).
+* minimega settings are provided in both [start-minimega.sh](./start-minimega.sh) and [minimega](./fsroot/etc/default/minimega).
+* miniweb settings are provided in both [start-minimega.sh](./start-minimega.sh).
+
+The minimega configuration values can be overwritten either by passing environment variables to Docker when starting the container or by binding a file to `/etc/default/minimega` in the container that contains updated values.
+
+> [!NOTE]
+> Currently, the FIREWHEEL configuration options are hard-coded to work with this configuration.
+> Flexibility in setting these values may be provided in a future release.
+>  overwritten via Docker environment variables.
