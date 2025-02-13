@@ -18,9 +18,9 @@ jobs:
           images: |
             ghcr.io/${{ github.repository }}
           labels: |
-            org.opencontainers.image.vendor="Sandia National Laboratories"
-            org.opencontainers.image.authors="FIREWHEEL Development Team"
-            org.opencontainers.image.documentation="https://sandialabs.github.io/firewheel/"
+            org.opencontainers.image.vendor=Sandia National Laboratories
+            org.opencontainers.image.authors=FIREWHEEL Development Team
+            org.opencontainers.image.documentation=https://sandialabs.github.io/firewheel/
             org.opencontainers.image.licenses="GPL-3.0"
           # generate Docker tags based on the following events/attributes
           tags: |
