@@ -48,7 +48,7 @@ if tty -s; then
     fi
 else
     # Sleep until we need to shut down.
-    cat
+    sleep 100000
 fi
 
 grn "Stopping experiment...     "
