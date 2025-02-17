@@ -40,10 +40,15 @@ gr "done"
 
 source /fwpy/bin/activate
 
-if [ "$#" -eq 0 ]; then
-    tmux
+if tty -s; then
+    if [ "$#" -eq 0 ]; then
+        tmux
+    else
+        /bin/bash "$@"
+    fi
 else
-    /bin/bash "$@"
+    # Sleep until we need to shut down.
+    cat
 fi
 
 grn "Stopping experiment...     "
