@@ -119,4 +119,4 @@ class TestRepositoryDb:
         for entry in repo_entries:
             repository_db.add_repository(entry)
         curr_count = len(list(repository_db.list_repositories()))
-        assert len(curr_count) == orig_entry_count + len(repo_entries)
+        assert curr_count == orig_entry_count + len(repo_entries)
