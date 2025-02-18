@@ -20,7 +20,7 @@ gr "done"
 
 grn "Setting up FIREWHEEL...    "
 mkdir -p /tmp/firewheel
-firewheel config set -s system.default_group root &>/dev/null
+firewheel config set -s system.default_group $(whoami) &>/dev/null
 firewheel config set -s cluster.control "$HN" &>/dev/null
 firewheel config set -s cluster.compute "" &>/dev/null
 firewheel config set -s cluster.compute "$HN" &>/dev/null
