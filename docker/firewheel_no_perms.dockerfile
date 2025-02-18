@@ -12,6 +12,9 @@ ENV GRPC_HOSTNAME=localhost
 ENV EXPERIMENT_INTERFACE=lo
 
 
+# Create a new group with the specified GID
+RUN groupadd -g $USER_UID $USER
+
 # Create a new user with the specified UID
 RUN useradd -m -u $USER_UID $USER
 
