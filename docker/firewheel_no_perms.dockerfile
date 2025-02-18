@@ -15,11 +15,6 @@ ENV EXPERIMENT_INTERFACE=lo
 RUN useradd -m -u 1001750000 firewheel
 RUN groupmod -g 1001750000 firewheel 
 
-# Change ownership of all files in the container to the new user
-# Note: This should be done after all files are copied to the image
-# (e.g., after COPY or ADD commands)
-RUN chown -R $USER_UID:$USER_UID /opt
-
 # Install dependencies
 RUN export DEBIAN_FRONTEND=noninteractive \
     && apt-get update && apt-get upgrade -y \
@@ -50,7 +45,6 @@ RUN cd /usr/local/bin && for x in /opt/discovery/bin/*; do echo $x ; ln -s $x .;
 # --#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#-- #
 
 ## Firewheel installation
-USER $USER
 RUN bash -c "python3.10 -m venv /fwpy \
     && source /fwpy/bin/activate \
     && python3 -m pip install --upgrade wheel setuptools pip \
@@ -95,5 +89,11 @@ RUN chmod +x /usr/local/bin/entry && \
     chmod +x /start-minimega.sh
 
 # --#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#-- #
+
+# Change ownership of all files in the container to the new user
+# Note: This should be done after all files are copied to the image
+# (e.g., after COPY or ADD commands)
+RUN chown -R $USER_UID:$USER_UID /fwpy /start-minimega.sh /tmp /scratch /var/log /opt
+USER $USER
 
 ENTRYPOINT ["/usr/local/bin/entry"]
