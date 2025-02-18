@@ -7,16 +7,13 @@ ENV MM_INSTALL_DIR=/opt/minimega
 ENV MINIMEGA_CONFIG=/etc/default/minimega
 ENV MM_BASE=/tmp/minimega
 ENV USER=firewheel
-ENV USER_UID=1001750001
+ENV USER_UID=1001750000
 ENV GRPC_HOSTNAME=localhost
 ENV EXPERIMENT_INTERFACE=lo
 
-
-# Create a new group with the specified GID
-RUN groupadd -g $USER_UID $USER
-
 # Create a new user with the specified UID
-RUN useradd -m -u $USER_UID $USER
+RUN useradd -m -u 1001750000 firewheel
+RUN groupmod -g 1001750000 firewheel 
 
 # Change ownership of all files in the container to the new user
 # Note: This should be done after all files are copied to the image
@@ -64,7 +61,7 @@ RUN bash -c "python3.10 -m venv /fwpy \
 RUN bash -c "source /fwpy/bin/activate  && \
     mkdir -p /var/log/minimega && \
     mkdir -p /scratch/firewheel && \
-    firewheel config set -s system.default_group \$USER && \
+    firewheel config set -s system.default_group firewheel && \
     firewheel config set -s minimega.experiment_interface lo && \
     firewheel config set -s system.default_output_dir /scratch/firewheel && \
     firewheel config set -s minimega.base_dir /tmp/minimega && \
