@@ -13,7 +13,7 @@ ENV EXPERIMENT_INTERFACE=lo
 
 # Create a new user with the specified UID
 RUN useradd -m -u 1001750000 firewheel
-RUN groupmod -g 1001750000 firewheel 
+RUN groupmod -g 1001750000 firewheel
 
 # Install dependencies
 RUN export DEBIAN_FRONTEND=noninteractive \
@@ -73,7 +73,8 @@ RUN bash -c "source /fwpy/bin/activate  && \
 RUN bash -c "source /fwpy/bin/activate  && \
     python3 -m pip install --upgrade firewheel-repo-base firewheel-repo-linux firewheel-repo-vyos firewheel-repo-layer2 firewheel-repo-tutorials firewheel-repo-dns firewheel-repo-ntp"
 
-RUN firewheel repository install -s -i
+# This makes the container much much larger
+# RUN firewheel repository install -s -i
 
 RUN cp /usr/bin/ssh /usr/bin/ssh-old && \
     cp /usr/bin/scp /usr/bin/scp-old && \
