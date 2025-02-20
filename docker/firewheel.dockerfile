@@ -80,7 +80,7 @@ RUN bash -c "source /fwpy/bin/activate  && \
     || { echo "Bash completion setup failed"; exit 1; } 
 
 
-RUN firewheel repository install -s -i
+RUN firewheel repository install -s -i || { echo "Repository installation failed"; exit 1; }
 
 RUN cp /usr/bin/ssh /usr/bin/ssh-old && \
     cp /usr/bin/scp /usr/bin/scp-old && \

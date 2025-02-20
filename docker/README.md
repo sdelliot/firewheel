@@ -22,8 +22,8 @@ docker build -t firewheel -f docker/firewheel.dockerfile .
 ```
 
 ### Low-Permissioned Enviornments
-If the container is running in a low-permissioned environment (e.g., volumes cannot be mounted or additional software cannot be installed on the host) than the container will still run, but lack the ability to launch VMs.
-Effectivily, this breaks minimega, but still enables the user to design and code the topology.
+If the container is running in a low-permissioned environment (e.g., volumes cannot be mounted or additional software cannot be installed on the host) than the container will still run, but _likely_ lack the ability to launch VMs or connect together.
+Effectively, this breaks minimega, but still enables the user to design and code the topology.
 That is, building new model components and topologies is still possible as is checking for dependency issues, syntax errors, etc.
 Model Components such as [`misc.print_graph`](https://sandialabs.github.io/firewheel/model_components/misc.print_graph.html) can be further leveraged to verify the network topology and scheduled events will occur as expected.
 To run the FIREWHEEL container in low-permissioned mode, use:
@@ -31,6 +31,11 @@ To run the FIREWHEEL container in low-permissioned mode, use:
 ```bash
 sudo docker run --rm -it ghcr.io/sandialabs/firewheel:main
 ```
+
+> [!NOTE]
+> During some tests, we were able to still launch VMs without KVM by changing the default CPU model from `host` to `qemu64` (see [minimega.parse_experiment_graph](https://github.com/sandialabs/firewheel_repo_base/blob/main/src/firewheel_repo_base/minimega/parse_experiment_graph/plugin.py#L53)).
+> However, there is a performance difference (due to using the [default CPU models](https://www.qemu.org/docs/master/system/i386/cpu.html#default-x86-cpu-models) which are designed to work on all systems but "leave the guest OS vulnerable to various CPU hardware flaws").
+> In addition to the CPU model change, VMs must **NOT** have a network interface (as OVS will not work).
 
 ### High-Permissioned Environments
 To access the full range of capabilities (including launching VMs), this docker container needs various system privileges and mounted volumes.
