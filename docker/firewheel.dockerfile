@@ -11,10 +11,6 @@ ENV USER_UID=1001750000
 ENV GRPC_HOSTNAME=localhost
 ENV EXPERIMENT_INTERFACE=lo
 
-# Create a new user with the specified UID
-# RUN useradd -m -u $USER_UID firewheel
-# RUN groupmod -g $USER_UID firewheel
-
 # Install dependencies
 RUN export DEBIAN_FRONTEND=noninteractive \
     && apt-get update && apt-get upgrade -y \
@@ -41,6 +37,11 @@ RUN wget https://github.com/mitchnegus/minimega-discovery/releases/download/fire
     dpkg -i discovery.deb && \
     rm discovery.deb
 RUN cd /usr/local/bin && for x in /opt/discovery/bin/*; do echo $x ; ln -s $x .; done
+
+
+# Create a new user with the specified UID
+RUN useradd -m -u $USER_UID firewheel
+# RUN groupmod -g $USER_UID firewheel
 
 # --#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#-- #
 
