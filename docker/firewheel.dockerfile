@@ -40,8 +40,9 @@ RUN cd /usr/local/bin && for x in /opt/discovery/bin/*; do echo $x ; ln -s $x .;
 
 
 # Create a new user with the specified UID
-RUN useradd -m -u $USER_UID firewheel
-# RUN groupmod -g $USER_UID firewheel
+# The -l is needed, see: https://stackoverflow.com/a/48770482
+RUN useradd -l -m -u $USER_UID firewheel
+RUN groupmod -g $USER_UID firewheel
 
 # --#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#-- #
 
@@ -90,5 +91,11 @@ RUN chmod +x /usr/local/bin/entry && \
     chmod +x /start-minimega.sh
 
 # --#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#-- #
+
+# Change ownership of all files in the container to the new user
+# Note: This should be done after all files are copied to the image
+# (e.g., after COPY or ADD commands)
+RUN chown -R $USER_UID:$USER_UID /fwpy /start-minimega.sh /tmp /scratch /var/log /opt
+USER $USER
 
 ENTRYPOINT ["/usr/local/bin/entry"]
