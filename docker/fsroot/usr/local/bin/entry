@@ -47,7 +47,7 @@ if tty -s; then
     fi
 else
     # Sleep until we need to shut down.
-    sleep 100000
+    sleep infinity
 fi
 
 grn "Stopping experiment...     "

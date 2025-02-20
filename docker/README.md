@@ -21,12 +21,12 @@ If building the image is necessary, than it must be built from the base director
 docker build -t firewheel -f docker/firewheel.dockerfile .
 ```
 
-### Low-Permissioned Enviornments
-If the container is running in a low-permissioned environment (e.g., volumes cannot be mounted or additional software cannot be installed on the host) than the container will still run, but _likely_ lack the ability to launch VMs or connect together.
+### Low-Trust Enviornments
+If the container is running in a low-trust environment (e.g., volumes cannot be mounted or additional software cannot be installed on the host) than the container will still run, but _likely_ lack the ability to launch VMs or connect together.
 Effectively, this breaks minimega, but still enables the user to design and code the topology.
 That is, building new model components and topologies is still possible as is checking for dependency issues, syntax errors, etc.
 Model Components such as [`misc.print_graph`](https://sandialabs.github.io/firewheel/model_components/misc.print_graph.html) can be further leveraged to verify the network topology and scheduled events will occur as expected.
-To run the FIREWHEEL container in low-permissioned mode, use:
+To run the FIREWHEEL container in low-trust mode, use:
 
 ```bash
 sudo docker run --rm -it ghcr.io/sandialabs/firewheel:main
@@ -37,7 +37,7 @@ sudo docker run --rm -it ghcr.io/sandialabs/firewheel:main
 > However, there is a performance difference (due to using the [default CPU models](https://www.qemu.org/docs/master/system/i386/cpu.html#default-x86-cpu-models) which are designed to work on all systems but "leave the guest OS vulnerable to various CPU hardware flaws").
 > In addition to the CPU model change, VMs must **NOT** have a network interface (as OVS will not work).
 
-### High-Permissioned Environments
+### High-Trust Environments
 To access the full range of capabilities (including launching VMs), this docker container needs various system privileges and mounted volumes.
 
 > [!IMPORTANT] 
@@ -45,7 +45,7 @@ To access the full range of capabilities (including launching VMs), this docker 
 > * The host running the docker container must have Open vSwitch installed.
 > * The host running the docker container must have QEMU/KVM installed.
 
-Once the prerequisits have been met, the FIREWHEEL container can be started via:
+Once the prerequisites have been met, the FIREWHEEL container can be started via:
 
 ```bash
 sudo docker run --rm -it --privileged --cap-add ALL -v /dev:/dev -v /lib/modules:/lib/modules:ro ghcr.io/sandialabs/firewheel:main
@@ -62,7 +62,7 @@ Once the container is launched, it will kick off a script which ensures that a n
 
 Users will need to install any extra images or load any new model components that need to be placed into the environment.
 It is also possible to mount a new volume with those pre-loaded model components, for example `-v /opt/firewheel/model_components:/models`.
-Then once the envionment is started, simply add that path as a new model component repository (e.g., `firewheel repository install /models`).
+Then once the environment is started, simply add that path as a new model component repository (e.g., `firewheel repository install /models`).
 
 ## FIREWHEEL, minimega, and miniweb configuration
 
@@ -78,3 +78,27 @@ The minimega configuration values can be overwritten either by passing environme
 > Currently, the FIREWHEEL configuration options are hard-coded to work with this configuration.
 > Flexibility in setting these values may be provided in a future release.
 >  overwritten via Docker environment variables.
+
+
+## Technical Details
+As with most docker containers, the default user is `root`.
+However, we have also created a separate `firewheel` user that has a large `uid` and can be used in low-trust environments where a root user may not be permitted.
+
+### Default Program Changes
+To enable FIREWHEEL to work properly (without any modifications) the docker based implementation needed to avoid some FIREWHEEL/minimega required packages.
+These include:
+- `sudo` - and specifically `sudo systemctl`
+- `chgrp`
+- `scp`
+- `ssh`
+
+Therefore, we have created wrappers around these programs to adjust the behavior.
+However, the original programs have been kept/renamed to `<progname>-old` (e.g., `ssh-old`).
+Therefore, if these programs are needed, they are still available, but will not be used by FIREWHEEL.
+
+### Minimega Differences
+The minimega container provides a [`start-minimega.sh`](https://github.com/sandia-minimega/minimega/blob/master/docker/start-minimega.sh) script which is overwritten by a customized version in the FIREWHEEL container.
+The primary difference between these scripts is the addition of logging various errors and exiting early if minimega is already running.
+
+Additionally, we include a minimega environment variables configuration file (described above) which can be used/changed as needed.
+Within the container it is located at `/etc/default/minimega`.
