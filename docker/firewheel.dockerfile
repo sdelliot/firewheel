@@ -12,7 +12,7 @@ ENV GRPC_HOSTNAME=localhost
 ENV EXPERIMENT_INTERFACE=lo
 
 # Install dependencies
-RUN export DEBIAN_FRONTEND=noninteractive \
+RUN export DEBIAN_FRONTEND=noninteractive && \
     apt-get update && apt-get upgrade -y && \
     apt-get install -y sudo git git-lfs build-essential tar net-tools procps tmux \
                         ethtool libpcap-dev openvswitch-switch qemu-kvm qemu-utils \
