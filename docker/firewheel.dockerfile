@@ -13,36 +13,39 @@ ENV EXPERIMENT_INTERFACE=lo
 
 # Install dependencies
 RUN export DEBIAN_FRONTEND=noninteractive \
-    && apt-get update && apt-get upgrade -y \
-    && apt-get install -y sudo git git-lfs build-essential tar net-tools procps tmux \
-                          ethtool libpcap-dev openvswitch-switch qemu-kvm qemu-utils \
-                          dnsmasq ntfs-3g iproute2 qemu-system-x86 software-properties-common \
-                          dosfstools openssh-server locales locales-all python3.10 python3.10-venv \
-                          vim psmisc
+    apt-get update && apt-get upgrade -y && \
+    apt-get install -y sudo git git-lfs build-essential tar net-tools procps tmux \
+                        ethtool libpcap-dev openvswitch-switch qemu-kvm qemu-utils \
+                        dnsmasq ntfs-3g iproute2 qemu-system-x86 software-properties-common \
+                        dosfstools openssh-server locales locales-all python3.10 python3.10-venv \
+                        vim psmisc && \
+    apt-get clean && rm -rf /var/lib/apt/lists/* || { echo "Package installation failed"; exit 1; }
 
 ### Locale support ###
 ENV LANG=en_US.UTF-8
 ENV LANGUAGE=en_US.UTF-8
 ENV LC_ALL=en_US.UTF-8
-RUN localedef -i en_US -f UTF-8 en_US.UTF-8
-RUN echo "LANG=\"en_US.UTF-8\"" > /etc/locale.conf
+RUN localedef -i en_US -f UTF-8 en_US.UTF-8 && \
+    echo "LANG=\"en_US.UTF-8\"" > /etc/locale.conf || { echo "Locale setup failed"; exit 1; }
 ### Locale Support END ###
 
 
 # --#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#-- #
 
 WORKDIR /
+
 # Install discovery
 RUN wget https://github.com/mitchnegus/minimega-discovery/releases/download/firewheel-debian_faed761/discovery.deb && \
     dpkg -i discovery.deb && \
-    rm discovery.deb
-RUN cd /usr/local/bin && for x in /opt/discovery/bin/*; do echo $x ; ln -s $x .; done
+    rm discovery.deb && \
+    cd /usr/local/bin && for x in /opt/discovery/bin/*; do echo $x ; ln -s $x .; done \
+    || { echo "Discovery installation failed"; exit 1; }
 
 # Create a new user with the specified UID
 # The --no-log-init is needed, see: https://stackoverflow.com/a/48770482
-RUN useradd --no-log-init --create-home --shell /bin/bash  --user-group --uid $USER_UID $USER
-RUN groupmod -g $USER_UID firewheel
-RUN usermod -a -G $USER root
+RUN useradd --no-log-init --create-home --shell /bin/bash --user-group --uid $USER_UID $USER && \
+    groupmod -g $USER_UID firewheel && \
+    usermod -a -G $USER root || { echo "User creation failed"; exit 1; }
 
 # --#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#-- #
 
@@ -51,9 +54,11 @@ RUN bash -c "python3.10 -m venv /fwpy \
     && source /fwpy/bin/activate \
     && python3 -m pip install --upgrade wheel setuptools pip \
     && python3 -m pip install --upgrade firewheel \
-    && ln -s /fwpy/bin/firewheel /usr/local/bin/firewheel"
+    && python3 -m pip install --upgrade firewheel-repo-base firewheel-repo-linux firewheel-repo-vyos firewheel-repo-layer2 firewheel-repo-tutorials firewheel-repo-dns firewheel-repo-ntp \
+    && ln -s /fwpy/bin/firewheel /usr/local/bin/firewheel" \
+    || { echo "Firewheel installation failed"; exit 1; }
 
-
+# Configure Firewheel
 RUN bash -c "source /fwpy/bin/activate  && \
     mkdir -p /var/log/minimega && \
     mkdir -p /scratch/firewheel && \
@@ -64,20 +69,16 @@ RUN bash -c "source /fwpy/bin/activate  && \
     firewheel config set -s minimega.files_dir /tmp/minimega/files && \
     firewheel config set -s python.venv /fwpy && \
     firewheel config set -s python.bin python3 && \
-    firewheel config set -s logging.root_dir /scratch/firewheel"
+    firewheel config set -s logging.root_dir /scratch/firewheel" \
+    || { echo "Firewheel configuration failed"; exit 1; }
 
 # Set up Bash completion
 RUN bash -c "source /fwpy/bin/activate  && \
     prep_fw_tab_completion && \
-    echo 'source \$(/fwpy/bin/prep_fw_tab_completion --print-path)' >> /root/.bashrc"
+    echo 'source \$(/fwpy/bin/prep_fw_tab_completion --print-path)' >> /root/.bashrc && \
+    echo 'source \$(/fwpy/bin/prep_fw_tab_completion --print-path)' >> /home/$USER/.bashrc" \
+    || { echo "Bash completion setup failed"; exit 1; } 
 
-RUN bash -c "source /fwpy/bin/activate  && \
-    prep_fw_tab_completion && \
-    echo 'source \$(/fwpy/bin/prep_fw_tab_completion --print-path)' >> /home/$USER/.bashrc"
-
-# Add some supported model components
-RUN bash -c "source /fwpy/bin/activate  && \
-    python3 -m pip install --upgrade firewheel-repo-base firewheel-repo-linux firewheel-repo-vyos firewheel-repo-layer2 firewheel-repo-tutorials firewheel-repo-dns firewheel-repo-ntp"
 
 RUN firewheel repository install -s -i
 
