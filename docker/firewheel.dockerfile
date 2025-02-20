@@ -6,7 +6,7 @@ FROM ghcr.io/sandia-minimega/minimega/minimega:master AS minimega
 ENV MM_INSTALL_DIR=/opt/minimega
 ENV MINIMEGA_CONFIG=/etc/default/minimega
 ENV MM_BASE=/tmp/minimega
-ENV USER=root
+ENV USER=firewheel
 ENV USER_UID=1001750000
 ENV GRPC_HOSTNAME=localhost
 ENV EXPERIMENT_INTERFACE=lo
@@ -38,11 +38,10 @@ RUN wget https://github.com/mitchnegus/minimega-discovery/releases/download/fire
     rm discovery.deb
 RUN cd /usr/local/bin && for x in /opt/discovery/bin/*; do echo $x ; ln -s $x .; done
 
-
 # Create a new user with the specified UID
-# The -l is needed, see: https://stackoverflow.com/a/48770482
-RUN useradd -l -m -u $USER_UID firewheel
-RUN groupmod -g $USER_UID firewheel
+# The --no-log-init is needed, see: https://stackoverflow.com/a/48770482
+RUN useradd --no-log-init --create-home --shell /bin/bash  --user-group --uid $USER_UID $USER
+RUN usermod -a -G $USER root
 
 # --#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#-- #
 
@@ -57,7 +56,7 @@ RUN bash -c "python3.10 -m venv /fwpy \
 RUN bash -c "source /fwpy/bin/activate  && \
     mkdir -p /var/log/minimega && \
     mkdir -p /scratch/firewheel && \
-    firewheel config set -s system.default_group root && \
+    firewheel config set -s system.default_group $USER && \
     firewheel config set -s minimega.experiment_interface lo && \
     firewheel config set -s system.default_output_dir /scratch/firewheel && \
     firewheel config set -s minimega.base_dir /tmp/minimega && \
@@ -70,6 +69,10 @@ RUN bash -c "source /fwpy/bin/activate  && \
 RUN bash -c "source /fwpy/bin/activate  && \
     prep_fw_tab_completion && \
     echo 'source \$(/fwpy/bin/prep_fw_tab_completion --print-path)' >> /root/.bashrc"
+
+RUN bash -c "source /fwpy/bin/activate  && \
+    prep_fw_tab_completion && \
+    echo 'source \$(/fwpy/bin/prep_fw_tab_completion --print-path)' >> /home/$USER/.bashrc"
 
 # Add some supported model components
 RUN bash -c "source /fwpy/bin/activate  && \
@@ -96,6 +99,5 @@ RUN chmod +x /usr/local/bin/entry && \
 # Note: This should be done after all files are copied to the image
 # (e.g., after COPY or ADD commands)
 RUN chown -R $USER_UID:$USER_UID /fwpy /start-minimega.sh /tmp /scratch /var/log /opt
-USER $USER
 
 ENTRYPOINT ["/usr/local/bin/entry"]
