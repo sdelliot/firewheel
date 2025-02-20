@@ -41,6 +41,7 @@ RUN cd /usr/local/bin && for x in /opt/discovery/bin/*; do echo $x ; ln -s $x .;
 # Create a new user with the specified UID
 # The --no-log-init is needed, see: https://stackoverflow.com/a/48770482
 RUN useradd --no-log-init --create-home --shell /bin/bash  --user-group --uid $USER_UID $USER
+RUN groupmod -g $USER_UID firewheel
 RUN usermod -a -G $USER root
 
 # --#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#-- #
