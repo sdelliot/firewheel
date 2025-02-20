@@ -12,8 +12,8 @@ ENV GRPC_HOSTNAME=localhost
 ENV EXPERIMENT_INTERFACE=lo
 
 # Create a new user with the specified UID
-RUN useradd -m -u $USER_UID firewheel
-RUN groupmod -g $USER_UID firewheel
+# RUN useradd -m -u $USER_UID firewheel
+# RUN groupmod -g $USER_UID firewheel
 
 # Install dependencies
 RUN export DEBIAN_FRONTEND=noninteractive \
