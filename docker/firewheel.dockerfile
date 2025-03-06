@@ -1,4 +1,4 @@
-FROM ghcr.io/sandia-minimega/minimega/minimega:master AS minimega
+FROM ghcr.io/sandia-minimega/minimega:master AS minimega
 
 # --#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#-- #
 
