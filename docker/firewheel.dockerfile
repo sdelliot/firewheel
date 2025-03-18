@@ -15,7 +15,7 @@ ENV EXPERIMENT_INTERFACE=lo
 RUN export DEBIAN_FRONTEND=noninteractive && \
     apt-get update && apt-get upgrade -y && \
     apt-get install -y sudo git git-lfs build-essential tar net-tools procps tmux \
-                        ethtool libpcap-dev openvswitch-switch qemu-kvm qemu-utils \
+                        ethtool libpcap-dev qemu-kvm qemu-utils \
                         dnsmasq ntfs-3g iproute2 qemu-system-x86 software-properties-common \
                         dosfstools openssh-server locales locales-all python3.10 python3.10-venv \
                         vim psmisc && \
@@ -48,6 +48,27 @@ RUN useradd --no-log-init --create-home --shell /bin/bash --user-group --uid $US
     usermod -a -G $USER root || { echo "User creation failed"; exit 1; }
 
 # --#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#--#-- #
+
+### Open vSwitch Installation ###
+# This needs to be installed in user-mode
+RUN git clone https://github.com/openvswitch/ovs.git && \
+    cd ovs && git checkout origin/branch-3.5 && cd ..
+
+# Install dependencies
+RUN export DEBIAN_FRONTEND=noninteractive \
+    && apt-get update && apt-get upgrade -y \
+    && apt-get install -y make gcc autoconf automake libtool libssl-dev libcap-ng-dev unbound
+
+RUN cd ovs && ./boot.sh && \
+    ./configure --prefix=/usr --localstatedir=/var --sysconfdir=/etc && \
+    make && make install && \
+    cd ..
+
+RUN mkdir /dev/net && \
+    mknod /dev/net/tun c 10 200 && \
+    export PATH=$PATH:/usr/share/openvswitch/scripts && ovs-ctl start
+
+
 
 ## Firewheel installation
 RUN bash -c "python3.10 -m venv /fwpy \
