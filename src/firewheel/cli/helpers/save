@@ -26,7 +26,13 @@ from pathlib import Path
 
 import minimega
 from rich.console import Console
-from rich.progress import Progress, Spinner, MofNCompleteColumn, TextColumn, TaskProgressColumn, BarColumn, TimeRemainingColumn, DownloadColumn
+from rich.progress import (
+    Progress,
+    BarColumn,
+    TextColumn,
+    MofNCompleteColumn,
+    TimeRemainingColumn,
+)
 
 from firewheel.cli.utils import cli_output_theme
 from firewheel.lib.minimega.api import minimegaAPI
@@ -35,6 +41,7 @@ from firewheel.lib.minimega.file_store import FileStore
 from firewheel.vm_resource_manager.vm_mapping import VMMapping
 from firewheel.vm_resource_manager.schedule_db import ScheduleDb
 from firewheel.vm_resource_manager.vm_resource_store import VmResourceStore
+
 
 def save_vm_state(experiment_name="firewheel_experiment", complete=False):
     """
@@ -94,7 +101,10 @@ def save_vm_state(experiment_name="firewheel_experiment", complete=False):
             if exp_files.exists():
                 with console.status("[yellow]Copying VM State/HDD files...[/yellow]", spinner="line"):
                     shutil.copytree(exp_files, temp_path / exp_files.name)
-                console.print(f"[green]Copied VM State/HDD files from [cyan]{exp_files}[/cyan] to [cyan]{temp_path}[/cyan]")
+                console.print(
+                    "[green]Copied VM State/HDD files from "
+                    f"[cyan]{exp_files}[/cyan] to [cyan]{temp_path}[/cyan]"
+                )
             else:
                 console.print(f"[yellow]The VM State/HDD files at [cyan]{exp_files}[/cyan] do not exist![/yellow]")
         except OSError as exc:
@@ -134,7 +144,10 @@ def save_vm_state(experiment_name="firewheel_experiment", complete=False):
                 if img_files.exists():
                     with console.status("[yellow]Copying ImageStore cache...[/yellow]", spinner="line"):
                         shutil.copytree(img_files, temp_path / img_files.name)
-                    console.print(f"[green]Copied Image files from [cyan]{img_files}[/cyan] to [cyan]{temp_path}[/cyan]")
+                    console.print(
+                        "[green]Copied Image files from "
+                        f"[cyan]{img_files}[/cyan] to [cyan]{temp_path}[/cyan]"
+                    )
                 else:
                     console.print(f"[yellow]The Image files at [cyan]{img_files}[/cyan] do not exist[/yellow]")
             except OSError as exc:
@@ -146,7 +159,10 @@ def save_vm_state(experiment_name="firewheel_experiment", complete=False):
                 if vmr_files.exists():
                     with console.status("[yellow]Copying VM Resource cache...[/yellow]", spinner="line"):
                         shutil.copytree(vmr_files, temp_path / vmr_files.name)
-                    console.print(f"[green]Copied VM Resources files from [cyan]{vmr_files}[/cyan] to [cyan]{temp_path}[/cyan]")
+                    console.print(
+                        "[green]Copied VM Resources files from "
+                        f"[cyan]{vmr_files}[/cyan] to [cyan]{temp_path}[/cyan]"
+                    )
                 else:
                     console.print(f"[yellow]The VM Resources files at [cyan]{vmr_files}[/cyan] do not exist[/yellow]")
             except OSError as exc:
@@ -164,6 +180,7 @@ def save_vm_state(experiment_name="firewheel_experiment", complete=False):
 
         console.print(f"[green]VM state saved to [cyan]{archive_file}[/cyan] successfully.[/green]")
     return 0
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Save VM state and schedule files.")
