@@ -25,6 +25,8 @@ import tempfile
 from pathlib import Path
 
 import minimega
+from rich.console import Console
+from rich.progress import Spinner
 
 from firewheel.lib.minimega.api import minimegaAPI
 from firewheel.control.image_store import ImageStore
@@ -33,6 +35,7 @@ from firewheel.vm_resource_manager.vm_mapping import VMMapping
 from firewheel.vm_resource_manager.schedule_db import ScheduleDb
 from firewheel.vm_resource_manager.vm_resource_store import VmResourceStore
 
+console = Console()
 
 def save_vm_state(experiment_name="firewheel_experiment", complete=False):
     """
@@ -54,21 +57,22 @@ def save_vm_state(experiment_name="firewheel_experiment", complete=False):
 
     # Make the API call to "namespace save"
     try:
-        mm_api.mm.ns_hosts()
         # mm_api.mm.ns_snapshot(name=experiment_name)
-        print("Namespace saved successfully.")
-    except minimega.Error:
-        raise
+        mm_api.mm.ns_hosts()
+        console.print("[green]Namespace saved successfully.[/green]")
+    except minimega.Error as exp:
+        console.print(f"[red]Error saving namespace: {exp}[/red]")
+        return 1
 
     # Create a FileStore for the "saved" directory
     try:
-
         saved_exp = FileStore("saved")
     except Exception as exp:
-        print("FileStore connection failed.")
+        console.print("[red]FileStore connection failed.[/red]")
         raise RuntimeError(
             f"Invalid value for FileStore connection. Details: {exp}"
         ) from exp
+
     exp_files = Path(saved_exp.get_file_path(experiment_name))
 
     # Initialize VMMapping and ScheduleDb
@@ -76,7 +80,6 @@ def save_vm_state(experiment_name="firewheel_experiment", complete=False):
     schedule_db = ScheduleDb()
 
     # Retrieve experiment state
-
     mapping = vm_mapping.get_all()
     files = schedule_db.cache.list_distinct_contents()
     schedule_db_paths = [schedule_db.cache.get_path(file) for file in files]
@@ -89,67 +92,69 @@ def save_vm_state(experiment_name="firewheel_experiment", complete=False):
         try:
             if exp_files.exists():
                 shutil.copytree(exp_files, temp_path / exp_files.name)
-                print(f"Copied VM State/HDD files from {exp_files} to {temp_path}")
+                console.print(f"[green]Copied VM State/HDD files from [cyan]{exp_files}[/cyan] to [cyan]{temp_path}[/cyan]")
             else:
-                print(f"The VM State/HDD files at {exp_files} do not exist")
+                console.print(f"[yellow]The VM State/HDD files at [cyan]{exp_files}[/cyan] do not exist[/yellow]")
         except OSError as exc:
-            print(f"Error copying VM State/HD directory {exp_files}: {exc}")
+            console.print(f"[red]Error copying VM State/HD directory [cyan]{exp_files}[/cyan]: {exc}[/red]")
 
+        # Save VM mapping states to a JSON file
         mapping_file = temp_path / "vm_mapping.json"
         try:
             with open(mapping_file, "w", encoding="utf-8") as f:
                 json.dump(mapping, f)
-            print(f"VM mapping states saved to {mapping_file} successfully.")
+            console.print(f"[green]VM mapping states saved to [cyan]{mapping_file}[/cyan] successfully.[/green]")
         except OSError as exc:
-            print(f"Error saving VM mapping states to file: {exc}")
+            console.print(f"[red]Error saving VM mapping states to file: {exc}[/red]")
             return 1
 
+        # Copy schedule files to the temporary directory
         for file in schedule_db_paths:
             try:
                 shutil.copy(file, temp_path)
-                print(f"Copied VM schedule file {file} to {temp_path}")
+                console.print(f"[green]Copied VM schedule file [cyan]{file}[/cyan] to [cyan]{temp_path}[/cyan]")
             except OSError as exc:
-                print(f"Error copying schedule file {file}: {exc}")
+                console.print(f"[red]Error copying schedule file {file}: {exc}[/red]")
                 return 1
 
+        # If complete is True, copy all cached images and VM resources
         if complete:
             image_store = ImageStore()
             img_files = Path(image_store.cache)
             try:
                 if img_files.exists():
-                    print(f"Copying ImageStore cache")
-                    shutil.copytree(img_files, temp_path / img_files.name)
-                    print(f"Copied Image files from {img_files} to {temp_path}")
+                    with console.status("[yellow]Copying ImageStore cache...[/yellow]", spinner="line"):
+                        shutil.copytree(img_files, temp_path / img_files.name)
+                    console.print(f"[green]Copied Image files from [cyan]{img_files}[/cyan] to {temp_path}[/cyan]")
                 else:
-                    print(f"The Image files at {img_files} do not exist")
+                    console.print(f"[yellow]The Image files at [cyan]{img_files}[/cyan] do not exist[/yellow]")
             except OSError as exc:
-                print(f"Error copying Image directory {img_files}: {exc}")
+                console.print(f"[red]Error copying Image directory [cyan]{img_files}[/cyan]: {exc}[/red]")
 
             vmr_store = VmResourceStore()
             vmr_files = Path(vmr_store.cache)
             try:
                 if vmr_files.exists():
-                    print(f"Copying VM Resource cache")
-                    shutil.copytree(vmr_files, temp_path / vmr_files.name)
-                    print(f"Copied VM Resources files from {vmr_files} to {temp_path}")
+                    with console.status("[yellow]Copying VM Resource cache...[/yellow]", spinner="line"):
+                        shutil.copytree(vmr_files, temp_path / vmr_files.name)
+                    console.print(f"[green]Copied VM Resources files from [cyan]{vmr_files}[/cyan] to [cyan]{temp_path}[/cyan]")
                 else:
-                    print(f"The VM Resources files at {vmr_files} do not exist")
+                    console.print(f"[yellow]The VM Resources files at [cyan]{vmr_files}[/cyan] do not exist[/yellow]")
             except OSError as exc:
-                print(f"Error copying VM Resources directory {vmr_files}: {exc}")
+                console.print(f"[red]Error copying VM Resources directory [cyan]{vmr_files}[/cyan]: {exc}[/red]")
 
         # Compress the temporary directory into a single archive
-        archive_file = Path("experiment_backup.tar.gz")
+        archive_file = Path(f"{experiment_name}_backup.tar.gz")
         try:
-            print(f"Compressing data")
+            console.print(f"[yellow]Compressing data...[/yellow]")
             shutil.make_archive(archive_file.stem, "gztar", temp_path)
-            print(f"Compressed data saved to {archive_file} successfully.")
+            console.print(f"[green]Compressed data saved to [cyan]{archive_file}[/cyan] successfully.[/green]")
         except OSError as exc:
-            print(f"Error compressing the temporary directory: {exc}")
+            console.print(f"[red]Error compressing the temporary directory: {exc}[/red]")
             return 1
 
-        print(f"VM state saved to {archive_file} successfully.")
+        console.print(f"[green]VM state saved to [cyan]{archive_file}[/cyan] successfully.[/green]")
     return 0
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Save VM state and schedule files.")
