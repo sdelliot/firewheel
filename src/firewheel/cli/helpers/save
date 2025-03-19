@@ -26,7 +26,7 @@ from pathlib import Path
 
 import minimega
 from rich.console import Console
-from rich.progress import Spinner
+from rich.progress import Progress, Spinner
 
 from firewheel.lib.minimega.api import minimegaAPI
 from firewheel.control.image_store import ImageStore
@@ -91,7 +91,8 @@ def save_vm_state(experiment_name="firewheel_experiment", complete=False):
         # Copy the saved namespace files to the temporary directory
         try:
             if exp_files.exists():
-                shutil.copytree(exp_files, temp_path / exp_files.name)
+                with console.status("[yellow]Copying VM State/HDD files...[/yellow]", spinner="line"):
+                    shutil.copytree(exp_files, temp_path / exp_files.name)
                 console.print(f"[green]Copied VM State/HDD files from [cyan]{exp_files}[/cyan] to [cyan]{temp_path}[/cyan]")
             else:
                 console.print(f"[yellow]The VM State/HDD files at [cyan]{exp_files}[/cyan] do not exist[/yellow]")
@@ -109,13 +110,17 @@ def save_vm_state(experiment_name="firewheel_experiment", complete=False):
             return 1
 
         # Copy schedule files to the temporary directory
-        for file in schedule_db_paths:
-            try:
-                shutil.copy(file, temp_path)
-                console.print(f"[green]Copied VM schedule file [cyan]{file}[/cyan] to [cyan]{temp_path}[/cyan]")
-            except OSError as exc:
-                console.print(f"[red]Error copying schedule file {file}: {exc}[/red]")
-                return 1
+        with Progress() as progress:
+            task = progress.add_task("[yellow]Copying schedule files...", total=len(schedule_db_paths))
+
+            for file in schedule_db_paths:
+                try:
+                    shutil.copy(file, temp_path)
+                except OSError as exc:
+                    console.print(f"[red]Error copying schedule file {file}: {exc}[/red]")
+                    return 1
+
+                progress.update(task, advance=1)
 
         # If complete is True, copy all cached images and VM resources
         if complete:
@@ -146,8 +151,8 @@ def save_vm_state(experiment_name="firewheel_experiment", complete=False):
         # Compress the temporary directory into a single archive
         archive_file = Path(f"{experiment_name}_backup.tar.gz")
         try:
-            console.print(f"[yellow]Compressing data...[/yellow]")
-            shutil.make_archive(archive_file.stem, "gztar", temp_path)
+            with console.status("[yellow]Compressing data...[/yellow]", spinner="line"):
+                shutil.make_archive(archive_file.stem, "gztar", temp_path)
             console.print(f"[green]Compressed data saved to [cyan]{archive_file}[/cyan] successfully.[/green]")
         except OSError as exc:
             console.print(f"[red]Error compressing the temporary directory: {exc}[/red]")
