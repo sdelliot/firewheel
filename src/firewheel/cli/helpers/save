@@ -114,9 +114,10 @@ def save_vm_state(experiment_name="firewheel_experiment", complete=False):
 
         if complete:
             image_store = ImageStore()
-            img_files = Path(image_store.get_file_path(experiment_name))
+            img_files = Path(image_store.cache)
             try:
                 if img_files.exists():
+                    print(f"Copying ImageStore cache")
                     shutil.copytree(img_files, temp_path / img_files.name)
                     print(f"Copied Image files from {img_files} to {temp_path}")
                 else:
@@ -125,9 +126,10 @@ def save_vm_state(experiment_name="firewheel_experiment", complete=False):
                 print(f"Error copying Image directory {img_files}: {exc}")
 
             vmr_store = VmResourceStore()
-            vmr_files = Path(vmr_store.get_file_path(experiment_name))
+            vmr_files = Path(vmr_store.cache)
             try:
                 if vmr_files.exists():
+                    print(f"Copying VM Resource cache")
                     shutil.copytree(vmr_files, temp_path / vmr_files.name)
                     print(f"Copied VM Resources files from {vmr_files} to {temp_path}")
                 else:
@@ -138,6 +140,7 @@ def save_vm_state(experiment_name="firewheel_experiment", complete=False):
         # Compress the temporary directory into a single archive
         archive_file = Path("experiment_backup.tar.gz")
         try:
+            print(f"Compressing data")
             shutil.make_archive(archive_file.stem, "gztar", temp_path)
             print(f"Compressed data saved to {archive_file} successfully.")
         except OSError as exc:
