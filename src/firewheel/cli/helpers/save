@@ -6,55 +6,69 @@ DESCRIPTION
 This Helper saves the current state of all VMs in the VM mapping and schedule database after making a Minimega API call to "ns save".
 The saved information is compressed into a single archive.
 
-**Usage:**  ``firewheel save [--name EXPERIMENT_NAME]``
+**Usage:**  ``firewheel save [--name EXPERIMENT_NAME] [--complete]``
 
 Example
 +++++++
 
-``firewheel save --name my_experiment``
+``firewheel save --name my_experiment --complete``
 
 DONE
 
 RUN Python ON control
 #!/usr/bin/env python
-import os
-import gzip
+import sys
 import json
 import shutil
-import tempfile
 import argparse
+import tempfile
 from pathlib import Path
 
 import minimega
 
+from firewheel.lib.minimega.api import minimegaAPI
+from firewheel.control.image_store import ImageStore
 from firewheel.lib.minimega.file_store import FileStore
 from firewheel.vm_resource_manager.vm_mapping import VMMapping
 from firewheel.vm_resource_manager.schedule_db import ScheduleDb
-from firewheel.lib.minimega.api import minimegaAPI
+from firewheel.vm_resource_manager.vm_resource_store import VmResourceStore
 
-def save_vm_state(experiment_name="firewheel_experiment"):
+
+def save_vm_state(experiment_name="firewheel_experiment", complete=False):
+    """
+    Saves the current state of all VMs and their schedules, optionally including all files from the experiment.
+
+    Args:
+        experiment_name (str): The name of the experiment to save.
+        complete (bool): If True, save all files from the experiment, including cached images and VM resources.
+
+    Returns:
+        int: 0 on success, 1 on failure.
+
+    Raises:
+        minimega.Error: If the minimega namespace (i.e., all VMs in the experiment) is not saved successfully.
+        RuntimeError: If we cannot connect to the location where the minimega namespace saved its files.
+    """
     # Initialize Minimega client
     mm_api = minimegaAPI()
 
     # Make the API call to "namespace save"
     try:
         mm_api.mm.ns_hosts()
-        #mm_api.mm.ns_snapshot(name=experiment_name)
+        # mm_api.mm.ns_snapshot(name=experiment_name)
         print("Namespace saved successfully.")
-    except minimega.Error as exp:
+    except minimega.Error:
         raise
 
-
+    # Create a FileStore for the "saved" directory
     try:
-        # Create a FileStore for the "saved" directory
+
         saved_exp = FileStore("saved")
     except Exception as exp:
         print("FileStore connection failed.")
         raise RuntimeError(
             f"Invalid value for FileStore connection. Details: {exp}"
         ) from exp
-
-
     exp_files = Path(saved_exp.get_file_path(experiment_name))
 
     # Initialize VMMapping and ScheduleDb
@@ -65,7 +79,7 @@ def save_vm_state(experiment_name="firewheel_experiment"):
 
     mapping = vm_mapping.get_all()
     files = schedule_db.cache.list_distinct_contents()
-    schedule_db_paths = [ schedule_db.cache.get_path(file) for file in files ]
+    schedule_db_paths = [schedule_db.cache.get_path(file) for file in files]
 
     # Create a temporary directory to store the data
     with tempfile.TemporaryDirectory() as temp_dir:
@@ -78,41 +92,69 @@ def save_vm_state(experiment_name="firewheel_experiment"):
                 print(f"Copied VM State/HDD files from {exp_files} to {temp_path}")
             else:
                 print(f"The VM State/HDD files at {exp_files} do not exist")
-        except Exception as e:
-            print(f"Error copying VM State/HD directory {exp_files}: {e}")
+        except OSError as exc:
+            print(f"Error copying VM State/HD directory {exp_files}: {exc}")
 
         mapping_file = temp_path / "vm_mapping.json"
         try:
-            with open(mapping_file, 'w', encoding='utf-8') as f:
+            with open(mapping_file, "w", encoding="utf-8") as f:
                 json.dump(mapping, f)
             print(f"VM mapping states saved to {mapping_file} successfully.")
-        except Exception as e:
-            print(f"Error saving VM mapping states to file: {e}")
+        except OSError as exc:
+            print(f"Error saving VM mapping states to file: {exc}")
             return 1
 
         for file in schedule_db_paths:
             try:
                 shutil.copy(file, temp_path)
                 print(f"Copied VM schedule file {file} to {temp_path}")
-            except Exception as e:
-                print(f"Error copying schedule file {file}: {e}")
+            except OSError as exc:
+                print(f"Error copying schedule file {file}: {exc}")
                 return 1
+
+        if complete:
+            image_store = ImageStore()
+            img_files = Path(image_store.get_file_path(experiment_name))
+            try:
+                if img_files.exists():
+                    shutil.copytree(img_files, temp_path / img_files.name)
+                    print(f"Copied Image files from {img_files} to {temp_path}")
+                else:
+                    print(f"The Image files at {img_files} do not exist")
+            except OSError as exc:
+                print(f"Error copying Image directory {img_files}: {exc}")
+
+            vmr_store = VmResourceStore()
+            vmr_files = Path(vmr_store.get_file_path(experiment_name))
+            try:
+                if vmr_files.exists():
+                    shutil.copytree(vmr_files, temp_path / vmr_files.name)
+                    print(f"Copied VM Resources files from {vmr_files} to {temp_path}")
+                else:
+                    print(f"The VM Resources files at {vmr_files} do not exist")
+            except OSError as exc:
+                print(f"Error copying VM Resources directory {vmr_files}: {exc}")
 
         # Compress the temporary directory into a single archive
         archive_file = Path("experiment_backup.tar.gz")
         try:
-            shutil.make_archive(archive_file.stem, 'gztar', temp_path)
+            shutil.make_archive(archive_file.stem, "gztar", temp_path)
             print(f"Compressed data saved to {archive_file} successfully.")
-        except Exception as e:
-            print(f"Error compressing the temporary directory: {e}")
+        except OSError as exc:
+            print(f"Error compressing the temporary directory: {exc}")
             return 1
 
         print(f"VM state saved to {archive_file} successfully.")
     return 0
 
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Save VM state and schedule files.")
     parser.add_argument("--name", type=str, default="firewheel_experiment", help="Name of the experiment to save.")
+    parser.add_argument(
+        "--complete", action="store_true",
+        help="If provided, save all files from the experiment, including cached images and VM resources."
+    )
     args = parser.parse_args()
-    exit(save_vm_state(experiment_name=args.name))
+    sys.exit(save_vm_state(experiment_name=args.name, complete=args.complete))
 DONE
