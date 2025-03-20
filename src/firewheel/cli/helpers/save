@@ -34,6 +34,7 @@ from rich.progress import (
     TimeRemainingColumn,
 )
 
+from firewheel.config import config
 from firewheel.cli.utils import cli_output_theme
 from firewheel.lib.minimega.api import minimegaAPI
 from firewheel.control.image_store import ImageStore
@@ -167,6 +168,17 @@ def save_vm_state(experiment_name="firewheel_experiment", complete=False):
                     console.print(f"[yellow]The VM Resources files at [cyan]{vmr_files}[/cyan] do not exist[/yellow]")
             except OSError as exc:
                 console.print(f"[red]Error copying VM Resources directory [cyan]{vmr_files}[/cyan]: {exc}[/red]")
+
+        # Getting the launch_cmds.mm as well
+        vmr_launch_cmds = Path(config["logging"]["root_dir"]) / "launch_cmds.mm"
+        if vmr_launch_cmds.exists():
+            shutil.copy(vmr_launch_cmds, temp_path)
+            console.print("[green]Copied VM Resources Handler Launch file.")
+        else:
+            console.print(
+                "[yellow]The VM Resources Handler Launch file at "
+                f"[cyan]{vmr_launch_cmds}[/cyan] does not exist[/yellow]"
+            )
 
         # Compress the temporary directory into a single archive
         archive_file = Path(f"{experiment_name}_backup.tar.gz")

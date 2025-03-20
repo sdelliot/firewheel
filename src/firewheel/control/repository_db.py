@@ -133,7 +133,8 @@ class RepositoryDb:
             return 0
         except FileNotFoundError:
             self.log.debug(
-                "%s repository path does not exist, but was removed anyways.", repository
+                "%s repository path does not exist, but was removed anyways.",
+                repository,
             )
 
         with self.db_file.open("w") as db:
