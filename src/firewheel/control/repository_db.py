@@ -97,6 +97,10 @@ class RepositoryDb:
             # No database file exists yet.
             entries = []
 
+        if any(entry["path"] == repository["path"] for entry in entries):
+            self.log.debug("Ignoring duplicate repository: %s", repository)
+            return
+
         entries.append(repository)
         with self.db_file.open("w") as db:
             json.dump(entries, db)
