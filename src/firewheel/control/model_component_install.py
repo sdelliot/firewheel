@@ -3,6 +3,8 @@ import stat
 import subprocess
 from pathlib import Path
 
+import yaml
+import ansible_runner
 from rich.prompt import PromptBase
 from rich.syntax import Syntax
 from rich.console import Console
@@ -93,6 +95,12 @@ class ModelComponentInstall:
             install_path.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH
         )
         console.print(f"[b green]Starting to install [cyan]{name}[/cyan]!")
+
+        # Check if the install script is a valid Ansible playbook
+        # if it is, we should execute it with "ansible-runner"
+        if self.is_ansible_playbook(install_path):
+            return self.run_ansible_playbook(install_path)
+
         try:
             # We have already checked with the user to ensure that they want to run
             # this script.
@@ -107,6 +115,60 @@ class ModelComponentInstall:
                 return True
 
             console.print(f"[b red]Failed to install [cyan]{name}[/cyan]!")
+            return False
+
+    def is_ansible_playbook(self, install_path):
+        """
+        Check if the given script is a valid `Ansible <https://docs.ansible.com/>`_ playbook.
+
+        Args:
+            install_path (pathlib.Path): The path of the ``INSTALL`` file.
+
+        Returns:
+            bool: :py:data:`True` if the script is a valid Ansible playbook, :py:data:`False` otherwise.
+        """
+        try:
+            with open(install_path, "r", encoding="utf-8") as fhand:
+                playbook_content = fhand.read()
+                playbook = yaml.safe_load(playbook_content)
+
+                # Check if the playbook has the required structure
+                return isinstance(playbook, list) and all(
+                    "hosts" in play for play in playbook
+                )
+        except yaml.YAMLError:
+            return False
+
+    def run_ansible_playbook(self, install_path):
+        """
+        Run the Ansible playbook using ansible-runner.
+
+        Args:
+            install_path (pathlib.Path): The path of the Ansible playbook.
+
+        Returns:
+            bool: :py:data:`True` if the playbook executed successfully, :py:data:`False` otherwise.
+        """
+        console = Console()
+
+        ansible_config = None
+
+        # Run the Ansible playbooks
+        ret = ansible_runner.run(
+            private_data_dir=str(install_path.parent),
+            playbook=str(install_path),
+            extravars=ansible_config,
+        )
+
+        if ret.rc == 0:
+            console.print(
+                f"[b green]Successfully executed Ansible playbook [cyan]{install_path}[/cyan]!"
+            )
+            return True
+        else:
+            console.print(
+                f"[b red]Ansible playbook [cyan]{install_path}[/cyan] failed with return code {ret.rc}."
+            )
             return False
 
     def run_install_script(self, insecure=False):
