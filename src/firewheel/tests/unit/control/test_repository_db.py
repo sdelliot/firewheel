@@ -1,8 +1,23 @@
 
+import os
+from unittest.mock import patch
+
 import pytest
 from pathlib import Path
 
 from firewheel.control.repository_db import RepositoryDb
+
+
+@pytest.fixture
+def mock_permissioned_filesystem():
+    # Save a reference to the original `os.access` method before mocking
+    os_access = os.access
+
+    def _deny_user_access_to_root_home_directory(path, mode, **kwargs):
+        return False if Path(path) == Path("/root") else os_access(path, mode, **kwargs)
+
+    with patch("os.access", side_effect=_deny_user_access_to_root_home_directory):
+        yield
 
 
 def create_test_repo(repo_path):
@@ -25,9 +40,10 @@ def repository_db():
     repository_db = RepositoryDb(
         db_filename="test_repositories.json",
     )
+    yield repository_db
+    # Ensure all repositories are removed during teardown
     for repo in repository_db.list_repositories():
         repository_db.delete_repository(repo)
-    yield repository_db
 
 
 @pytest.fixture
@@ -79,7 +95,7 @@ class TestRepositoryDb:
         assert location.exists() is False
 
     def test_add_repository(self, repository_db, repo_entry):
-        repository_db.add_repository(repo_entry)
+        assert repository_db.add_repository(repo_entry) == 1
         repo_list = list(repository_db.list_repositories())
         assert self._entry_in_repo_list(repo_entry, repo_list)
 
@@ -99,14 +115,16 @@ class TestRepositoryDb:
             [{"path": "asdf"}, FileNotFoundError],  # ----- missing directory
         ],
     )
-    def test_add_repository_invalid(self, invalid_entry, exception, repository_db):
+    def test_add_repository_invalid(
+        self, invalid_entry, exception, mock_permissioned_filesystem, repository_db
+    ):
         with pytest.raises(exception):
             repository_db.add_repository(invalid_entry)
 
     def test_duplicate_repository(self, repository_db, repo_entry):
         orig_entry_count = len(list(repository_db.list_repositories()))
-        repository_db.add_repository(repo_entry)
-        repository_db.add_repository(repo_entry)
+        assert repository_db.add_repository(repo_entry) == 1
+        assert repository_db.add_repository(repo_entry) == 0
         repo_list = list(repository_db.list_repositories())
         assert self._entry_in_repo_list(repo_entry, repo_list)
         # The entry should only be added once
