@@ -1,0 +1,39 @@
+---
+# This playbook will loop through all values in the `cached_files` variable
+# and collected those cached files from an S3 instance.
+# The user will be prompted for all relevant S3 information including:
+# - The instance URL
+# - The bucket name
+# - The access key
+# - The secret key
+
+- name: Download files from an S3 instance
+  hosts: localhost
+  vars_prompt:
+    - name: s3_endpoint
+      prompt: "Please enter the S3 instance endpoint URL"
+      private: no
+
+    - name: s3_bucket
+      prompt: "Please enter the S3 bucket name"
+      private: no
+
+    - name: aws_access_key_id
+      prompt: "Please enter the S3 access key"
+      private: yes
+
+    - name: aws_secret_access_key
+      prompt: "Please enter the S3 secret key"
+      private: yes
+
+  tasks:
+    - name: Download cached files from custom S3
+      aws_s3:
+        bucket: "{{ s3_bucket }}"
+        object: "{{ item.source }}"
+        dest: "./{{ item.destination }}"
+        mode: get
+        aws_access_key: "{{ aws_access_key_id }}"
+        aws_secret_key: "{{ aws_secret_access_key }}"
+        endpoint_url: "{{ s3_endpoint }}"
+      loop: "{{ cached_files }}"
