@@ -1,0 +1,39 @@
+---
+# This playbook will clone a Git repository and move specified cached files
+# The user will be prompted for all relevant Git information including:
+# - The repository URL
+# - The branch name (optional)
+# - The access token (if required for authentication)
+
+- name: Clone Git repository and move files
+  hosts: localhost
+  vars_prompt:
+    - name: git_server
+      prompt: "Please enter the Git server URL"
+      private: no
+    
+    - name: git_repo_path
+      prompt: "Please enter the path to the git repository"
+      private: no
+
+  tasks:
+    - name: Clone the Git repository
+      git:
+        repo: "{{ git_server }}/{{ git_repo_path }}"
+        dest: "/tmp/fwcache"
+        version: "{{ git_branch | default('main') }}"
+        clone: yes
+        update: yes
+        # If using an access token, you can specify it in the URL
+        # For example: https://<token>@github.com/user/repo.git
+      register: git_clone_result
+
+    - name: Move cached files to the desired location
+      command: mv /tmp/fwcache/{{ item.source }} ./{{ item.destination }}
+      loop: "{{ cached_files }}"
+      when: git_clone_result.changed
+
+    - name: Remove the Git repository
+      file:
+        path: "/tmp/fwcache"
+        state: absent
