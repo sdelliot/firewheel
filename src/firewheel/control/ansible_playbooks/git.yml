@@ -9,11 +9,11 @@
   hosts: localhost
   vars_prompt:
     - name: git_server
-      prompt: "Please enter the Git server URL"
+      prompt: "Please enter the Git server URL or set `ansible.git_server` in the FIREWHEEL configuration."
       private: no
     
     - name: git_repo_path
-      prompt: "Please enter the path to the git repository"
+      prompt: "Please enter the path to the git repository or set `ansible.git_repo_path` in the FIREWHEEL configuration."
       private: no
 
   tasks:
@@ -31,7 +31,6 @@
     - name: Move cached files to the desired location
       command: mv /tmp/fwcache/{{ item.source }} ./{{ item.destination }}
       loop: "{{ cached_files }}"
-      when: git_clone_result.changed
 
     - name: Remove the Git repository
       file:
