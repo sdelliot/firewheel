@@ -149,11 +149,14 @@ class ModelComponentInstall:
 
         Returns:
             bool: :py:data:`True` if the playbook executed successfully, :py:data:`False` otherwise.
+
+        Raises:
+            ValueError: If an invalid ansible.cash_type is provided in the FIREWHEEL config.
         """
         console = Console()
 
         ansible_config = {
-            "ansible_remote_tmp" : config["system"]["default_output_dir"],
+            "ansible_remote_tmp": config["system"]["default_output_dir"],
         }
 
         # Add any remaining configuration options provided in the FIREWHEEL
@@ -170,28 +173,36 @@ class ModelComponentInstall:
             cached_files = []
 
             # Read the playbook file to get the cached_files variables
-            with open(install_path, 'r') as file:
+            with open(install_path, "r") as file:
                 playbook = yaml.safe_load(file)
 
             # Extract variables from the playbook
             variables = {}
             for play in playbook:
-                if 'vars' in play:
-                    variables.update(play['vars'])
+                if "vars" in play:
+                    variables.update(play["vars"])
 
             cached_files = variables.get("cached_files", [])
 
             # Now we need to update the destination path for all the cached files
             # we can prepend the directory of the original install file.
             for file in cached_files:
-                file["destination"] = str(install_path.parent / Path(file["destination"]))
+                file["destination"] = str(
+                    install_path.parent / Path(file["destination"])
+                )
 
             # Call the cache playbook from the ansible_playbooks directory
-            cache_playbook_path = Path(__file__).resolve().parent / Path(f"ansible_playbooks/{cache_type}.yml")
+            cache_playbook_path = Path(__file__).resolve().parent / Path(
+                f"ansible_playbooks/{cache_type}.yml"
+            )
 
             if not cache_playbook_path.exists():
                 # Get a list of all cache types
-                available_types = [file.stem for file in cache_playbook_path.parent.iterdir() if file.is_file()]
+                available_types = [
+                    file.stem
+                    for file in cache_playbook_path.parent.iterdir()
+                    if file.is_file()
+                ]
                 console.print(
                     f"[b red]Failed to find cache_type=[cyan]{cache_type}[/cyan]."
                     f"Available types are: [magenta]{available_types}[/magenta]"
@@ -211,9 +222,9 @@ class ModelComponentInstall:
 
             # Now we need to ensure the config has these properties
             # so that it will properly take in values passed.
-            rc.input_fd=sys.stdin
-            rc.output_fd=sys.stdout
-            rc.error_fd=sys.stderr
+            rc.input_fd = sys.stdin
+            rc.output_fd = sys.stdout
+            rc.error_fd = sys.stderr
             cache_runner = ansible_runner.Runner(config=rc)
 
             # Ensure we are using subprocess mode
