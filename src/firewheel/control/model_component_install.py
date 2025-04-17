@@ -9,8 +9,8 @@ from rich.prompt import PromptBase
 from rich.syntax import Syntax
 from rich.console import Console
 
-from firewheel.lib.log import Log
 from firewheel.config import config
+from firewheel.lib.log import Log
 
 
 class InstallPrompt(PromptBase[str]):
@@ -173,7 +173,7 @@ class ModelComponentInstall:
             cached_files = []
 
             # Read the playbook file to get the cached_files variables
-            with open(install_path, "r") as file:
+            with open(install_path, "r", encoding="utf-8") as file:
                 playbook = yaml.safe_load(file)
 
             # Extract variables from the playbook
@@ -207,7 +207,7 @@ class ModelComponentInstall:
                     f"[b red]Failed to find cache_type=[cyan]{cache_type}[/cyan]."
                     f"Available types are: [magenta]{available_types}[/magenta]"
                 )
-                raise ValueError("Available `cache_type` are: {available_types}")
+                raise ValueError(f"Available `cache_type` are: {available_types}")
 
             # By defining everything here, we can enable prompt's as we will no longer
             # use pexpect by default, but rather use subprocess, enabling stdin
@@ -241,7 +241,8 @@ class ModelComponentInstall:
                 return True
             else:
                 console.print(
-                    f"[b red]Failed to collect cached files via: [cyan]{cache_type}[/cyan]; Failed with return code {ret.rc}."
+                    f"[b red]Failed to collect cached files via: [cyan]{cache_type}[/cyan]; "
+                    f"Failed with return code {ret.rc}."
                 )
                 return False
 
