@@ -10,6 +10,7 @@ from rich.syntax import Syntax
 from rich.console import Console
 
 from firewheel.lib.log import Log
+from firewheel.config import config
 
 
 class InstallPrompt(PromptBase[str]):
@@ -151,21 +152,24 @@ class ModelComponentInstall:
         """
         console = Console()
 
-        # TODO: Pull this information from the FW configuration
         ansible_config = {
-            "ansible_remote_tmp" : "/scratch/firewheel",
-            "cache_type" : "git",
-            #"cache_type" : "s3",
+            "ansible_remote_tmp" : config["system"]["default_output_dir"],
         }
-        # Get the cache_type with a default value of an empty string
+
+        # Add any remaining configuration options provided in the FIREWHEEL
+        # configuration
+        ansible_config.update(config["ansible"])
+
+        # Get the cache_type and default to an empty string
+        # for easy access
         cache_type = ansible_config.get("cache_type", "")
 
-        # Check to see what mode we need to use
-        if cache_type != "online":  # Adjust this condition as needed
-            # Get the cached files
+        # If we set a different cache type, then we should use it
+        # to download the needed cached files.
+        if cache_type != "online":
             cached_files = []
 
-            # Read the playbook file
+            # Read the playbook file to get the cached_files variables
             with open(install_path, 'r') as file:
                 playbook = yaml.safe_load(file)
 
@@ -176,6 +180,11 @@ class ModelComponentInstall:
                     variables.update(play['vars'])
 
             cached_files = variables.get("cached_files", [])
+
+            # Now we need to update the destination path for all the cached files
+            # we can prepend the directory of the original install file.
+            for file in cached_files:
+                file["destination"] = str(install_path.parent / Path(file["destination"]))
 
             # Call the cache playbook from the ansible_playbooks directory
             cache_playbook_path = Path(__file__).resolve().parent / Path(f"ansible_playbooks/{cache_type}.yml")
@@ -202,7 +211,10 @@ class ModelComponentInstall:
             cache_runner.runner_mode = "subprocess"
 
             ret = cache_runner.run()
-            if ret.rc == 0:
+
+            # Invoking the runner this way uses an (unnamed) tuple as a return value
+            # For example: ("success", 0)
+            if ret[1] == 0:
                 console.print(
                     f"[b green]Successfully collected cached files via: [cyan]{cache_type}[/cyan]!"
                 )
