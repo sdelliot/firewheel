@@ -151,7 +151,67 @@ class ModelComponentInstall:
         """
         console = Console()
 
-        ansible_config = None
+        # TODO: Pull this information from the FW configuration
+        ansible_config = {
+            "ansible_remote_tmp" : "/scratch/firewheel",
+            "cache_type" : "git",
+            #"cache_type" : "s3",
+        }
+        # Get the cache_type with a default value of an empty string
+        cache_type = ansible_config.get("cache_type", "")
+
+        # Check to see what mode we need to use
+        if cache_type != "online":  # Adjust this condition as needed
+            # Get the cached files
+            cached_files = []
+
+            # Read the playbook file
+            with open(install_path, 'r') as file:
+                playbook = yaml.safe_load(file)
+
+            # Extract variables from the playbook
+            variables = {}
+            for play in playbook:
+                if 'vars' in play:
+                    variables.update(play['vars'])
+
+            cached_files = variables.get("cached_files", [])
+
+            # Call the cache playbook from the ansible_playbooks directory
+            cache_playbook_path = Path(__file__).resolve().parent / Path(f"ansible_playbooks/{cache_type}.yml")
+
+            # By defining everything here, we can enable prompt's as we will no longer
+            # use pexpect by default, but rather use subprocess, enabling stdin
+            # See: https://github.com/ansible/ansible-runner/issues/1399
+            rc = ansible_runner.RunnerConfig(
+                private_data_dir=str(ansible_config["ansible_remote_tmp"]),
+                playbook=str(cache_playbook_path),
+                extravars={"cached_files": cached_files, **ansible_config},
+            )
+
+            rc.prepare()
+
+            # Now we need to ensure the config has these properties
+            # so that it will properly take in values passed.
+            rc.input_fd=sys.stdin
+            rc.output_fd=sys.stdout
+            rc.error_fd=sys.stderr
+            cache_runner = ansible_runner.Runner(config=rc)
+
+            # Ensure we are using subprocess mode
+            cache_runner.runner_mode = "subprocess"
+
+            ret = cache_runner.run()
+            if ret.rc == 0:
+                console.print(
+                    f"[b green]Successfully collected cached files via: [cyan]{cache_type}[/cyan]!"
+                )
+                return True
+            else:
+                console.print(
+                    f"[b red]Failed to collect cached files via: [cyan]{cache_type}[/cyan]; Failed with return code {ret.rc}."
+                )
+                return False
 
         # Run the Ansible playbooks
         ret = ansible_runner.run(
