@@ -189,6 +189,15 @@ class ModelComponentInstall:
             # Call the cache playbook from the ansible_playbooks directory
             cache_playbook_path = Path(__file__).resolve().parent / Path(f"ansible_playbooks/{cache_type}.yml")
 
+            if not cache_playbook_path.exists():
+                # Get a list of all cache types
+                available_types = [file.stem for file in cache_playbook_path.parent.iterdir() if file.is_file()]
+                console.print(
+                    f"[b red]Failed to find cache_type=[cyan]{cache_type}[/cyan]."
+                    f"Available types are: [magenta]{available_types}[/magenta]"
+                )
+                raise ValueError("Available `cache_type` are: {available_types}")
+
             # By defining everything here, we can enable prompt's as we will no longer
             # use pexpect by default, but rather use subprocess, enabling stdin
             # See: https://github.com/ansible/ansible-runner/issues/1399
