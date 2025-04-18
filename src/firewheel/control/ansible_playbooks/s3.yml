@@ -12,23 +12,23 @@
   vars_prompt:
     - name: s3_endpoint
       prompt: "Please enter the S3 instance endpoint URL"
-      private: no
+      private: false
 
     - name: s3_bucket
       prompt: "Please enter the S3 bucket name"
-      private: no
+      private: false
 
     - name: aws_access_key_id
       prompt: "Please enter the S3 access key"
-      private: yes
+      private: true
 
     - name: aws_secret_access_key
       prompt: "Please enter the S3 secret key"
-      private: yes
+      private: true
 
   tasks:
     - name: Download cached files from custom S3
-      aws_s3:
+      amazon.aws.s3_object:
         bucket: "{{ s3_bucket }}"
         object: "{{ item.source }}"
         dest: "{{ item.destination }}"

@@ -30,8 +30,9 @@
 
     - name: Move cached files to the desired location
       ansible.builtin.copy:
-        src: /tmp/fwcache/{{ item.source }}
-        dest: {{ item.destination }}
+        src: "/tmp/fwcache/{{ item.source }}"
+        dest: "{{ item.destination }}"
+        mode: 0666
       loop: "{{ cached_files }}"
 
     - name: Remove the Git repository
