@@ -1,38 +1,40 @@
 ---
 # This playbook will clone a Git repository and move specified cached files
-# The user will be prompted for all relevant Git information including:
-# - The repository URL
-# - The branch name (optional)
-# - The access token (if required for authentication)
+# If you are using an access token, you can specify it in the `git_server` URL
+# For example: https://<token>@github.com/user/repo.git
+# The user will need to provide all relevant information including:
+# - ``git_server`` - The URL of the git server
+# - ``git_repo_path`` - The path to the repo from the server
+# - ``git_branch`` - The branch name (optional); default: main
 
 - name: Clone Git repository and move files
   hosts: localhost
   vars_prompt:
     - name: git_server
       prompt: "Please enter the Git server URL or set `ansible.git_server` in the FIREWHEEL configuration."
-      private: no
-    
+      private: false
+
     - name: git_repo_path
       prompt: "Please enter the path to the git repository or set `ansible.git_repo_path` in the FIREWHEEL configuration."
-      private: no
+      private: false
 
   tasks:
     - name: Clone the Git repository
-      git:
+      ansible.builtin.git:
         repo: "{{ git_server }}/{{ git_repo_path }}"
         dest: "/tmp/fwcache"
         version: "{{ git_branch | default('main') }}"
-        clone: yes
-        update: yes
-        # If using an access token, you can specify it in the URL
-        # For example: https://<token>@github.com/user/repo.git
+        clone: true
+        update: true
       register: git_clone_result
 
     - name: Move cached files to the desired location
-      command: mv /tmp/fwcache/{{ item.source }} ./{{ item.destination }}
+      ansible.builtin.copy:
+        src: /tmp/fwcache/{{ item.source }}
+        dest: {{ item.destination }}
       loop: "{{ cached_files }}"
 
     - name: Remove the Git repository
-      file:
+      ansible.builtin.file:
         path: "/tmp/fwcache"
         state: absent

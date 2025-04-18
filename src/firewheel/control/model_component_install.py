@@ -102,6 +102,10 @@ class ModelComponentInstall:
         if self.is_ansible_playbook(install_path):
             return self.run_ansible_playbook(install_path)
 
+        console.print(
+            "[b yellow]Warning: Use of non-ansible-based INSTALL scripts is deprecated. "
+            "Please contact the model component developer to transition this file."
+        )
         try:
             # We have already checked with the user to ensure that they want to run
             # this script.
