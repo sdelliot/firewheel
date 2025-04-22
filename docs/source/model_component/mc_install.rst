@@ -14,7 +14,8 @@ INSTALL File Requirements
 *************************
 
 Regardless of whether the INSTALL file is an Ansible Playbook or an executable, FIREWHEEL expects the following:
-1. Upon successful installation, a new file is created in the model component directory with the following format: ``.<MC Name>.installed``. For example, if the model component name is "dns.dns_objects" than the new file would be ``.dns.dns_objects.installed``.
+
+1. Upon successful installation, a new file is created in the model component directory with the following format: ``.<MC Name>.installed``. For example, if the model component name is ``dns.dns_objects`` than the new file would be ``.dns.dns_objects.installed``.
 2. After execution, all non-packaged dependencies for the model component should be met.
 
 *****************
@@ -23,7 +24,7 @@ Design Principles
 
 In addition to the requirements above, we recommend that the following principles are adhered to when creating a new INSTALL file.
 
-1. `**Idempotence** <https://en.wikipedia.org/wiki/Idempotence>`_ - The file should be capable of running multiple times without causing issues. This is a core tenant of Ansible and a strong motivator why Ansible Playbooks are the preferred INSTALL file method.
+1. `Idempotence <https://en.wikipedia.org/wiki/Idempotence>`_ - The file should be capable of running multiple times without causing issues. This is a core tenant of Ansible and a strong motivator why Ansible Playbooks are the preferred INSTALL file method.
 2. **Reproducibility** - It is critical that users will download the exact same data that was originally intended by the Model Component creators.
    If the data/packages differ, than there is a strong possibly that the experimental outcomes will differ and could produce unintended consequences.
    Therefore, we strongly recommend that MC creators link to exact versions of software to download, rather than an automatically updating link.
@@ -50,7 +51,6 @@ Ansible INSTALL Files
 *********************
 
 While INSTALL files should not have an extension, if INSTALL contains valid YAML, is a list, and has the "hosts" key in each list entry, then FIREWHEEL will attempt to use Ansible to execute the file.
-
 We strongly recommend using ``localhost`` as the "hosts" value.
 We also recommend that users define an ``install_flag`` variable and a ``cached_files`` variable (if needed).
 
@@ -76,6 +76,8 @@ Cached Files
 
 FIREWHEEL supports collecting pre-computed blobs from various resources to enable offline experiment access.
 To enable retrieving files from a cache, users should set the ``ansible.cache_type`` to ``git`` or ``s3`` depending on if the files are cached in a git repository or in an Amazon S3 data store.
+This is an optional feature and the default value for ``ansible.cache_type`` is ``online``.
+See :ref:`firewheel_configuration` for additional information.
 
 Path Convention
 ===============
@@ -90,11 +92,12 @@ For example, if we cloned the cache for ``dns.dns_objects`` the structure would 
 
 Git Cache
 =========
-If users have access to an AWS S3 instance, they can specify the following information under the ``ansible`` key in the :ref:`firewheel_configuration`.
+If users have access to an git server instance, they can specify the following information under the ``ansible`` key in the :ref:`firewheel_configuration`.
 If these values are not provided, but ``ansible.cache_type`` is ``git``, the user will be prompted for the information.
+
 - ``git_server`` - The URL of the git server
 - ``git_repo_path`` - The path to the repo from the server. Because this is likely to change for each model component, we recommend not setting this parameter and simply prompting the user for each path.
-- ``git_branch`` - The branch name (optional); default: "main"
+- ``git_branch`` - (optional) The branch name, defaults to ``main``.
 
 If you an access token is being used, the user can specify it in the ``git_server`` URL.
 For example: ``https://<token>@github.com/user/repo.git``
@@ -103,6 +106,7 @@ S3 Cache
 ========
 If users have access to an AWS S3 instance, they can specify the following information under the ``ansible`` key in the :ref:`firewheel_configuration`.
 If these values are not provided, but ``ansible.cache_type`` is ``s3``, the user will be prompted for the information.
+
 - ``s3_endpoint`` - The S3 instance URL
 - ``s3_bucket`` - The name of the S3 bucket name
 - ``aws_access_key_id`` - The AWS access key
