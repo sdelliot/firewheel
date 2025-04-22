@@ -80,12 +80,12 @@ Path Convention
 ===============
 The source of the file within the cache should always be: ``<package name>/path/to/file``.
 In the case of git, note that the ``<package name>`` is **NOT** the repository name.
-For example, if we cloned the cache for ``dns.dns_objects`` the structure would look like:
+For example, if we cloned the cache for ``dns.dns_objects`` the structure would look like::
 
-firewheel_repo_dns -- Cloned repository
-└── firewheel_repo_dns
-    └── dns_objects
-        └── bind9_xenial_debs.tgz
+    firewheel_repo_dns -- Cloned repository
+    └── firewheel_repo_dns
+        └── dns_objects
+            └── bind9_xenial_debs.tgz
 
 Git Cache
 =========
