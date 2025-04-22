@@ -56,7 +56,8 @@ We also recommend that users define an ``install_flag`` variable and a ``cached_
 
 Below is beginning of an example Ansible "play":
 
-.. codebloack:: yaml
+.. code-block:: yaml
+
     ---
     - name: Download DNS Data files
       hosts: localhost
