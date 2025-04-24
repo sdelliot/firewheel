@@ -89,12 +89,6 @@ class ModelComponentInstall:
             installed), False otherwise
         """
         console = Console()
-
-        # Make the install file executable
-        # We assume that it can be run with a "shebang" line
-        install_path.chmod(
-            install_path.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH
-        )
         console.print(f"[b green]Starting to install [cyan]{name}[/cyan]!")
 
         # Check if the install script is a valid Ansible playbook
@@ -106,6 +100,13 @@ class ModelComponentInstall:
             "[b yellow]Warning: Use of non-ansible-based INSTALL scripts is deprecated. "
             "Please contact the model component developer to transition this file."
         )
+
+        # Make the install file executable
+        # We assume that it can be run with a "shebang" line
+        install_path.chmod(
+            install_path.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH
+        )
+
         try:
             # We have already checked with the user to ensure that they want to run
             # this script.
@@ -124,7 +125,9 @@ class ModelComponentInstall:
 
     def is_ansible_playbook(self, install_path):
         """
-        Check if the given script is a valid `Ansible <https://docs.ansible.com/>`_ playbook.
+        Check if the given INSTALL file is a valid `Ansible <https://docs.ansible.com/>`_ playbook.
+        For this check, we check if the file is valid YAML and if each entry in
+        the YAML's list contains a "hosts" key.
 
         Args:
             install_path (pathlib.Path): The path of the ``INSTALL`` file.
@@ -133,9 +136,8 @@ class ModelComponentInstall:
             bool: :py:data:`True` if the script is a valid Ansible playbook, :py:data:`False` otherwise.
         """
         try:
-            with open(install_path, "r", encoding="utf-8") as fhand:
-                playbook_content = fhand.read()
-                playbook = yaml.safe_load(playbook_content)
+            with install_path.open("r", encoding="utf-8") as file:
+                playbook = yaml.safe_load(file)
 
                 # Check if the playbook has the required structure
                 return isinstance(playbook, list) and all(
@@ -146,7 +148,7 @@ class ModelComponentInstall:
 
     def run_ansible_playbook(self, install_path):
         """
-        Run the Ansible playbook using ansible-runner.
+        Run the provided Ansible playbook using ansible-runner.
 
         Args:
             install_path (pathlib.Path): The path of the Ansible playbook.
@@ -155,7 +157,7 @@ class ModelComponentInstall:
             bool: :py:data:`True` if the playbook executed successfully, :py:data:`False` otherwise.
 
         Raises:
-            ValueError: If an invalid ansible.cash_type is provided in the FIREWHEEL config.
+            ValueError: If an invalid ``ansible.cache_type`` is provided in the FIREWHEEL config.
         """
         console = Console()
 
@@ -177,7 +179,7 @@ class ModelComponentInstall:
             cached_files = []
 
             # Read the playbook file to get the cached_files variables
-            with open(install_path, "r", encoding="utf-8") as file:
+            with install_path.open("r", encoding="utf-8") as file:
                 playbook = yaml.safe_load(file)
 
             # Extract variables from the playbook
@@ -187,69 +189,74 @@ class ModelComponentInstall:
                     variables.update(play["vars"])
 
             cached_files = variables.get("cached_files", [])
+            if cached_files:
+                # Now we need to update the destination path for all the cached files
+                # we can prepend the directory of the original install file.
+                for file in cached_files:
+                    file["destination"] = str(
+                        install_path.parent / Path(file["destination"])
+                    )
 
-            # Now we need to update the destination path for all the cached files
-            # we can prepend the directory of the original install file.
-            for file in cached_files:
-                file["destination"] = str(
-                    install_path.parent / Path(file["destination"])
+                # Call the cache playbook from the ansible_playbooks directory
+                cache_playbook_path = Path(__file__).resolve().parent / Path(
+                    f"ansible_playbooks/{cache_type}.yml"
                 )
 
-            # Call the cache playbook from the ansible_playbooks directory
-            cache_playbook_path = Path(__file__).resolve().parent / Path(
-                f"ansible_playbooks/{cache_type}.yml"
-            )
+                if not cache_playbook_path.exists():
+                    # Get a list of all cache types
+                    available_types = [
+                        file.stem
+                        for file in cache_playbook_path.parent.iterdir()
+                        if file.is_file()
+                    ]
+                    available_types.append("online")
+                    console.print(
+                        f"[b red]Failed to find cache_type=[cyan]{cache_type}[/cyan]."
+                        f"Available types are: [magenta]{available_types}[/magenta]"
+                    )
+                    raise ValueError(f"Available `cache_type` are: {available_types}")
 
-            if not cache_playbook_path.exists():
-                # Get a list of all cache types
-                available_types = [
-                    file.stem
-                    for file in cache_playbook_path.parent.iterdir()
-                    if file.is_file()
-                ]
-                console.print(
-                    f"[b red]Failed to find cache_type=[cyan]{cache_type}[/cyan]."
-                    f"Available types are: [magenta]{available_types}[/magenta]"
+                # By defining everything here, we can enable prompt's as we will no longer
+                # use pexpect by default, but rather use subprocess, enabling stdin
+                # See: https://github.com/ansible/ansible-runner/issues/1399
+                rc = ansible_runner.RunnerConfig(
+                    private_data_dir=str(ansible_config["ansible_remote_tmp"]),
+                    playbook=str(cache_playbook_path),
+                    extravars={"cached_files": cached_files, **ansible_config},
                 )
-                raise ValueError(f"Available `cache_type` are: {available_types}")
 
-            # By defining everything here, we can enable prompt's as we will no longer
-            # use pexpect by default, but rather use subprocess, enabling stdin
-            # See: https://github.com/ansible/ansible-runner/issues/1399
-            rc = ansible_runner.RunnerConfig(
-                private_data_dir=str(ansible_config["ansible_remote_tmp"]),
-                playbook=str(cache_playbook_path),
-                extravars={"cached_files": cached_files, **ansible_config},
-            )
+                rc.prepare()
 
-            rc.prepare()
+                # Now we need to ensure the config has these properties
+                # so that it will properly take in values passed.
+                rc.input_fd = sys.stdin
+                rc.output_fd = sys.stdout
+                rc.error_fd = sys.stderr
+                cache_runner = ansible_runner.Runner(config=rc)
 
-            # Now we need to ensure the config has these properties
-            # so that it will properly take in values passed.
-            rc.input_fd = sys.stdin
-            rc.output_fd = sys.stdout
-            rc.error_fd = sys.stderr
-            cache_runner = ansible_runner.Runner(config=rc)
+                # Ensure we are using subprocess mode
+                cache_runner.runner_mode = "subprocess"
 
-            # Ensure we are using subprocess mode
-            cache_runner.runner_mode = "subprocess"
+                ret = cache_runner.run()
 
-            ret = cache_runner.run()
-
-            # Invoking the runner this way uses an (unnamed) tuple as a return value
-            # For example: ("success", 0)
-            if ret[1] == 0:
-                console.print(
-                    f"[b green]Successfully collected cached files via: [cyan]{cache_type}[/cyan]!"
-                )
-                return True
+                # Invoking the runner this way uses an (unnamed) tuple as a return value
+                # For example: ("success", 0)
+                if ret[1] == 0:
+                    console.print(
+                        f"[b green]Successfully collected cached files via: [cyan]{cache_type}[/cyan]!"
+                    )
+                    return True
+                else:
+                    console.print(
+                        f"[b red]Failed to collect cached files via: [cyan]{cache_type}[/cyan]; "
+                        f"Failed with return code {ret[1]}."
+                    )
+                    return False
             else:
                 console.print(
-                    f"[b red]Failed to collect cached files via: [cyan]{cache_type}[/cyan]; "
-                    f"Failed with return code {ret[1]}."
+                    f"[b yellow]Cache type [cyan]{cache_type}[/cyan] provided but no cached files "
+                    f"found in [cyan]{install_path}[/cyan]. Continuing."
                 )
-                return False
-
         # Run the Ansible playbooks
         ret = ansible_runner.run(
             private_data_dir=str(install_path.parent),
