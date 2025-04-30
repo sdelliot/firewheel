@@ -137,7 +137,7 @@ class ModelComponentInstall:
         """
         try:
             with install_path.open("r", encoding="utf-8") as file:
-                playbook = yaml.safe_load(file)
+                playbook = yaml.safe_load(file.read())
 
                 # Check if the playbook has the required structure
                 return isinstance(playbook, list) and all(
@@ -180,7 +180,7 @@ class ModelComponentInstall:
 
             # Read the playbook file to get the cached_files variables
             with install_path.open("r", encoding="utf-8") as file:
-                playbook = yaml.safe_load(file)
+                playbook = yaml.safe_load(file.read())
 
             # Extract variables from the playbook
             variables = {}
