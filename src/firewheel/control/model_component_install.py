@@ -245,7 +245,6 @@ class ModelComponentInstall:
                     console.print(
                         f"[b green]Successfully collected cached files via: [cyan]{cache_type}[/cyan]!"
                     )
-                    return True
                 else:
                     console.print(
                         f"[b red]Failed to collect cached files via: [cyan]{cache_type}[/cyan]; "

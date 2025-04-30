@@ -3,6 +3,8 @@ from unittest.mock import patch, MagicMock
 from pathlib import Path
 import yaml
 import subprocess
+import ansible_runner
+
 from firewheel.control.model_component_install import ModelComponentInstall, InstallPrompt
 
 @pytest.fixture
@@ -126,3 +128,104 @@ def test_run_install_script_insecure_fail(mock_install_mc, mock_exists, install_
 def test_run_install_script_insecure_pass(mock_install_mc, mock_exists, install_component):
     result = install_component.run_install_script(insecure=True)
     assert result is True
+
+
+@patch('firewheel.control.model_component_install.ansible_runner.run')
+@patch('firewheel.control.model_component_install.Path.open', new_callable=MagicMock)
+@patch('firewheel.control.model_component_install.Path.exists', return_value=True)
+def test_run_ansible_playbook_success(mock_exists, mock_open, mock_run, install_component):
+    # Mock the playbook content
+    mock_file = MagicMock()
+    mock_file.read.return_value = "---\n- hosts: localhost"
+    mock_open.return_value.__enter__.return_value = mock_file
+
+    # Mock the return value of ansible_runner.run
+    mock_run.return_value = MagicMock(rc=0)
+
+    result = install_component.run_ansible_playbook(Path("/mock/path/INSTALL"))
+    assert result is True  # Expecting True since the playbook should execute successfully
+
+
+@patch('firewheel.control.model_component_install.ansible_runner.RunnerConfig')
+@patch('firewheel.control.model_component_install.Path.open', new_callable=MagicMock)
+@patch('firewheel.control.model_component_install.config', new_callable=MagicMock)  # Mock the config dictionary
+def test_run_ansible_playbook_with_cache(mock_config, mock_open, mock_runner_config, install_component):
+    # Mock the playbook content
+    mock_file = MagicMock()
+    mock_file.read.return_value = "---\n- hosts: localhost\n  vars:\n    cached_files: [{'destination': 'file.txt'}]"
+    mock_open.return_value.__enter__.return_value = mock_file
+
+    # Set up the mock configuration
+    mock_config.__getitem__.side_effect = lambda key: {
+        "system": {"default_output_dir": "mock_dir"},
+        "ansible": {"cache_type": "git"}
+    }[key]
+
+    # Create a mock for the RunnerConfig
+    mock_runner_config_instance = MagicMock()
+    mock_runner_config_instance.prepare = MagicMock()
+    mock_runner_config_instance.private_data_dir = "mock_dir"
+    mock_runner_config_instance.playbook = "mock_playbook.yml"
+
+    # Mock the return value of ansible_runner.RunnerConfig
+    mock_runner_config.return_value = mock_runner_config_instance
+
+    mock_runner = MagicMock()
+    mock_runner.rc = 0
+
+    # Patch the ansible_runner.run to return the mock runner
+    with patch('firewheel.control.model_component_install.ansible_runner.Runner.run', return_value=("success", 0)):
+        with patch('firewheel.control.model_component_install.ansible_runner.run', return_value=mock_runner):
+            result = install_component.run_ansible_playbook(Path("/mock/path/INSTALL"))
+    assert result is True  # Expecting True since the playbook should execute successfully
+
+@patch('firewheel.control.model_component_install.ansible_runner.RunnerConfig')
+@patch('firewheel.control.model_component_install.Path.open', new_callable=MagicMock)
+@patch('firewheel.control.model_component_install.config', new_callable=MagicMock)  # Mock the config dictionary
+def test_run_ansible_playbook_fail(mock_config, mock_open, mock_runner_config, install_component):
+    # Mock the playbook content
+    mock_file = MagicMock()
+    mock_file.read.return_value = "---\n- hosts: localhost\n  vars:\n    cached_files: [{'destination': 'file.txt'}]"
+    mock_open.return_value.__enter__.return_value = mock_file
+
+    # Set up the mock configuration
+    mock_config.__getitem__.side_effect = lambda key: {
+        "system": {"default_output_dir": "mock_dir"},
+        "ansible": {"cache_type": "git"}
+    }[key]
+
+    # Create a mock for the RunnerConfig
+    mock_runner_config_instance = MagicMock()
+    mock_runner_config_instance.prepare = MagicMock()
+    mock_runner_config_instance.private_data_dir = "mock_dir"
+    mock_runner_config_instance.playbook = "mock_playbook.yml"
+
+    # Mock the return value of ansible_runner.RunnerConfig
+    mock_runner_config.return_value = mock_runner_config_instance
+
+    mock_runner = MagicMock()
+    mock_runner.rc = 1
+
+    # Patch the ansible_runner.run to return the mock runner
+    with patch('firewheel.control.model_component_install.ansible_runner.Runner.run', return_value=("success", 0)):
+        with patch('firewheel.control.model_component_install.ansible_runner.run', return_value=mock_runner):
+            result = install_component.run_ansible_playbook(Path("/mock/path/INSTALL"))
+    assert result is False
+
+@patch('firewheel.control.model_component_install.Path.open', new_callable=MagicMock)
+@patch('firewheel.control.model_component_install.config', new_callable=MagicMock)  # Mock the config dictionary
+def test_run_ansible_playbook_invalid_cache_type(mock_config, mock_open, install_component):
+    # Mock the playbook content
+    mock_file = MagicMock()
+    mock_file.read.return_value = "---\n- hosts: localhost\n  vars:\n    cached_files: [{'destination': 'file.txt'}]"
+    mock_open.return_value.__enter__.return_value = mock_file
+
+    # Set up the mock configuration
+    mock_config.__getitem__.side_effect = lambda key: {
+        "system": {"default_output_dir": "mock_dir"},
+        "ansible": {"cache_type": "invalid"}
+    }[key]
+
+    # Assert that ValueError is raised
+    with pytest.raises(ValueError, match="Available `cache_type` are:"):
+        install_component.run_ansible_playbook(Path("/mock/path/INSTALL"))
