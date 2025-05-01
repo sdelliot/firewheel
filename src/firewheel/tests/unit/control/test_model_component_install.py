@@ -163,7 +163,7 @@ def test_is_ansible_playbook_invalid(mock_open, mock_yaml, install_component):
 
     Args:
         mock_open (MagicMock): Mock for the :py:meth:`pathlib.Path.open` method.
-        mock_yaml (MagicMock): Mock for the yaml.safe_load method.
+        mock_yaml (MagicMock): Mock for the py:meth:`yaml.safe_load method`.
         install_component (ModelComponentInstall): The instance of :py:class:`ModelComponentInstall` to test.
     """
     # Mock the behavior of the file read to simulate invalid YAML
@@ -203,7 +203,7 @@ def test_run_install_script_no_install_script(mock_exists, install_component):
     Test the :py:meth:`run_install_script` method when the install script does not exist.
 
     Args:
-        mock_exists (MagicMock): Mock for the :py:meth:`pathlib.Path.exists` method to simulate the absence of the install script..
+        mock_exists (MagicMock): Mock for the :py:meth:`pathlib.Path.exists` method to simulate the absence of the install script.
         install_component (ModelComponentInstall): The instance of :py:class:`ModelComponentInstall` to test.
     """
     result = install_component.run_install_script()
@@ -213,7 +213,7 @@ def test_run_install_script_no_install_script(mock_exists, install_component):
 
 @patch(
     "firewheel.control.model_component_install.Path.exists", side_effect=[True, True]
-)  # install_script exists, install_flag exists
+)
 def test_run_install_script_with_existing_install_flag(mock_exists, install_component):
     """
     Test the :py:meth:`run_install_script` method when the install flag exists.
@@ -229,12 +229,12 @@ def test_run_install_script_with_existing_install_flag(mock_exists, install_comp
 
 def test_model_component_install_init_raises_value_error():
     """
-    Test that initializing :py:class:`ModelComponentInstall` without a ModelComponent raises a ValueError.
+    Test that initializing :py:class:`ModelComponentInstall` without a :py:class:`ModelComponent` raises a :py:exc:`ValueError`.
 
     Asserts that the appropriate error message is raised when no ModelComponent is provided.
     """
     with pytest.raises(ValueError, match="Must specify a Model Component."):
-        # Pass nothing to trigger the ValueError
+        # Pass nothing to trigger a ValueError
         ModelComponentInstall()
 
 
@@ -342,7 +342,7 @@ def test_run_ansible_playbook_fail(
     mock_config, mock_open, mock_runner_config, install_component
 ):
     """
-    Test the failure of the run_ansible_playbook method when an error occurs.
+    Test the failure of the :py:meth:`run_ansible_playbook` method when an error occurs.
 
     Mocks the playbook content and simulates a failure during execution.
 
@@ -387,7 +387,7 @@ def test_run_ansible_playbook_invalid_cache_type(
     mock_config, mock_open, install_component
 ):
     """
-    Test the run_ansible_playbook method when an invalid cache type is provided.
+    Test the :py:meth:`run_ansible_playbook` method when an invalid cache type is provided.
 
     Mocks the playbook content and simulates an invalid cache type scenario.
 
