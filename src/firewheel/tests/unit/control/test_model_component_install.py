@@ -34,7 +34,8 @@ def install_component(mock_model_component):
         mock_model_component (MockModelComponent): A mock ModelComponent instance.
 
     Returns:
-        ModelComponentInstall: An instance of :py:class:`ModelComponentInstall` initialized with the mock ModelComponent.
+        ModelComponentInstall: An instance of :py:class:`ModelComponentInstall` initialized with the
+        mock ModelComponent.
     """
     return ModelComponentInstall(mc=mock_model_component)
 
@@ -203,7 +204,8 @@ def test_run_install_script_no_install_script(mock_exists, install_component):
     Test the :py:meth:`run_install_script` method when the install script does not exist.
 
     Args:
-        mock_exists (MagicMock): Mock for the :py:meth:`pathlib.Path.exists` method to simulate the absence of the install script.
+        mock_exists (MagicMock): Mock for the :py:meth:`pathlib.Path.exists` method to simulate the absence
+            of the install script.
         install_component (ModelComponentInstall): The instance of :py:class:`ModelComponentInstall` to test.
     """
     result = install_component.run_install_script()
@@ -219,7 +221,8 @@ def test_run_install_script_with_existing_install_flag(mock_exists, install_comp
     Test the :py:meth:`run_install_script` method when the install flag exists.
 
     Args:
-        mock_exists (MagicMock): Mock for the :py:meth:`pathlib.Path.exists` method.  Simulates the presence of the ``install_script`` and the ``install_flag``.
+        mock_exists (MagicMock): Mock for the :py:meth:`pathlib.Path.exists` method.
+            Simulates the presence of the ``install_script`` and the ``install_flag``.
         install_component (ModelComponentInstall): The instance of :py:class:`ModelComponentInstall` to test.
     """
     result = install_component.run_install_script()
@@ -229,7 +232,8 @@ def test_run_install_script_with_existing_install_flag(mock_exists, install_comp
 
 def test_model_component_install_init_raises_value_error():
     """
-    Test that initializing :py:class:`ModelComponentInstall` without a :py:class:`ModelComponent` raises a :py:exc:`ValueError`.
+    Test that initializing :py:class:`ModelComponentInstall` without a :py:class:`ModelComponent`
+    raises a :py:exc:`ValueError`.
 
     Asserts that the appropriate error message is raised when no ModelComponent is provided.
     """
@@ -254,8 +258,10 @@ def test_run_install_script_user_prompt(
 
     Args:
         mock_install_mc (MagicMock): Mock for the :py:meth:`install_mc` method to return True.
-        mock_ask (MagicMock): Mock for the :py:meth:`InstallPrompt.ask` method. Mocks the user input to simulate a positive response to the installation prompt.
-        mock_exists (MagicMock): Mock for the :py:meth:`pathlib.Path.exists` method.  Mocks the existence of the ``install_script`` and the non-existence of the ``install_flag``.
+        mock_ask (MagicMock): Mock for the :py:meth:`InstallPrompt.ask` method. Mocks the user input to simulate
+            a positive response to the installation prompt.
+        mock_exists (MagicMock): Mock for the :py:meth:`pathlib.Path.exists` method.  Mocks the existence of
+            the ``install_script`` and the non-existence of the ``install_flag``.
         install_component (ModelComponentInstall): The instance of :py:class:`ModelComponentInstall` to test.
     """
     result = install_component.run_install_script()
@@ -276,8 +282,10 @@ def test_run_install_script_insecure_fail(
     Test the :py:meth:`run_install_script` method when insecure installation fails.
 
     Args:
-        mock_install_mc (MagicMock): Mock for the :py:meth:`install_mc` method to simulate a failure during insecure installation..
-        mock_exists (MagicMock): Mock for the :py:meth:`pathlib.Path.exists` method. Mocks the existence of the ``install_script`` and the non-existence of the ``install_flag``.
+        mock_install_mc (MagicMock): Mock for the :py:meth:`install_mc` method to simulate a failure
+            during insecure installation..
+        mock_exists (MagicMock): Mock for the :py:meth:`pathlib.Path.exists` method. Mocks the existence of
+            the ``install_script`` and the non-existence of the ``install_flag``.
         install_component (ModelComponentInstall): The instance of :py:class:`ModelComponentInstall` to test.
     """
     result = install_component.run_install_script(insecure=True)
@@ -298,8 +306,10 @@ def test_run_install_script_insecure_pass(
     Test the :py:meth:`run_install_script` method when insecure installation succeeds.
 
     Args:
-        mock_install_mc (MagicMock): Mock for the :py:meth:`install_mc` method to simulate a successful installation during insecure mode.
-        mock_exists (MagicMock): Mock for the :py:meth:`pathlib.Path.exists` method. Mocks the existence of the ``install_script`` and the non-existence of the ``install_flag``.
+        mock_install_mc (MagicMock): Mock for the :py:meth:`install_mc` method to simulate a successful
+            installation during insecure mode.
+        mock_exists (MagicMock): Mock for the :py:meth:`pathlib.Path.exists` method. Mocks the existence of the
+            ``install_script`` and the non-existence of the ``install_flag``.
         install_component (ModelComponentInstall): The instance of :py:class:`ModelComponentInstall` to test.
     """
     result = install_component.run_install_script(insecure=True)
