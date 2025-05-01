@@ -1,0 +1,33 @@
+---
+# This playbook will collect cached files from a given URL.
+# It uses https://docs.ansible.com/ansible/latest/collections/ansible/builtin/get_url_module.html.
+# 
+# If you are using an username or password token, you can specify it in the URL
+# For example: https://user:password@server.com/url/cache/path/file.txt
+# The user should provide the following:
+# - ``url`` - The URL of the server hosting the cached files.
+# - ``url_cache_path`` - The path to the file's base directory from the server. For example: http://example.com/<url_cache_path>/file.txt
+# - ``use_proxy`` - (optional) If false, it will not use a proxy, even if one is defined in an environment variable on the target hosts; default: true
+# - ``validate_certs`` - (optional) If false, SSL certificates will not be validated; default: true
+
+- name: Download and move files from a given server URL
+  hosts: localhost
+  vars_prompt:
+    - name: url
+      prompt: "Please enter the server URL or set `ansible.url` in the FIREWHEEL configuration."
+      private: false
+    
+    - name: url_cache_path
+      prompt: "Please enter the path to the cache directory or set `ansible.url_cache_path` in the FIREWHEEL configuration."
+      private: false
+
+  tasks:
+    - name: Download the cached files to the desired location
+      ansible.builtin.get_url:
+        url: "{{ url }}/{{ git_repo_path }}/{{ item.source }}"
+        dest: "{{ item.destination }}"
+        mode: "666"
+        checksum: "{{ item.checksum | default('') }}"
+        use_proxy: "{{ use_proxy | default(true) }}"
+        validate_certs: "{{ validate_certs | default(true) }}"
+      loop: "{{ cached_files }}"

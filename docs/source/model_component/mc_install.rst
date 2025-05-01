@@ -90,12 +90,27 @@ For example, if we cloned the cache for ``dns.dns_objects`` the structure would 
         └── dns_objects
             └── bind9_xenial_debs.tgz
 
+URL Cache
+=========
+If users have access to any file server (HTTP/HTTPS/FTP), they can specify the ``ansible.cache_type`` key as ``url`` in the :ref:`firewheel_configuration`.
+Additional configuration options under the ``ansible`` key are also necessary.
+If these values are not provided, but ``ansible.cache_type`` is ``url``, the user will be prompted for the information.
+
+- ``url`` - The URL of the server hosting the cached files.
+- ``url_cache_path`` - The path to the file's base directory from the server. For example: ``http://example.com/<url_cache_path>/file.txt``.
+- ``use_proxy`` - (optional) If ``false``, it will not use a proxy, even if one is defined in an environment variable on the target hosts. The default is: ``true``.
+- ``validate_certs`` - (optional) If ``false``, SSL certificates will not be validated. The default is: ``true``.
+
+If you are using an username or password token, you can specify it in the URL.
+For example: ``https://user:password@server.com/url/cache/path/file.txt``
+
 Git Cache
 =========
-If users have access to an git server instance, they can specify the following information under the ``ansible`` key in the :ref:`firewheel_configuration`.
+If users have access to an git server instance, they can specify the ``ansible.cache_type`` key as ``git`` in the :ref:`firewheel_configuration`.
+Additional configuration options under the ``ansible`` key are also necessary.
 If these values are not provided, but ``ansible.cache_type`` is ``git``, the user will be prompted for the information.
 
-- ``git_server`` - The URL of the git server
+- ``git_server`` - The URL of the git server.
 - ``git_repo_path`` - The path to the repo from the server. Because this is likely to change for each model component, we recommend not setting this parameter and simply prompting the user for each path.
 - ``git_branch`` - (optional) The branch name, defaults to ``main``.
 
@@ -104,7 +119,8 @@ For example: ``https://<token>@github.com/user/repo.git``
 
 S3 Cache
 ========
-If users have access to an AWS S3 instance, they can specify the following information under the ``ansible`` key in the :ref:`firewheel_configuration`.
+If users have access to an AWS S3 instance, they can specify the ``ansible.cache_type`` key as ``s3`` in the :ref:`firewheel_configuration`.
+Additional configuration options under the ``ansible`` key are also necessary.
 If these values are not provided, but ``ansible.cache_type`` is ``s3``, the user will be prompted for the information.
 
 - ``s3_endpoint`` - The S3 instance URL
