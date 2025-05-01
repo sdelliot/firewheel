@@ -382,11 +382,16 @@ def test_run_ansible_playbook_fail(
     mock_runner = MagicMock()
     mock_runner.rc = 1
 
+    # Patch the ansible_runner.run to return the mock runner
     with patch(
-        "firewheel.control.model_component_install.ansible_runner.run",
-        return_value=mock_runner,
+        'firewheel.control.model_component_install.ansible_runner.Runner.run',
+        return_value=("success", 0),
     ):
-        result = install_component.run_ansible_playbook(Path("/mock/path/INSTALL"))
+        with patch(
+            "firewheel.control.model_component_install.ansible_runner.run",
+            return_value=mock_runner,
+        ):
+            result = install_component.run_ansible_playbook(Path("/mock/path/INSTALL"))
 
     assert result is False
 
