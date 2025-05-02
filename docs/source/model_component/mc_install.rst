@@ -146,9 +146,9 @@ The current template is shown below.
 
 
 .. dropdown:: A Bash-based INSTALL template
-  
+
     .. code-block:: bash
-        :caption: This is an example INSTALL file using bash scripting. By replacing ``{{mc_name}}`` with the model component name, users can modify this example. 
+        :caption: This is an example INSTALL file using bash scripting. By replacing ``{{mc_name}}`` with the model component name, users can modify this example.
 
         #!/bin/bash
 
