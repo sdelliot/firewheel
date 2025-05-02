@@ -26,7 +26,7 @@ In addition to the requirements above, we recommend that the following principle
 
 1. `Idempotence <https://en.wikipedia.org/wiki/Idempotence>`_ - The file should be capable of running multiple times without causing issues. This is a core tenant of Ansible and a strong motivator why Ansible Playbooks are the preferred INSTALL file method.
 2. **Reproducibility** - It is critical that users will download the exact same data that was originally intended by the Model Component creators.
-   If the data/packages differ, than there is a strong possibly that the experimental outcomes will differ and could produce unintended consequences.
+   If the data/packages differ, than there is a strong possibility that the experimental outcomes will differ and could produce unintended consequences.
    Therefore, we strongly recommend that MC creators link to exact versions of software to download, rather than an automatically updating link.
    For example, if the MC was supposed to install a GitLab runner:
 
@@ -106,7 +106,7 @@ For example: ``https://user:password@server.com/url/cache/path/file.txt``
 
 Git Cache
 =========
-If users have access to an git server instance, they can specify the ``ansible.cache_type`` key as ``git`` in the :ref:`firewheel_configuration`.
+If users have access to a git server instance, they can specify the ``ansible.cache_type`` key as ``git`` in the :ref:`firewheel_configuration`.
 Additional configuration options under the ``ansible`` key are also necessary.
 If these values are not provided, but ``ansible.cache_type`` is ``git``, the user will be prompted for the information.
 
@@ -114,7 +114,7 @@ If these values are not provided, but ``ansible.cache_type`` is ``git``, the use
 - ``git_repo_path`` - The path to the repo from the server. Because this is likely to change for each model component, we recommend not setting this parameter and simply prompting the user for each path.
 - ``git_branch`` - (optional) The branch name, defaults to ``main``.
 
-If you an access token is being used, the user can specify it in the ``git_server`` URL.
+If an access token is being used, the user can specify it in the ``git_server`` URL.
 For example: ``https://<token>@github.com/user/repo.git``
 
 S3 Cache
