@@ -151,7 +151,7 @@ def test_has_shebang_valid(mock_open, install_component):
 
 
 @patch("firewheel.control.model_component_install.Path.open", new_callable=MagicMock)
-def test_has_shebang_invalid(mock_open, mock_yaml, install_component):
+def test_has_shebang_invalid(mock_open, install_component):
     """
     Test the :py:meth:`has_shebang` method with a valid Ansible playbook.
 
