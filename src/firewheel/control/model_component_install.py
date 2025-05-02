@@ -248,7 +248,7 @@ class ModelComponentInstall:
                 else:
                     console.print(
                         f"[b red]Failed to collect cached files via: [cyan]{cache_type}[/cyan]; "
-                        f"Failed with return code {ret[1]}."
+                        f"Failed with: {ret}."
                     )
                     return False
             else:
