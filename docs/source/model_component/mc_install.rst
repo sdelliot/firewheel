@@ -141,7 +141,7 @@ The current template is shown below.
 
     .. literalinclude:: ../../../src/firewheel/control/utils/templates/INSTALL.template
         :language: yaml
-        :caption: INSTALL template
+        :caption: Ansible INSTALL template. Note that this template has escaped the ansible Jinja2 blocks as the :ref:`helper_mc_generate` uses Jinja2 to replace the name of the model component.
         :name: INSTALL
 
 
