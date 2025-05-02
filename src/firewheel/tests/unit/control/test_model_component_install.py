@@ -2,7 +2,6 @@ import subprocess
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import yaml
 import pytest
 
 from firewheel.control.model_component_install import ModelComponentInstall
