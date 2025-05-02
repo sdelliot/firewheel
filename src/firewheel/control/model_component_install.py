@@ -91,9 +91,9 @@ class ModelComponentInstall:
         console = Console()
         console.print(f"[b green]Starting to install [cyan]{name}[/cyan]!")
 
-        # Check if the install script is a valid Ansible playbook
-        # if it is, we should execute it with "ansible-runner"
-        if self.is_ansible_playbook(install_path):
+        # Check if the install script has a shebang line
+        # if it does not, we should execute it with "ansible-runner"
+        if not self.has_shebang(install_path):
             return self.run_ansible_playbook(install_path)
 
         console.print(
@@ -123,28 +123,21 @@ class ModelComponentInstall:
             console.print(f"[b red]Failed to install [cyan]{name}[/cyan]!")
             return False
 
-    def is_ansible_playbook(self, install_path):
+    def has_shebang(self, install_path):
         """
-        Check if the given INSTALL file is a valid `Ansible <https://docs.ansible.com/>`_ playbook.
-        For this check, we check if the file is valid YAML and if each entry in
-        the YAML's list contains a "hosts" key.
+        Check if the given INSTALL file has a `shebang <https://en.wikipedia.org/wiki/Shebang_(Unix)`_
+        line and should be treated as an executable file.
 
         Args:
             install_path (pathlib.Path): The path of the ``INSTALL`` file.
 
         Returns:
-            bool: :py:data:`True` if the script is a valid Ansible playbook, :py:data:`False` otherwise.
+            bool: :py:data:`True` if the script starts with ``#!``, :py:data:`False` otherwise.
         """
-        try:
-            with install_path.open("r", encoding="utf-8") as file:
-                playbook = yaml.safe_load(file.read())
-
-                # Check if the playbook has the required structure
-                return isinstance(playbook, list) and all(
-                    "hosts" in play for play in playbook
-                )
-        except yaml.YAMLError:
-            return False
+        script = ""
+        with install_path.open("r", encoding="utf-8") as file:
+            script = file.read()
+        return script.startswith("#!")
 
     def run_ansible_playbook(self, install_path):
         """

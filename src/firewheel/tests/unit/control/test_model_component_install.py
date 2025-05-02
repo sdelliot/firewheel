@@ -131,58 +131,29 @@ def test_install_mc_already_installed(
         assert result is True
 
 
-@patch("yaml.safe_load", return_value=[{"hosts": "localhost"}])
 @patch("firewheel.control.model_component_install.Path.open", new_callable=MagicMock)
-def test_is_ansible_playbook_valid(mock_open, mock_yaml, install_component):
+def test_has_shebang_valid(mock_open, install_component):
     """
-    Test the :py:meth:`is_ansible_playbook` method with a valid Ansible playbook.
-
-    Mocks the playbook content to simulate a valid YAML structure.
+    Test the :py:meth:`has_shebang` method with a valid INSTALL script.
 
     Args:
         mock_open (MagicMock): Mock for the :py:meth:`pathlib.Path.open` method.
-        mock_yaml (MagicMock): Mock for the :py:meth:`yaml.safe_load` method.
         install_component (ModelComponentInstall): The instance of :py:class:`ModelComponentInstall` to test.
     """
     # Mock the behavior of the file read to simulate a valid Ansible playbook
     mock_file = MagicMock()
-    mock_file.read.return_value = "---\n- hosts: localhost"
+    mock_file.read.return_value = "#! /bin/bash"
     mock_open.return_value.__enter__.return_value = mock_file
 
-    result = install_component.is_ansible_playbook(Path("/mock/path/INSTALL"))
-    # Expecting True since the playbook is valid
+    result = install_component.has_shebang(Path("/mock/path/INSTALL"))
+    # Expecting True since the INSTALL is valid
     assert result is True
 
 
-@patch("yaml.safe_load", side_effect=yaml.YAMLError)
 @patch("firewheel.control.model_component_install.Path.open", new_callable=MagicMock)
-def test_is_ansible_playbook_invalid(mock_open, mock_yaml, install_component):
+def test_has_shebang_invalid(mock_open, mock_yaml, install_component):
     """
-    Test the :py:meth:`is_ansible_playbook` method with an invalid Ansible playbook.
-
-    Mocks the playbook content to simulate an invalid YAML structure.
-
-    Args:
-        mock_open (MagicMock): Mock for the :py:meth:`pathlib.Path.open` method.
-        mock_yaml (MagicMock): Mock for the py:meth:`yaml.safe_load method`.
-        install_component (ModelComponentInstall): The instance of :py:class:`ModelComponentInstall` to test.
-    """
-    # Mock the behavior of the file read to simulate invalid YAML
-    mock_file = MagicMock()
-    mock_file.read.return_value = "invalid yaml"
-    mock_open.return_value.__enter__.return_value = mock_file
-
-    result = install_component.is_ansible_playbook(Path("/mock/path/INSTALL"))
-    # Expecting False due to invalid YAML
-    assert result is False
-
-
-@patch("firewheel.control.model_component_install.Path.open", new_callable=MagicMock)
-def test_is_ansible_playbook_invalid_format(mock_open, install_component):
-    """
-    Test the :py:meth:`is_ansible_playbook` method with an invalid format in the playbook.
-
-    Mocks the playbook content to simulate an invalid YAML structure.
+    Test the :py:meth:`has_shebang` method with a valid Ansible playbook.
 
     Args:
         mock_open (MagicMock): Mock for the :py:meth:`pathlib.Path.open` method.
@@ -190,11 +161,11 @@ def test_is_ansible_playbook_invalid_format(mock_open, install_component):
     """
     # Mock the behavior of the file read to simulate invalid YAML
     mock_file = MagicMock()
-    mock_file.read.return_value = "invalid yaml"
+    mock_file.read.return_value = "---\n- hosts: localhost\n  vars:\n    cached_files: [{'destination': 'file.txt'}]"
     mock_open.return_value.__enter__.return_value = mock_file
 
-    result = install_component.is_ansible_playbook(Path("/mock/path/INSTALL"))
-    # Expecting False due to invalid YAML
+    result = install_component.has_shebang(Path("/mock/path/INSTALL"))
+    # Expecting False due to lack of shebang
     assert result is False
 
 
