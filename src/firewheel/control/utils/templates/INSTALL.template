@@ -19,7 +19,7 @@
   hosts: localhost
   become: yes
   vars:
-    install_flag: "{{ playbook_dir }}/.{{mc_name}}.installed"
+    install_flag: "{{ '{{' }} playbook_dir {{ '}}' }}/.{{mc_name}}.installed"
     # If there are files that can be cached, the final file name should
     # be added to this list. Then offline users may use a storage mechanism
     # for quick retrieval, rather than downloading from the Internet each time.
@@ -31,30 +31,30 @@
   tasks:
     - name: Check if {{mc_name}} is already installed
       ansible.builtin.stat:
-        path: "{{ install_flag }}"
+        path: "{{ '{{' }} install_flag {{ '}}' }}"
       register: flag_check
 
     - name: Ensure all cached file destinations exist
       ansible.builtin.stat:
-        path: "{{ item.destination }}"
+        path: "{{ '{{' }} item.destination {{ '}}' }}"
       register: cached_file_check
-      loop: "{{ cached_files }}"
+      loop: "{{ '{{' }} cached_files {{ '}}' }}"
 
     - name: Fail if install flag is set and any cached file destination does not exist
       ansible.builtin.fail:
-        msg: "The destination {{ item.item.destination }} does not exist."
+        msg: "The destination {{ '{{' }} item.item.destination {{ '}}' }} does not exist."
       when: flag_check.stat.exists and not item.stat.exists
-      loop: "{{ cached_file_check.results }}"
+      loop: "{{ '{{' }} cached_file_check.results {{ '}}' }}"
 
     # Check if all cached files exist
     - name: Set fact for cached files existence
       ansible.builtin.set_fact:
-        cached_files_exist: "{{ cached_file_check.results | selectattr('stat.exists', 'equalto', true) | list | length == cached_files | length }}"
+        cached_files_exist: "{{ '{{' }} cached_file_check.results | selectattr('stat.exists', 'equalto', true) | list | length == cached_files | length {{ '}}' }}"
 
     # Create installation flag if all cached files exist
     - name: Create installation flag if all cached files exist
       ansible.builtin.file:
-        path: "{{ install_flag }}"
+        path: "{{ '{{' }} install_flag {{ '}}' }}"
         state: touch
       when: cached_files_exist
 
@@ -74,16 +74,16 @@
 
     - name: Ensure all cached file destinations exist
       ansible.builtin.stat:
-        path: "{{ item.destination }}"
+        path: "{{ '{{' }} item.destination {{ '}}' }}"
       register: cached_file_check
-      loop: "{{ cached_files }}"
+      loop: "{{ '{{' }} cached_files {{ '}}' }}"
 
     - name: Fail if install flag is set and any cached file destination does not exist
       ansible.builtin.fail:
-        msg: "The destination {{ item.item.destination }} does not exist."
+        msg: "The destination {{ '{{' }} item.item.destination {{ '}}' }} does not exist."
       when: flag_check.stat.exists and not item.stat.exists
 
     - name: Create installation flag
       ansible.builtin.file:
-        path: "{{ install_flag }}"
+        path: "{{ '{{' }} install_flag {{ '}}' }}"
         state: touch
