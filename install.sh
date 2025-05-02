@@ -15,7 +15,7 @@
 # head node. Then your FIREWHEEL cluster will be ready to use!
 #
 # Requirements:
-# * Python >=3.7, with the path to its executable specified by PYTHON_BIN
+# * Python >=3.8, with the path to its executable specified by PYTHON_BIN
 #   (we recommend using virtual environments).
 # * minimega and discovery installed and configured.
 
@@ -80,24 +80,78 @@ function check_deps() {
     fi
 }
 
+#######################################
+# Basic setup for upgrading the virtual envionment tools and
+# building the FIREWHEEL whl file.
+# Arguments:
+#     None
+# Globals:
+#     PIP_ARGS
+#     PYTHON_BIN
+#######################################
+function install_firewheel_generic() {
+    if ! ${PYTHON_BIN} -m pip install ${PIP_ARGS} build; then
+        err "FIREWHEEL setup failed to pip install 'build'."
+        err "Consult the pip error logs, and verify network connectivity. Aborting."
+        exit 1
+    fi
+
+    if ! ${PYTHON_BIN} -m build; then
+        err "FIREWHEEL setup failed to build the source distribution and wheel."
+        err "Consult the error logs, and verify network connectivity. Aborting."
+        exit 1
+    fi
+
+}
+
+#######################################
+# Installing the FIREWHEEL package with standard dependencies.
+# Arguments:
+#     None
+# Globals:
+#     FIREWHEEL_ROOT_DIR
+#     PIP_ARGS
+#     PYTHON_BIN
+#######################################
+function install_firewheel() {
+    local clone="$1"
+
+    if [[ $clone -eq 0 ]]; then
+        ${PYTHON_BIN} -m pip install ${PIP_ARGS} ${FIREWHEEL_ROOT_DIR}/[mcs]
+    else
+        ${PYTHON_BIN} -m pip install ${PIP_ARGS} ${FIREWHEEL_ROOT_DIR}/
+        ${PYTHON_BIN} -m pip install ${PIP_ARGS} ${MC_DIR}/firewheel_repo_base
+        ${PYTHON_BIN} -m pip install ${PIP_ARGS} ${MC_DIR}/firewheel_repo_linux
+        ${PYTHON_BIN} -m pip install ${PIP_ARGS} ${MC_DIR}/firewheel_repo_vyos
+    fi
+}
 
 #######################################
 # Installing the FIREWHEEL package with development dependencies.
 # Arguments:
 #     None
 # Globals:
-#     FIREWHEEL_ROOT
+#     FIREWHEEL_ROOT_DIR
 #     PIP_ARGS
 #     PYTHON_BIN
 #######################################
 function install_firewheel_development() {
-    local mc_dir="${MC_DIR}_packages"
-    # Install the development version of FIREWHEEL
-    ${PYTHON_BIN} -m pip install ${PIP_ARGS} -e ${FIREWHEEL_ROOT_DIR}/[dev]
-    # Essential MCs (base, linux, vyos, etc.) were cloned; install them in development mode too
-    ${PYTHON_BIN} -m pip install ${PIP_ARGS} -e ${mc_dir}/firewheel_repo_base
-    ${PYTHON_BIN} -m pip install ${PIP_ARGS} -e ${mc_dir}/firewheel_repo_linux
-    ${PYTHON_BIN} -m pip install ${PIP_ARGS} -e ${mc_dir}/firewheel_repo_vyos
+    local clone="$1"
+    install_firewheel_generic
+
+    # Install the development version.
+    if [[ $clone -eq 0 ]]; then
+        ${PYTHON_BIN} -m pip install ${PIP_ARGS} -e ${FIREWHEEL_ROOT_DIR}/[dev]
+    else
+        # In this case, we do not use the "dev" optional dependencies as
+        # the user is using the source code version of these model components, rather
+        # than the Python package installed repositories.
+        ${PYTHON_BIN} -m pip install ${PIP_ARGS} pre-commit tox
+        ${PYTHON_BIN} -m pip install ${PIP_ARGS} -e ${FIREWHEEL_ROOT_DIR}/[format,docs]
+        ${PYTHON_BIN} -m pip install ${PIP_ARGS} -e ${MC_DIR}/firewheel_repo_base
+        ${PYTHON_BIN} -m pip install ${PIP_ARGS} -e ${MC_DIR}/firewheel_repo_linux
+        ${PYTHON_BIN} -m pip install ${PIP_ARGS} -e ${MC_DIR}/firewheel_repo_vyos
+    fi
 }
 
 #######################################
@@ -211,7 +265,7 @@ function main() {
         install_firewheel_development
     else
         echo "${fw_str} Installing FIREWHEEL with standard (non-development) dependencies."
-        ${PYTHON_BIN} -m pip install ${PIP_ARGS} firewheel[mcs]
+        install_firewheel $clone
     fi
     echo "${fw_str} Setting configuration options."
     init_firewheel $static
