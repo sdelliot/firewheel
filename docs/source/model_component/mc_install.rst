@@ -68,14 +68,15 @@ Below is beginning of an example Ansible "play":
           - source: "firewheel_repo_dns/dns_objects/bind9_xenial_debs.tgz"
             destination: "vm_resources/bind9_xenial_debs.tgz"
 
-When designing the tasks, recall that it is possible that the existing ``cached_files`` to become available prior to playbook execution.
+When designing the tasks, it is possible that any ``cached_files`` will be collected prior to the execution of the INSTALL file.
+Therefore, assumptions about existence of (or a lack thereof) these ``cached_files`` should be avoided.
 
 ************
 Cached Files
 ************
 
 FIREWHEEL supports collecting pre-computed blobs from various resources to enable offline experiment access.
-To enable retrieving files from a cache, users should set the ``ansible.cache_type`` to ``git`` or ``s3`` depending on if the files are cached in a git repository or in an Amazon S3 data store.
+To enable retrieving files from a cache, users should set the ``ansible.cache_type`` to ``url``, ``git`` or ``s3`` depending on if the files are cached in a file server, git repository, or in an Amazon S3 data store.
 This is an optional feature and the default value for ``ansible.cache_type`` is ``online``.
 See :ref:`firewheel_configuration` for additional information.
 
