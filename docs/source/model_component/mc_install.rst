@@ -50,8 +50,9 @@ In addition to the requirements above, we recommend that the following principle
 Ansible INSTALL Files
 *********************
 
-While INSTALL files should not have an extension, if INSTALL contains valid YAML, is a list, and has the "hosts" key in each list entry, then FIREWHEEL will attempt to use Ansible to execute the file.
-We strongly recommend using ``localhost`` as the "hosts" value.
+While INSTALL files should not have an extension, if INSTALL contains a `shebang <https://en.wikipedia.org/wiki/Shebang_(Unix)>`_ line, than it will be executed as a script.
+Otherwise, it is passed directly to Ansible.
+If users include a ``hosts`` key, we strongly recommend using ``localhost`` as the value.
 We also recommend that users define an ``install_flag`` variable and a ``cached_files`` variable (if needed).
 
 Below is beginning of an example Ansible "play":
@@ -137,11 +138,11 @@ The file ``src/firewheel/control/utils/templates/INSTALL.template`` contains a t
 When users use the :ref:`helper_mc_generate` Helper, this file is automatically added to the MC directory.
 The current template is shown below.
 
-.. dropdown:: A Ansible-based INSTALL template
+.. dropdown:: An Ansible-based INSTALL template
 
     .. literalinclude:: ../../../src/firewheel/control/utils/templates/INSTALL.template
         :language: yaml
-        :caption: Ansible INSTALL template. Note that this template has escaped the ansible Jinja2 blocks as the :ref:`helper_mc_generate` uses Jinja2 to replace the name of the model component.
+        :caption: This Ansible INSTALL template has escaped the ansible Jinja2 blocks as the :ref:`helper_mc_generate` uses Jinja2 to replace the name of the model component.
         :name: INSTALL
 
 
