@@ -24,8 +24,8 @@
     # be added to this list. Then offline users may use a storage mechanism
     # for quick retrieval, rather than downloading from the Internet each time.
     # cached_files:
-    #   - source: "repo_name/mc_name/file.gz"
-    #     destination: "vm_resources/file.gz"
+    #   - source: "repo_name/mc_name/example.tgz"
+    #     destination: "vm_resources/example.tgz"
     #     checksum: "sha256:e0287e6339a4e77232a32725bacc7846216a1638faba62618a524a6613823df5"
 
   tasks:

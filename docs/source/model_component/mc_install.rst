@@ -24,24 +24,24 @@ Design Principles
 
 In addition to the requirements above, we recommend that the following principles are adhered to when creating a new INSTALL file.
 
-1. `Idempotence <https://en.wikipedia.org/wiki/Idempotence>`_ - The file should be capable of running multiple times without causing issues. This is a core tenant of Ansible and a strong motivator why Ansible Playbooks are the preferred INSTALL file method.
-2. **Reproducibility** - It is critical that users will download the exact same data that was originally intended by the Model Component creators.
+1. `Idempotence <https://en.wikipedia.org/wiki/Idempotence>`_ -- The file should be capable of running multiple times without causing issues. This is a core tenant of Ansible and a strong motivator why Ansible Playbooks are the preferred INSTALL file method.
+2. **Reproducibility** -- It is critical that users will download the exact same data that was originally intended by the Model Component creators.
    If the data/packages differ, than there is a strong possibility that the experimental outcomes will differ and could produce unintended consequences.
    Therefore, we strongly recommend that MC creators link to exact versions of software to download, rather than an automatically updating link.
    For example, if the MC was supposed to install a GitLab runner:
 
    .. code-block:: bash
 
-        # This will automatically get the latest URL, this is BAD
+        # BAD: This will automatically get the latest URL.
         wget https://gitlab-runner-downloads.s3.amazonaws.com/latest/binaries/gitlab-runner-linux-amd64
 
-        # This will get a specific version, this is GOOD!
+        # GOOD: Get version 11.4.2
         wget https://s3.amazonaws.com/gitlab-runner-downloads/v11.4.2/binaries/gitlab-runner-linux-386
 
-3. **Integrity** - A checksum for all downloaded files is strongly recommend both to facilitate reproducibility and to increase the security of the experiment.
-4. **Offline Accessible** - Many experiments are conducted on infrastructure that lacks Internet access. Therefore, we recommend that INSTALL files allow users to achieve the same end result using cached files. While we do not expect users to support all methods for retrieving these cached files, we suggest designing the INSTALL file to ensure that the presence of these files does not lead to errors.
-5. **Cleanup** - INSTALL files should include only the essential dependencies and should remove any irrelevant data that may have been generated during intermediate steps.
-6. **Readability** - Users will need to execute these potentially unknown actions, the INSTALL script should be well documented and readable to the average user. Readability is desired over brevity.
+3. **Integrity** -- A checksum for all downloaded files is strongly recommend both to facilitate reproducibility and to increase the security of the experiment.
+4. **Offline Accessible** -- Many experiments are conducted on infrastructure that lacks Internet access. Therefore, we recommend that INSTALL files allow users to achieve the same end result using cached files. While we do not expect users to support all methods for retrieving these cached files, we suggest designing the INSTALL file to ensure that the presence of these files does not lead to errors.
+5. **Cleanup** -- INSTALL files should include only the essential dependencies and should remove any irrelevant data that may have been generated during intermediate steps.
+6. **Readability** -- Users will need to execute these potentially unknown actions, the INSTALL script should be well documented and readable to the average user. Readability is desired over brevity.
 
 
 .. _mc_install_ansible:
@@ -98,13 +98,13 @@ If users have access to any file server (HTTP/HTTPS/FTP), they can specify the `
 Additional configuration options under the ``ansible`` key are also necessary.
 If these values are not provided, but ``ansible.cache_type`` is ``url``, the user will be prompted for the information.
 
-- ``url`` - The URL of the server hosting the cached files.
-- ``url_cache_path`` - The path to the file's base directory from the server. For example: ``http://example.com/<url_cache_path>/file.txt``.
-- ``use_proxy`` - (optional) If ``false``, it will not use a proxy, even if one is defined in an environment variable on the target hosts. The default is: ``true``.
-- ``validate_certs`` - (optional) If ``false``, SSL certificates will not be validated. The default is: ``true``.
+- ``url`` -- The URL of the server hosting the cached files.
+- ``url_cache_path`` -- The path to the file's base directory from the server. For example: ``http://example.com/<url_cache_path>/file/path/file.txt``.
+- ``use_proxy`` -- (optional) If ``false``, it will not use a proxy, even if one is defined in an environment variable on the target hosts. The default is: ``true``.
+- ``validate_certs`` -- (optional) If ``false``, SSL certificates will not be validated. The default is: ``true``.
 
 If you are using an username or password token, you can specify it in the URL.
-For example: ``https://user:password@server.com/url/cache/path/file.txt``
+For example: ``https://user:password@server.com/url/cache/path/file/path/file.txt``
 
 Git Cache
 =========
@@ -112,9 +112,9 @@ If users have access to a git server instance, they can specify the ``ansible.ca
 Additional configuration options under the ``ansible`` key are also necessary.
 If these values are not provided, but ``ansible.cache_type`` is ``git``, the user will be prompted for the information.
 
-- ``git_server`` - The URL of the git server.
-- ``git_repo_path`` - The path to the repo from the server. Because this is likely to change for each model component, we recommend not setting this parameter and simply prompting the user for each path.
-- ``git_branch`` - (optional) The branch name, defaults to ``main``.
+- ``git_server`` -- The URL of the git server.
+- ``git_repo_path`` -- The path to the repo from the server. Because this is likely to change for each model component, we recommend not setting this parameter and simply prompting the user for each path.
+- ``git_branch`` -- (optional) The branch name, defaults to ``main``.
 
 If an access token is being used, the user can specify it in the ``git_server`` URL.
 For example: ``https://<token>@github.com/user/repo.git``
@@ -125,10 +125,10 @@ If users have access to an AWS S3 instance, they can specify the ``ansible.cache
 Additional configuration options under the ``ansible`` key are also necessary.
 If these values are not provided, but ``ansible.cache_type`` is ``s3``, the user will be prompted for the information.
 
-- ``s3_endpoint`` - The S3 instance URL
-- ``s3_bucket`` - The name of the S3 bucket name
-- ``aws_access_key_id`` - The AWS access key
-- ``aws_secret_access_key`` - The AWS secret key
+- ``s3_endpoint`` -- The S3 instance URL
+- ``s3_bucket`` -- The name of the S3 bucket name
+- ``aws_access_key_id`` -- The AWS access key
+- ``aws_secret_access_key`` -- The AWS secret key
 
 ****************
 INSTALL Template
