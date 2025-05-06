@@ -23,7 +23,7 @@
       ansible.builtin.git:
         repo: "{{ git_server }}/{{ git_repo_path }}"
         dest: "/tmp/fwcache"
-        version: "{{ git_branch | default('main') }}"
+        version: "{{ git_branch | default(omit) }}"
         clone: true
         update: true
       register: git_clone_result
