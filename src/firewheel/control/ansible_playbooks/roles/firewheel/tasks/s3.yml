@@ -14,7 +14,7 @@
         that: (s3_endpoint is defined and s3_endpoint != "") and (s3_bucket is defined and s3_bucket != "") and (aws_access_key_id is defined and aws_access_key_id != "") and (aws_secret_access_key is defined and aws_secret_access_key != "")
         success_msg: "Found s3"
         fail_msg: "No S3 information provided. Please provide valid S3 credentials."
-        queit: true
+        quiet: true
       register: s3_cache
 
     - name: Download cached files from S3
@@ -34,7 +34,9 @@
       ansible.builtin.fail:
         msg: "Failed to download files from S3. Please check the S3 information and try again."
       when: s3_download_result is failed
+
   rescue:
     - name: Rescue the block
       ansible.builtin.debug:
         msg: "No S3 Cache information provided"
+      when: s3_cache is failed

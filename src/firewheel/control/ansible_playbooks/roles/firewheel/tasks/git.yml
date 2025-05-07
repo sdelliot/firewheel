@@ -8,31 +8,33 @@
 # - ``git_branch`` - The branch name (optional); default: main
 
 - name: Attempt to pull cache from Git repository if URL fails
-    block:
+  block:
     - name: Check if Git information is provided
-        ansible.builtin.assert:
-        that: (git_server is defined and git_server != "") and (git_repo_path is defined and git_repo_path != "")
+      ansible.builtin.assert:
+        that:
+          - (git_server is defined and git_server != "")
+          - (git_repo_path is defined and git_repo_path != "")
         success_msg: "Found git creds, trying to pull cache"
         fail_msg: "No git creds, continuing..."
         quiet: true
-        register: git_cache
+      register: git_cache
 
     - name: Clone Git repository
-        ansible.builtin.git:
+      ansible.builtin.git:
         repo: "{{ git_server }}/{{ git_repo_path }}"
         dest: "/tmp/fwcache"
         clone: true
         update: true
         register: git_clone_result
-        ignore_errors: true
+      ignore_errors: true
 
     - name: Fail if Git clone fails
-        ansible.builtin.fail:
+      ansible.builtin.fail:
         msg: "Failed to clone Git repository. Please check the repository information and try again."
-        when: git_clone_result is failed
+      when: git_clone_result is failed
 
-    rescue:
+  rescue:
     - name: Rescue the block
-        ansible.builtin.debug:
+      ansible.builtin.debug:
         msg: "No Git Cache information provided"
-
+      when: git_cache is failed

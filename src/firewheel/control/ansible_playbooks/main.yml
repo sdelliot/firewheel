@@ -5,7 +5,7 @@
   tasks:
     - name: Import variables from model component
       include_vars:
-        file: {{ vars_path }}
+        file: "{{ vars_path }}"
     - name: Check for files
       include_role:
         name: firewheel
@@ -14,30 +14,36 @@
     - name: Adding git
       include_role:
         name: firewheel
-        tasks_from: check_and_end.yml
-      when: 
+        tasks_from: git.yml
 
     - name: Adding s3
       include_role:
         name: firewheel
-        tasks_from: check_and_end.yml
-      when: 
+        tasks_from: s3.yml
+      when:
+        - git_clone_result is not defined or git_clone_result is failed
 
     - name: Adding url
       include_role:
         name: firewheel
         tasks_from: url.yml
-      when: 
+      when:
+        - git_clone_result is not defined or git_clone_result is failed
+        - s3_download_result is not defined or s3_download_result is failed
 
     - name: Check if user is online
       ansible.builtin.command: ping -c 1 8.8.8.8
       register: ping_result
       ignore_errors: true
+      when:
+        - git_clone_result is not defined or git_clone_result is failed
+        - s3_download_result is not defined or s3_download_result is failed
+        - url_download_result is not defined or url_download_result is failed
 
     - name: Final failure message if all attempts fail
       ansible.builtin.fail:
         msg: "All cache file methods have failed and system does not appear to be online. Please provide valid cache information."
-      when: ping_result.rc != 0 and (git_cache is failed) and (url_cache is failed) and (s3_cache is failed)
+      when: ping_result.rc | default(0) != 0
 
     # check_and_end (if we ran a cache)
     - name: Check for files
@@ -45,11 +51,10 @@
         name: firewheel
         tasks_from: check_and_end.yml
 
-
     # We definitly don't have any cached files and are online
     # so we need to run the tasks
     - name: Include INSTALL tasks if online
-      include_tasks: {{ tasks_path }}
+      include_tasks: "{{ tasks_path }}"
       when: ping_result.rc == 0
 
     # check_and_end Or do I need the following?
