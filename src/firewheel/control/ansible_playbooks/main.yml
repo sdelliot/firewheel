@@ -3,10 +3,9 @@
   hosts: localhost
   gather_facts: no
   tasks:
-    - name: Import variables from INSTALL.yml
+    - name: Import variables from model component
       include_vars:
-        file: INSTALL/vars.yml
-
+        file: {{ vars_path }}
     - name: Check for files
       include_role:
         name: firewheel
@@ -50,7 +49,7 @@
     # We definitly don't have any cached files and are online
     # so we need to run the tasks
     - name: Include INSTALL tasks if online
-      include_tasks: INSTALL/tasks.yml
+      include_tasks: {{ tasks_path }}
       when: ping_result.rc == 0
 
     # check_and_end Or do I need the following?
