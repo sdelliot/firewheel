@@ -10,24 +10,31 @@
 # - ``use_proxy`` - (optional) If false, it will not use a proxy, even if one is defined in an environment variable on the target hosts; default: true
 # - ``validate_certs`` - (optional) If false, SSL certificates will not be validated; default: true
 
-- name: Download and move files from a given server URL
-  hosts: localhost
-  vars_prompt:
-    - name: url
-      prompt: "Please enter the server URL or set `ansible.url` in the FIREWHEEL configuration."
-      private: false
-    
-    - name: url_cache_path
-      prompt: "Please enter the path to the cache directory or set `ansible.url_cache_path` in the FIREWHEEL configuration."
-      private: false
+- name: Attempt to pull cache from URL if offline
+  block:
+    - name: Check if URL information is provided
+      ansible.builtin.assert:
+        that: (url is defined and url != "") and (url_cache_path is defined and url_cache_path != "")
+        fail_msg: "No URL information provided. Please provide a valid URL."
+        success_msg: "Found a server"
+        queit: true
+      register: url_cache
 
-  tasks:
-    - name: Download the cached files to the desired location
+    - name: Download cached files from URL
       ansible.builtin.get_url:
-        url: "{{ url }}/{{ git_repo_path }}/{{ item.source }}"
+        url: "{{ url }}/{{ url_cache_path }}/{{ item.source }}"
         dest: "{{ item.destination }}"
         mode: "666"
-        checksum: "{{ item.checksum | default('') }}"
-        use_proxy: "{{ use_proxy | default(true) }}"
-        validate_certs: "{{ validate_certs | default(true) }}"
       loop: "{{ cached_files }}"
+      register: url_download_result
+      ignore_errors: true
+
+    - name: Fail if URL download fails
+      ansible.builtin.fail:
+        msg: "Failed to download files from URL. Please check the URL and try again."
+      when: url_download_result is failed
+  rescue:
+    - name: Rescue the block
+      ansible.builtin.debug:
+        msg: "No Server Cache information provided"
+

@@ -1,0 +1,73 @@
+---
+- name: Check online status and manage cache retrieval
+  hosts: localhost
+  gather_facts: no
+  tasks:
+    - name: Import variables from INSTALL.yml
+      include_vars:
+        file: INSTALL/vars.yml
+
+    - name: Check for files
+      include_role:
+        name: firewheel
+        tasks_from: check_and_end.yml
+
+    - name: Adding git
+      include_role:
+        name: firewheel
+        tasks_from: check_and_end.yml
+      when: 
+
+    - name: Adding s3
+      include_role:
+        name: firewheel
+        tasks_from: check_and_end.yml
+      when: 
+
+    - name: Adding url
+      include_role:
+        name: firewheel
+        tasks_from: url.yml
+      when: 
+
+    - name: Check if user is online
+      ansible.builtin.command: ping -c 1 8.8.8.8
+      register: ping_result
+      ignore_errors: true
+
+    - name: Final failure message if all attempts fail
+      ansible.builtin.fail:
+        msg: "All cache file methods have failed and system does not appear to be online. Please provide valid cache information."
+      when: ping_result.rc != 0 and (git_cache is failed) and (url_cache is failed) and (s3_cache is failed)
+
+    # check_and_end (if we ran a cache)
+    - name: Check for files
+      include_role:
+        name: firewheel
+        tasks_from: check_and_end.yml
+
+
+    # We definitly don't have any cached files and are online
+    # so we need to run the tasks
+    - name: Include INSTALL tasks if online
+      include_tasks: INSTALL/tasks.yml
+      when: ping_result.rc == 0
+
+    # check_and_end Or do I need the following?
+
+
+    - name: Ensure all cached file destinations exist
+      ansible.builtin.stat:
+        path: "{{ item.destination }}"
+      register: cached_file_check
+      loop: "{{ cached_files }}"
+
+    - name: Fail if any cached file destination does not exist
+      ansible.builtin.fail:
+        msg: "The destination {{ item.item.destination }} does not exist."
+      when: not item.stat.exists
+
+    - name: Create installation flag
+      ansible.builtin.file:
+        path: "{{ install_flag }}"
+        state: touch

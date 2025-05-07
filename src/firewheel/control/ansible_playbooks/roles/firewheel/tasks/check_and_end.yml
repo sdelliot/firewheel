@@ -1,0 +1,23 @@
+- name: Ensure all cached file destinations exist
+    ansible.builtin.stat:
+    path: "{{ item.destination }}"
+    register: cached_file_check
+    loop: "{{ cached_files }}"
+
+# Check if all cached files exist
+- name: Set fact for cached files existence
+    ansible.builtin.set_fact:
+    completed_once: "{{ cached_file_check.results | selectattr('stat.exists', 'equalto', true) | list | length == cached_files | length }}"
+
+# Create installation flag if all cached files exist
+- name: Create installation flag if all cached files exist
+    ansible.builtin.file:
+    path: "{{ install_flag }}"
+    state: touch
+    when: completed_once
+
+# Exit successfully if there are no issues with cached files
+- name: Exit successfully if there are issues with cached files
+    meta: end_play
+    when: completed_once
+
