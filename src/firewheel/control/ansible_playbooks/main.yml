@@ -31,20 +31,6 @@
         - git_clone_result is not defined or git_clone_result is failed
         - s3_download_result is not defined or s3_download_result is failed
 
-    - name: Check if user is online
-      ansible.builtin.command: ping -c 1 8.8.8.8
-      register: ping_result
-      ignore_errors: true
-      when:
-        - git_clone_result is not defined or git_clone_result is failed
-        - s3_download_result is not defined or s3_download_result is failed
-        - url_download_result is not defined or url_download_result is failed
-
-    - name: Final failure message if all attempts fail
-      ansible.builtin.fail:
-        msg: "All cache file methods have failed and system does not appear to be online. Please provide valid cache information."
-      when: ping_result.rc | default(0) != 0
-
     # check_and_end (if we ran a cache)
     - name: Check for files
       include_role:
@@ -52,6 +38,16 @@
         tasks_from: check_and_end.yml
       when:
         - (git_clone_result is defined and git_clone_result is succeeded) or (s3_download_result is defined and s3_download_result is succeeded) or (url_download_result is defined and url_download_result is succeeded)
+
+    - name: Check if user is online
+      ansible.builtin.command: ping -c 1 8.8.8.8
+      register: ping_result
+      ignore_errors: true
+
+    - name: Final failure message if all attempts fail
+      ansible.builtin.fail:
+        msg: "All cache file methods have failed and system does not appear to be online. Please provide valid cache information."
+      when: ping_result.rc | default(0) != 0
 
     # We definitly don't have any cached files and are online
     # so we need to run the tasks
