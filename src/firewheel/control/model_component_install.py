@@ -194,6 +194,7 @@ class ModelComponentInstall:
             "tasks_path": str(tasks_path),
             "mc_dir": str(install_path.parent),
             "install_flag": str(install_path.parent / f".{name}.install"),
+            "mc_name": str(name),
         }
 
         # Add any remaining configuration options provided in the FIREWHEEL
