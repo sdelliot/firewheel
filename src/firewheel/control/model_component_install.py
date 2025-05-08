@@ -3,7 +3,6 @@ import stat
 import subprocess
 from pathlib import Path
 
-import yaml
 import ansible_runner
 from rich.prompt import PromptBase
 from rich.syntax import Syntax
@@ -32,12 +31,13 @@ class InstallPrompt(PromptBase[str]):
 
 class ModelComponentInstall:
     """
-    Some Model Components may provide an additional install script called ``INSTALL``
+    Some Model Components may provide an additional installation details
     which can be executed to perform other setup steps (e.g. installing an extra python package
     or downloading an external VM resource).
-    This class helps execute that file and install a Model Component.
-    ``INSTALL`` scripts can be can be any executable file type as defined by a
-    `shebang <https://en.wikipedia.org/wiki/Shebang_(Unix)>`_ line.
+    This takes the form of either a ``INSTALL`` directory with a ``vars.yml`` and a ``tasks.yml``
+    that are Ansible tasks which can be executed.
+    Alternatively, it can be a single ``INSTALL`` script that can be can be any executable file
+    type as defined by a `shebang <https://en.wikipedia.org/wiki/Shebang_(Unix)>`_ line.
 
     .. warning::
 
@@ -125,7 +125,8 @@ class ModelComponentInstall:
 
     def has_shebang(self, install_path):
         """
-        Check if the given INSTALL file has a `shebang <https://en.wikipedia.org/wiki/Shebang_(Unix)`_
+        Check if the given INSTALL file has a
+        `shebang <https://en.wikipedia.org/wiki/Shebang_(Unix)`_
         line and should be treated as an executable file.
 
         Args:
@@ -148,17 +149,21 @@ class ModelComponentInstall:
 
         Args:
             name (str): The name of the Model Component.
-            install_path (pathlib.Path): The path of the Ansible playbook.
+            install_path (pathlib.Path): The path of the Ansible playbook directory.
 
         Returns:
-            bool: :py:data:`True` if the playbook executed successfully, :py:data:`False` otherwise.
+            bool: :py:data:`True` if the playbook executed successfully,
+            :py:data:`False` otherwise.
 
         Raises:
             ValueError: If an invalid ``ansible.cache_type`` is provided in the FIREWHEEL config.
         """
         console = Console()
-        
-        wrong_structure_msg = f"[b red][cyan]{install_path}[/cyan] must either be a directory with tasks.yml and vars.yml or a file with a shebang line."
+
+        wrong_structure_msg = str(
+            f"[b red][cyan]{install_path}[/cyan] must either be a directory with tasks.yml "
+            "and vars.yml or a file with a shebang line."
+        )
         if not install_path.is_dir():
             console.print(wrong_structure_msg)
             raise ValueError("Invalid INSTALL file.")
@@ -196,7 +201,7 @@ class ModelComponentInstall:
         ansible_config.update(config["ansible"])
 
         playbook_path = Path(__file__).resolve().parent / Path(
-            f"ansible_playbooks/main.yml"
+            "ansible_playbooks/main.yml"
         )
 
         # Run the Ansible playbooks
@@ -273,13 +278,26 @@ class ModelComponentInstall:
                 break
             if value.startswith("v"):
                 contents = ""
-                with open(install_script, "r", encoding="utf-8") as fhand:
-                    contents = fhand.read()
                 style = False
                 if value == "vc":
                     style = True
-                with console.pager(styles=style):
-                    console.print(Syntax(contents, lexer="bash"))
+                if install_script.is_dir():
+                    file_contents = []
+                    for file_path in install_script.iterdir():
+                        if file_path.is_file():
+                            with file_path.open('r') as file:
+                                content = file.read()
+                                file_contents.append((file_path.name, content))
+                    with console.pager(styles=style):
+                        for filename, contents in file_contents:
+                            console.print(f"[bold underline]Contents of {filename}:[/]")
+                            console.print(Syntax(contents, lexer="bash"))
+                            console.print("\n" + "-" * 40 + "\n")
+                else:
+                    with open(install_script, "r", encoding="utf-8") as fhand:
+                        contents = fhand.read()
+                    with console.pager(styles=style):
+                        console.print(Syntax(contents, lexer="bash"))
             elif value.startswith("q"):
                 sys.exit(0)
         return True
