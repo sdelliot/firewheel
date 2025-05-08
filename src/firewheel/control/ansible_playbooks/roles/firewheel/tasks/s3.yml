@@ -11,7 +11,11 @@
   block:
     - name: Check if S3 information is provided
       ansible.builtin.assert:
-        that: (s3_endpoint is defined and s3_endpoint != "") and (s3_bucket is defined and s3_bucket != "") and (aws_access_key_id is defined and aws_access_key_id != "") and (aws_secret_access_key is defined and aws_secret_access_key != "")
+        that:
+          - (s3_endpoint is defined and s3_endpoint != "")
+          - (s3_bucket is defined and s3_bucket != "")
+          - (aws_access_key_id is defined and aws_access_key_id != "")
+          - (aws_secret_access_key is defined and aws_secret_access_key != "")
         success_msg: "Found s3"
         fail_msg: "No S3 information provided. Please provide valid S3 credentials."
         quiet: true

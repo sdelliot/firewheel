@@ -24,8 +24,9 @@
         repo: "{{ git_server }}/{{ git_repo_path }}"
         dest: "/tmp/fwcache"
         clone: true
+        version: "{{ git_branch }} | default('HEAD')"
         update: true
-        register: git_clone_result
+      register: git_clone_result
       ignore_errors: true
 
     - name: Fail if Git clone fails

@@ -20,12 +20,12 @@
 ###############################################################################
 - name: "Install Model Component: {{ mc_name }}"
   hosts: localhost
-  gather_facts: no
+  gather_facts: false
   tasks:
     - name: Import variables from model component
       ansible.builtin.include_vars:
         file: "{{ vars_path }}"
-    
+
     - name: Check for needed files
       ansible.builtin.include_role:
         name: firewheel
@@ -55,11 +55,15 @@
       ansible.builtin.include_role:
         name: firewheel
         tasks_from: check_and_end.yml
-      when: (git_clone_result is defined and git_clone_result is succeeded) or (s3_download_result is defined and s3_download_result is succeeded) or (url_download_result is defined and url_download_result is succeeded)
+      when: |
+        (git_clone_result is defined and git_clone_result is succeeded) or
+        (s3_download_result is defined and s3_download_result is succeeded) or
+        (url_download_result is defined and url_download_result is succeeded)
 
     - name: Check if user is online
       ansible.builtin.command: ping -c 1 8.8.8.8
       register: ping_result
+      changed_when: false
       ignore_errors: true
 
     - name: Final failure message if all attempts fail
@@ -69,7 +73,7 @@
 
     # If we don't have any cached files and are online
     # then we need to run the MC Install tasks
-    - name: "Include {{ mc_name }} tasks (if needed)"
+    - name: "Include tasks (if needed) for: {{ mc_name }}"
       ansible.builtin.include_tasks: "{{ tasks_path }}"
       when: (ping_result.rc | default(1)) == 0
 

@@ -1,5 +1,5 @@
 - name: Initialize a variable to track file status
-  set_fact:
+  ansible.builtin.set_fact:
     all_files_valid: true
 
 - name: Ensure all cached file destinations exist
@@ -22,7 +22,7 @@
     index_var: index
 
 - name: Check for missing files
-  set_fact:
+  ansible.builtin.set_fact:
     all_files_valid: false
   when:
     - not cached_file_check.results[index].stat.exists
@@ -35,10 +35,10 @@
   ansible.builtin.file:
     path: "{{ install_flag }}"
     state: touch
+    mode: "660"
   when: all_files_valid
 
 # Exit successfully if there are no issues with cached files
 - name: Exit successfully if there are issues with cached files
-  meta: end_play
+  ansible.builtin.meta: end_play
   when: all_files_valid
-
