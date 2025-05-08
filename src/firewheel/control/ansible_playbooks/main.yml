@@ -57,7 +57,7 @@
     # so we need to run the tasks
     - name: Include INSTALL tasks if online
       include_tasks: "{{ tasks_path }}"
-      when: ping_result.rc == 0
+      when: ping_result.rc | default(1) == 0
 
     - name: Check for files
       include_role:
