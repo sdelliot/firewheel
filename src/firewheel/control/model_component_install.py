@@ -94,7 +94,7 @@ class ModelComponentInstall:
         # Check if the install script has a shebang line
         # if it does not, we should execute it with "ansible-runner"
         if not self.has_shebang(install_path):
-            return self.run_ansible_playbook(install_path)
+            return self.run_ansible_playbook(name, install_path)
 
         console.print(
             "[b yellow]Warning: Use of non-ansible-based INSTALL scripts is deprecated. "
@@ -142,11 +142,12 @@ class ModelComponentInstall:
             script = file.read()
         return script.startswith("#!")
 
-    def run_ansible_playbook(self, install_path):
+    def run_ansible_playbook(self, name, install_path):
         """
         Run the provided Ansible playbook using ansible-runner.
 
         Args:
+            name (str): The name of the Model Component.
             install_path (pathlib.Path): The path of the Ansible playbook.
 
         Returns:
@@ -161,7 +162,7 @@ class ModelComponentInstall:
         if not install_path.is_dir():
             console.print(wrong_structure_msg)
             raise ValueError("Invalid INSTALL file.")
-        
+
         # Check for vars file.
         vars_path = None
         if Path(install_path / "vars.yml").exists():
@@ -171,7 +172,7 @@ class ModelComponentInstall:
         else:
             console.print(wrong_structure_msg)
             raise ValueError(f"Missing vars.yml file in directory {install_path}.")
-        
+
         # Check for tasks file.
         tasks_path = None
         if Path(install_path / "tasks.yml").exists():
@@ -187,6 +188,7 @@ class ModelComponentInstall:
             "vars_path": str(vars_path),
             "tasks_path": str(tasks_path),
             "mc_dir": str(install_path.parent),
+            "install_flag": str(install_path.parent / f".{name}.install"),
         }
 
         # Add any remaining configuration options provided in the FIREWHEEL
@@ -196,7 +198,7 @@ class ModelComponentInstall:
         playbook_path = Path(__file__).resolve().parent / Path(
             f"ansible_playbooks/main.yml"
         )
-        
+
         # Run the Ansible playbooks
         ret = ansible_runner.run(
             private_data_dir=str(install_path.parent),
