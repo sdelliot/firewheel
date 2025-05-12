@@ -1508,5 +1508,3 @@ Example
 ``firewheel vm resume host.root.net bgp.root.net``
 
 ``firewheel vm resume --all``
-
-
