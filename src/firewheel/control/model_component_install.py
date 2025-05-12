@@ -286,7 +286,7 @@ class ModelComponentInstall:
                     file_contents = []
                     for file_path in install_script.iterdir():
                         if file_path.is_file():
-                            with file_path.open('r') as file:
+                            with file_path.open("r") as file:
                                 content = file.read()
                                 file_contents.append((file_path.name, content))
                     with console.pager(styles=style):

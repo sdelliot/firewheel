@@ -7,6 +7,8 @@ Model Component INSTALL file
 Some Model Components may require additional Python packages to be installed within FIREWHEEL's virtual environment or for data to be downloaded.
 In this case, the Model Component can have an ``INSTALL`` directory, which contains a valid `Ansible Playbook <https://docs.ansible.com/ansible/latest/playbook_guide/playbooks_intro.html>`_ (recommend method).
 Alternatively, ``INSTALL`` can be an executable script (as denoted by a `shebang <https://en.wikipedia.org/wiki/Shebang_(Unix)>`_ line), though this is not recommend and support will be removed in a future releases.
+When users use the :ref:`helper_mc_generate` Helper, a new INSTALL directory is created with sample ``tasks.yml`` and ``vars.yml`` automatically included.
+
 
 When a repository is installed via the :ref:`helper_repository_install` Helper, users have the option to can automatically run each MCs INSTALL script using the ``-s`` flag (see :ref:`helper_repository_install` for more details).
 
@@ -54,12 +56,12 @@ The ``vars.yml`` file should be a YAML dictionary of all the variable keys/value
 
 ``tasks.yml``
 =============
-The tasks file should be a YAML list with any tasks needed to ensure that the model component can execute correctly as intended. 
+The tasks file should be a YAML list with any tasks needed to ensure that the model component can execute correctly as intended.
 
 .. code-block:: yaml
   :caption: This is an example ``tasks.yml`` file that collects, verifies, and compresses needed binaries.
 
-    
+
    - name: Create directory for htop
      ansible.builtin.file:
        path: "htop-1_0_2_debs"
@@ -134,7 +136,7 @@ The full definition for ``cached_files`` is:
 .. confval:: destination
 
     Where the file should be placed.
-    Should include ``{{ mc_path }}`` if the file needs to be relative to the model component directory. 
+    Should include ``{{ mc_path }}`` if the file needs to be relative to the model component directory.
 
     :type: string
     :required: true
@@ -155,22 +157,6 @@ The full definition for ``cached_files`` is:
 
     :type: string
     :required: false
-
-
-INSTALL Template
-================
-
-The file ``src/firewheel/control/utils/templates/INSTALL.template`` contains a template for a Bash-based INSTALL file.
-When users use the :ref:`helper_mc_generate` Helper, this file is automatically added to the MC directory.
-The current template is shown below.
-
-.. dropdown:: An Ansible-based INSTALL template
-
-    .. literalinclude:: ../../../src/firewheel/control/utils/templates/INSTALL.template
-        :language: yaml
-        :caption: This Ansible INSTALL template has escaped the ansible Jinja2 blocks as the :ref:`helper_mc_generate` uses Jinja2 to replace the name of the model component.
-        :name: INSTALL
-
 
 .. _mc_install_cache:
 
