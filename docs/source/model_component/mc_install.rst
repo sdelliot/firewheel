@@ -187,48 +187,6 @@ Users are able to set multiple cache types as FIREWHEEL will check any caches fo
 
   Users setting up a cache **MUST** place cached files using the path: ``<package name>/<path to MC>/file``.
 
-
-URL Cache
-=========
-If users plan to use a file server (HTTP/HTTPS/FTP) for the Model Component cache, they can specify the following options in the :ref:`firewheel_configuration` under the ``ansible`` key.
-
-.. confval:: url
-
-    The URL of the server hosting the cached files.
-
-    :type: string
-    :required: true
-
-    .. note::
-
-        If you are using an username or password token, you can specify it in the URL.
-        For example: ``https://user:password@server.com``
-
-
-.. confval:: url_cache_path
-
-    The path to base directory of the FIREWHEEL cache. For example in the URL ``http://example.com/files/firewheel/firewheel_repo_linux/ubuntu/ubuntu/htop-1_0_2_debs.tgz``; ``url="http://example.com"``, and ``url_cache_path="files/firewheel"``.
-
-    :type: string
-    :required: true
-
-
-.. confval:: use_proxy
-
-    If ``false``, it will not use a proxy, even if one is defined in an environment variable on the target hosts.
-
-    :type: boolean
-    :required: false
-    :default: true
-
-.. confval:: validate_certs
-
-    If ``false``, SSL certificates will not be validated.
-
-    :type: boolean
-    :required: false
-    :default: true
-
 Git Cache
 =========
 If users plan to use a git server for the Model Component cache, they can specify the following options in the :ref:`firewheel_configuration` under the ``ansible`` key.
@@ -278,7 +236,7 @@ An example of this configuration is shown below:
 
         A list of repositories associated with the Git server. Each repository is represented as a dictionary containing the following keys:
 
-        .. confval:: git_servers/repositories/path
+        .. confval:: path
 
             The path to the git repository containing the cached files. SCP-style URLs are not supported.
             When using the ``ssh://`` protocol, please use the following format: ``ssh://username@example.com``.
@@ -286,7 +244,7 @@ An example of this configuration is shown below:
             :type: string
             :required: true
 
-        .. confval:: git_servers/repositories/branch
+        .. confval:: branch
 
             The version of the repository to check out. This can be the literal string ``HEAD``, a branch name, or a tag name. This is passed to `ansible.builtin.git <https://docs.ansible.com/ansible/latest/collections/ansible/builtin/git_module.html#parameter-version>`_.
 
@@ -355,6 +313,46 @@ An example of this configuration is shown below:
         :type: list
         :required: true
 
+URL Cache
+=========
+If users plan to use a file server (HTTP/HTTPS/FTP) for the Model Component cache, they can specify the following options in the :ref:`firewheel_configuration` under the ``ansible`` key.
+
+.. confval:: url
+
+    The URL of the server hosting the cached files.
+
+    :type: string
+    :required: true
+
+    .. note::
+
+        If you are using an username or password token, you can specify it in the URL.
+        For example: ``https://user:password@server.com``
+
+
+.. confval:: url_cache_path
+
+    The path to base directory of the FIREWHEEL cache. For example in the URL ``http://example.com/files/firewheel/firewheel_repo_linux/ubuntu/ubuntu/htop-1_0_2_debs.tgz``; ``url="http://example.com"``, and ``url_cache_path="files/firewheel"``.
+
+    :type: string
+    :required: true
+
+
+.. confval:: use_proxy
+
+    If ``false``, it will not use a proxy, even if one is defined in an environment variable on the target hosts.
+
+    :type: boolean
+    :required: false
+    :default: true
+
+.. confval:: validate_certs
+
+    If ``false``, SSL certificates will not be validated.
+
+    :type: boolean
+    :required: false
+    :default: true
 
 ********************************
 Script INSTALL File Requirements
