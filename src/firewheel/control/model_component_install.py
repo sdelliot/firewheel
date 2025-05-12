@@ -126,7 +126,7 @@ class ModelComponentInstall:
     def has_shebang(self, install_path):
         """
         Check if the given INSTALL file has a
-        `shebang <https://en.wikipedia.org/wiki/Shebang_(Unix)`_
+        `shebang <https://en.wikipedia.org/wiki/Shebang_(Unix)>`_
         line and should be treated as an executable file.
 
         Args:
