@@ -297,14 +297,64 @@ An example of this configuration is shown below:
 
 S3 Cache
 ========
-If users have access to an AWS S3 instance, they can specify the ``ansible.cache_type`` key as ``s3`` in the :ref:`firewheel_configuration`.
-Additional configuration options under the ``ansible`` key are also necessary.
-If these values are not provided, but ``ansible.cache_type`` is ``s3``, the user will be prompted for the information.
+If users plan to use an AWS S3 instance for the Model Component cache, they can specify the following options in the :ref:`firewheel_configuration` under the ``ansible`` key.
 
-- ``s3_endpoint`` -- The S3 instance URL
-- ``s3_bucket`` -- The name of the S3 bucket name
-- ``aws_access_key_id`` -- The AWS access key
-- ``aws_secret_access_key`` -- The AWS secret key
+An example of this configuration is shown below:
+
+.. code-block:: yaml
+  :caption: A sample portion of the :ref:`firewheel_configuration`.
+
+  ansible:
+    s3_endpoints:
+      - s3_endpoint: "s3.us-east-1.amazonaws.com"
+        aws_access_key_id: "AKIAIOSFODNN7EXAMPLE"
+        aws_secret_access_key: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+        buckets:
+          - "firewheel_bucket1"
+          - "firewheel_bucket2"
+      - s3_endpoint: "s3.us-east-2.amazonaws.com"
+        aws_access_key_id: "AJIAIOSFODNN7EXAMPLE"
+        aws_secret_access_key: "wKalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+        buckets:
+          - "firewheel_bucket3"
+
+.. confval:: s3_endpoints
+
+    A list of dictionaries containing configuration options for multiple S3 endpoints.
+
+    :type: list
+    :required: true
+
+    Each dictionary should contain the following keys:
+
+    .. confval:: s3_endpoint
+
+        The full URL of the S3 instance (e.g., ``"s3.amazonaws.com"``).
+
+        :type: string
+        :required: true
+
+    .. confval:: aws_access_key_id
+
+        The `AWS access key <https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html>`_ (e.g., ``"AKIAIOSFODNN7EXAMPLE"``).
+
+        :type: string
+        :required: true
+
+    .. confval:: aws_secret_access_key
+
+        The `AWS secret key <https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html>`_ (e.g., ``"wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"``).
+
+        :type: string
+        :required: true
+
+    .. confval:: s3_buckets
+
+        A list of buckets associated with the S3 server. Each bucket is represented as string.
+
+        :type: list
+        :required: true
+
 
 ********************************
 Script INSTALL File Requirements

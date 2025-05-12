@@ -7,37 +7,67 @@
 # - ``aws_access_key_id`` - The access key
 # - ``aws_secret_access_key`` - The secret key
 
+# The user will need to provide all relevant information.
+# An example configuration is shown below:
+#
+# s3_endpoints:
+#   - s3_endpoint: "s3.us-east-1.amazonaws.com"
+#     aws_access_key_id: "SOME KEY ID"
+#     aws_secret_access_key: "SOME SECRET KEY"
+#     buckets:
+#       - "firewheel_bucket1"
+#       - "firewheel_bucket2"
+#   - s3_endpoint: "s3.us-east-2.amazonaws.com"
+#     aws_access_key_id: "SOME KEY ID"
+#     aws_secret_access_key: "SOME SECRET KEY"
+#     buckets:
+#       - "firewheel_bucket3"
+###################################################################################################
+
 - name: Attempt to pull cache from S3 if Git fails
   block:
     - name: Check if S3 information is provided
       ansible.builtin.assert:
         that:
-          - (s3_endpoint is defined and s3_endpoint != "")
-          - (s3_bucket is defined and s3_bucket != "")
-          - (aws_access_key_id is defined and aws_access_key_id != "")
-          - (aws_secret_access_key is defined and aws_secret_access_key != "")
-        success_msg: "Found s3"
-        fail_msg: "No S3 information provided. Please provide valid S3 credentials."
+          - (s3_endpoints is defined and s3_endpoints | length > 0)
+        success_msg: "Found S3 endpoint"
         quiet: true
       register: s3_cache
 
-    - name: Download cached files from S3
-      amazon.aws.s3_object:
-        bucket: "{{ s3_bucket }}"
-        object: "{{ item.source }}"
-        dest: "{{ item.destination }}"
-        mode: get
-        aws_access_key: "{{ aws_access_key_id }}"
-        aws_secret_key: "{{ aws_secret_access_key }}"
-        endpoint_url: "{{ s3_endpoint }}"
-      loop: "{{ cached_files }}"
-      register: s3_download_result
-      ignore_errors: true
+    - name: Clone each repository from each server
+      loop: "{{ s3_endpoints | subelements('buckets') }}"
+      vars:
+        s3_endpoint: "{{ item.0.s3_endpoint }}"
+        aws_access_key_id: "{{ item.0.aws_access_key_id }}"
+        aws_secret_access_key: "{{ item.0.aws_secret_access_key }}"
+        s3_bucket: "{{ item.1 }}"
+      block:
+        - name: Download cached files from S3
+          amazon.aws.s3_object:
+            bucket: "{{ s3_bucket }}"
+            object: "{{ item.source }}"
+            dest: "{{ item.destination }}"
+            mode: get
+            aws_access_key: "{{ aws_access_key_id }}"
+            aws_secret_key: "{{ aws_secret_access_key }}"
+            endpoint_url: "{{ s3_endpoint }}"
+          loop: "{{ cached_files }}"
+          register: s3_download_result
+          ignore_errors: true
 
-    - name: Fail if S3 download fails
-      ansible.builtin.fail:
-        msg: "Failed to download files from S3. Please check the S3 information and try again."
-      when: s3_download_result is failed
+        - name: Output any success messages
+          ansible.builtin.debug:
+            msg: >
+              {% for result in s3_download_result.results %}
+                {% if result is succeeded %}
+                  Successfully moved {{ item.source }} to {{ item.destination }}.
+                {% endif %}
+              {% endfor %}
+      rescue:
+        - name: Handle S3 download failures
+          ansible.builtin.debug:
+            msg: "Pulling file from host {{ s3_endpoint }} bucket {{ s3_bucket }} failed. Continuing..."
+          when: s3_download_result is failed
 
   rescue:
     - name: Rescue the block
