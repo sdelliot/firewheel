@@ -24,7 +24,7 @@
       ansible.builtin.get_url:
         url: "{{ url }}/{{ url_cache_path }}/{{ item.source }}"
         dest: "{{ item.destination }}"
-        mode: "666"
+        mode: "660"
       loop: "{{ cached_files }}"
       register: url_download_result
       ignore_errors: true

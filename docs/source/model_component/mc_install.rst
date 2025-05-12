@@ -5,15 +5,276 @@ Model Component INSTALL file
 ############################
 
 Some Model Components may require additional Python packages to be installed within FIREWHEEL's virtual environment or for data to be downloaded.
-In this case, the Model Component can have an ``INSTALL`` directory, which can be either a valid `Ansible Playbook <https://docs.ansible.com/ansible/latest/playbook_guide/playbooks_intro.html>`_ (recommend method) or any executable script (as denoted by a `shebang <https://en.wikipedia.org/wiki/Shebang_(Unix)>`_ line).
+In this case, the Model Component can have an ``INSTALL`` directory, which contains a valid `Ansible Playbook <https://docs.ansible.com/ansible/latest/playbook_guide/playbooks_intro.html>`_ (recommend method).
+Alternatively, ``INSTALL`` can be an executable script (as denoted by a `shebang <https://en.wikipedia.org/wiki/Shebang_(Unix)>`_ line), though this is not recommend and support will be removed in a future releases.
 
 When a repository is installed via the :ref:`helper_repository_install` Helper, users have the option to can automatically run each MCs INSTALL script using the ``-s`` flag (see :ref:`helper_repository_install` for more details).
 
-*********************************
-Ansible INSTALL File Requirements
-*********************************
+*****************
+Design Principles
+*****************
 
-Regardless of whether the INSTALL file is an Ansible Playbook or an executable, FIREWHEEL expects the following:
+We recommend that the following principles are adhered to when installing a model component.
+
+1. `Idempotence <https://en.wikipedia.org/wiki/Idempotence>`_ -- The file(s) should be capable of running multiple times without causing issues. This is a core tenant of Ansible and a strong motivator why Ansible Playbooks are the preferred method.
+2. **Reproducibility** -- It is critical that users will download the exact same data that was originally intended by the Model Component creators.
+   If the data/packages differ, than there is a strong possibility that the experimental outcomes will differ and could produce unintended consequences.
+   Therefore, we strongly recommend that MC creators link to exact versions of software to download, rather than an automatically updating link.
+   For example, if the MC was supposed to install a GitLab runner:
+
+   .. code-block:: bash
+
+        # BAD: This will automatically get the latest URL.
+        wget https://gitlab-runner-downloads.s3.amazonaws.com/latest/binaries/gitlab-runner-linux-amd64
+
+        # GOOD: Get version 11.4.2
+        wget https://s3.amazonaws.com/gitlab-runner-downloads/v11.4.2/binaries/gitlab-runner-linux-386
+
+3. **Integrity** -- A checksum for all downloaded files is strongly recommend both to facilitate reproducibility and to increase the security of the experiment.
+4. **Offline Accessible** -- Many experiments are conducted on infrastructure that lacks Internet access. Therefore, we recommend that INSTALL files allow users to achieve the same end result using cached files.
+5. **Cleanup** -- Only the essential dependencies should be kept and any irrelevant data that may have been generated during intermediate steps should be removed.
+6. **Readability** -- Users will need to execute these potentially unknown actions, the INSTALL script should be well documented and readable to the average user. Readability is desired over brevity.
+
+
+.. _mc_install_ansible:
+
+**************************************
+Ansible INSTALL Directory Requirements
+**************************************
+
+The expected ``INSTALL`` directory structure is::
+
+  MC_DIR
+  └── INSTALL
+      ├── tasks.yml
+      └── vars.yml
+
+Where ``tasks.yml`` is a YAML list of Ansible tasks that will be `included <https://docs.ansible.com/ansible/latest/collections/ansible/builtin/include_tasks_module.html>`__ when installing the model component.
+The ``vars.yml`` file should be a YAML dictionary of all the variable keys/values which will be used when installing the model component.
+
+``tasks.yml``
+=============
+The tasks file should be a YAML list with any tasks needed to ensure that the model component can execute correctly as intended. 
+
+.. code-block:: yaml
+  :caption: This is an example ``tasks.yml`` file that collects, verifies, and compresses needed binaries.
+
+    
+   - name: Create directory for htop
+     ansible.builtin.file:
+       path: "htop-1_0_2_debs"
+       state: directory
+
+   - name: Download htop Package
+     ansible.builtin.get_url:
+       url: "http://archive.ubuntu.com/ubuntu/pool/universe/h/htop/htop_1.0.2-3_amd64.deb"
+       dest: "htop-1_0_2_debs/htop_1.0.2-3_amd64.deb"
+       checksum: "sha256:0311d8a26689935ca53e8e9252cb2d95a1fdc2f8278f4edb5733f555dad984a9"
+
+   - name: Create tarball of htop directory
+     ansible.builtin.archive:
+       path: "htop-1_0_2_debs"
+       dest: "htop-1_0_2_debs.tar.gz"
+       format: gz
+
+   - name: Move tarball to vm_resources/debs/
+     ansible.builtin.copy:
+       src: "htop-1_0_2_debs.tar.gz"
+       dest: "{{ mc_dir }}/vm_resources/debs/htop-1_0_2_debs.tgz"
+
+   - name: Remove htop directory
+     ansible.builtin.file:
+       path: "htop-1_0_2_debs"
+       state: absent
+
+
+``vars.yml``
+============
+
+The ``vars.yml`` file should be a YAML dictionary of all the variable keys/values which will be used when installing the model component.
+FIREWHEEL will automatically provide the following variables to the Ansible playbooks when running:
+
+- ``mc_name`` -- The name of the Model Component.
+- ``mc_dir`` -- The full path to the model component directory.
+
+In addition to any variables the specific tasks need, the ``vars.yml`` *should* have a ``cached_files`` key where a list of the final output files is listed.
+This is because FIREWHEEL supports caching pre-computed blobs from various resources to enable offline experiment access.
+The process of collecting cached files is automatically handled by FIREWHEEL and using this process is discussed in detail in :ref:`mc_install_cache`.
+These cached files should be defined in ``INSTALL/vars.yml`` and the model component installation is assumed to be complete when all ``cached_files`` are present.
+If no ``cached_files`` are needed, then it can be omitted from ``INSTALL/vars.yml``.
+
+Continuing the example from above, the ``vars.yml`` would look like:
+
+.. code-block:: yaml
+  :caption: This is an example ``vars.yml`` file that ensures the final MC state.
+
+  cached_files:
+    - source: "firewheel_repo_linux/ubuntu/ubuntu/htop-1_0_2_debs.tgz"
+      destination: "{{ mc_dir }}/vm_resources/debs/htop-1_0_2_debs.tgz"
+
+
+The full definition for ``cached_files`` is:
+
+.. confval:: source
+
+    Where the file should be located within the cache. To stand
+    For standardization, this should follow the format: ``<package name>/<path to MC>/file``.
+    In the case of git, note that the ``<package name>`` is **NOT** the repository name.
+    For example, if we git cloned the cache for ``dns.dns_objects`` the structure would look like::
+
+      firewheel_repo_dns -- Cloned repository
+      └── firewheel_repo_dns
+          └── dns_objects
+              └── bind9_xenial_debs.tgz
+
+    :type: string
+    :required: true
+
+
+.. confval:: destination
+
+    Where the file should be placed.
+    Should include ``{{ mc_path }}`` if the file needs to be relative to the model component directory. 
+
+    :type: string
+    :required: true
+
+
+.. confval:: checksum_algorithm checksum_algo
+
+    Algorithm to determine checksum of file.
+    Must be supported by `ansible.builtin.stat <https://docs.ansible.com/ansible/latest/collections/ansible/builtin/stat_module.html#parameter-checksum_algorithm>`_ (e.g, ``"sha1"``, ``"sha256"``, etc.).
+
+    :type: string
+    :required: false
+
+
+.. confval:: checksum
+
+    The hash of the file.
+
+    :type: string
+    :required: false
+
+
+INSTALL Template
+================
+
+The file ``src/firewheel/control/utils/templates/INSTALL.template`` contains a template for a Bash-based INSTALL file.
+When users use the :ref:`helper_mc_generate` Helper, this file is automatically added to the MC directory.
+The current template is shown below.
+
+.. dropdown:: An Ansible-based INSTALL template
+
+    .. literalinclude:: ../../../src/firewheel/control/utils/templates/INSTALL.template
+        :language: yaml
+        :caption: This Ansible INSTALL template has escaped the ansible Jinja2 blocks as the :ref:`helper_mc_generate` uses Jinja2 to replace the name of the model component.
+        :name: INSTALL
+
+
+.. _mc_install_cache:
+
+***********
+Cache Types
+***********
+
+Collecting and retrieving files from a cache is automatically supported in Ansible playbooks without MC designer intervention.
+Currently, FIREWHEEL supports caching files in a file server, git repository, or in an Amazon S3 data store.
+If the user sets the necessary settings in the :ref:`firewheel_configuration` for the described types below, than FIREWHEEL will automatically check those locations for the cached file.
+Users are able to set multiple cache types as FIREWHEEL will check any caches for the required file.
+
+.. note::
+
+  Users setting up a cache **MUST** place cached files using the path: ``<package name>/<path to MC>/file``.
+
+
+URL Cache
+=========
+If users plan to use a file server (HTTP/HTTPS/FTP) for the Model Component cache, they can specify the following options in the :ref:`firewheel_configuration` under the ``ansible`` key.
+
+.. confval:: url
+
+    The URL of the server hosting the cached files.
+
+    :type: string
+    :required: true
+
+    .. note::
+
+        If you are using an username or password token, you can specify it in the URL.
+        For example: ``https://user:password@server.com``
+
+
+.. confval:: url_cache_path
+
+    The path to base directory of the FIREWHEEL cache. For example in the URL ``http://example.com/files/firewheel/firewheel_repo_linux/ubuntu/ubuntu/htop-1_0_2_debs.tgz``; ``url="http://example.com"``, and ``url_cache_path="files/firewheel"``.
+
+    :type: string
+    :required: true
+
+
+.. confval:: use_proxy
+
+    If ``false``, it will not use a proxy, even if one is defined in an environment variable on the target hosts.
+
+    :type: boolean
+    :required: false
+    :default: true
+
+.. confval:: validate_certs
+
+    If ``false``, SSL certificates will not be validated.
+
+    :type: boolean
+    :required: false
+    :default: true
+
+Git Cache
+=========
+If users plan to use a git server for the Model Component cache, they can specify the following options in the :ref:`firewheel_configuration` under the ``ansible`` key.
+
+
+.. confval:: git_server
+
+    The full URL of the git server (e.g., ``"https://github.com"``).
+
+    :type: string
+    :required: true
+
+    .. note::
+    
+        If an access token is being used, the user can specify it as part of the URL.
+        For example: ``https://<token>@github.com/user/repo.git``
+
+
+.. confval:: git_repo_path
+
+    The path to the git repository containing the cached files. SCP-style URLs are not supported.
+    So when using the ``ssh://`` protocol, please use the following format: ``ssh://username@example.com`` 
+    Currently, users are limited to a single git repository per "installation".
+
+    :type: string
+    :required: true
+
+
+.. confval:: git_branch
+
+    What version of the repository to check out. This can be the literal string ``HEAD``, a branch name, or a tag name. This is passed to `ansible.builtin.git <https://docs.ansible.com/ansible/latest/collections/ansible/builtin/git_module.html#parameter-version>`_.
+
+    :type: string
+    :required: false
+    :default: ``"HEAD"``
+
+S3 Cache
+========
+If users have access to an AWS S3 instance, they can specify the ``ansible.cache_type`` key as ``s3`` in the :ref:`firewheel_configuration`.
+Additional configuration options under the ``ansible`` key are also necessary.
+If these values are not provided, but ``ansible.cache_type`` is ``s3``, the user will be prompted for the information.
+
+- ``s3_endpoint`` -- The S3 instance URL
+- ``s3_bucket`` -- The name of the S3 bucket name
+- ``aws_access_key_id`` -- The AWS access key
+- ``aws_secret_access_key`` -- The AWS secret key
 
 ********************************
 Script INSTALL File Requirements
@@ -159,130 +420,3 @@ For example, if the model component name is ``dns.dns_objects`` than the new fil
         # Set the flag to notify of successful completion
         touch $INSTALL_FLAG
 
-
-*****************
-Design Principles
-*****************
-
-In addition to the requirements above, we recommend that the following principles are adhered to when creating a new INSTALL file.
-
-1. `Idempotence <https://en.wikipedia.org/wiki/Idempotence>`_ -- The file should be capable of running multiple times without causing issues. This is a core tenant of Ansible and a strong motivator why Ansible Playbooks are the preferred INSTALL file method.
-2. **Reproducibility** -- It is critical that users will download the exact same data that was originally intended by the Model Component creators.
-   If the data/packages differ, than there is a strong possibility that the experimental outcomes will differ and could produce unintended consequences.
-   Therefore, we strongly recommend that MC creators link to exact versions of software to download, rather than an automatically updating link.
-   For example, if the MC was supposed to install a GitLab runner:
-
-   .. code-block:: bash
-
-        # BAD: This will automatically get the latest URL.
-        wget https://gitlab-runner-downloads.s3.amazonaws.com/latest/binaries/gitlab-runner-linux-amd64
-
-        # GOOD: Get version 11.4.2
-        wget https://s3.amazonaws.com/gitlab-runner-downloads/v11.4.2/binaries/gitlab-runner-linux-386
-
-3. **Integrity** -- A checksum for all downloaded files is strongly recommend both to facilitate reproducibility and to increase the security of the experiment.
-4. **Offline Accessible** -- Many experiments are conducted on infrastructure that lacks Internet access. Therefore, we recommend that INSTALL files allow users to achieve the same end result using cached files. While we do not expect users to support all methods for retrieving these cached files, we suggest designing the INSTALL file to ensure that the presence of these files does not lead to errors.
-5. **Cleanup** -- INSTALL files should include only the essential dependencies and should remove any irrelevant data that may have been generated during intermediate steps.
-6. **Readability** -- Users will need to execute these potentially unknown actions, the INSTALL script should be well documented and readable to the average user. Readability is desired over brevity.
-
-
-.. _mc_install_ansible:
-
-*********************
-Ansible INSTALL Files
-*********************
-
-While INSTALL files should not have an extension, if INSTALL contains a `shebang <https://en.wikipedia.org/wiki/Shebang_(Unix)>`_ line, than it will be executed as a script.
-Otherwise, it is passed directly to Ansible.
-If users include a ``hosts`` key, we strongly recommend using ``localhost`` as the value.
-We also recommend that users define an ``install_flag`` variable and a ``cached_files`` variable (if needed).
-
-Below is beginning of an example Ansible "play":
-
-.. code-block:: yaml
-
-    ---
-    - name: Download DNS Data files
-      hosts: localhost
-      become: yes
-      vars:
-        install_flag: "{{ playbook_dir }}/.dns.dns_objects.installed"
-        cached_files:
-          - source: "firewheel_repo_dns/dns_objects/bind9_xenial_debs.tgz"
-            destination: "vm_resources/bind9_xenial_debs.tgz"
-
-When designing the tasks, it is possible that any ``cached_files`` will be collected prior to the execution of the INSTALL file.
-Therefore, assumptions about existence of (or a lack thereof) these ``cached_files`` should be avoided.
-
-************
-Cached Files
-************
-
-FIREWHEEL supports collecting pre-computed blobs from various resources to enable offline experiment access.
-To enable retrieving files from a cache, users should set the ``ansible.cache_type`` to ``url``, ``git`` or ``s3`` depending on if the files are cached in a file server, git repository, or in an Amazon S3 data store.
-This is an optional feature and the default value for ``ansible.cache_type`` is ``online``.
-See :ref:`firewheel_configuration` for additional information.
-
-Path Convention
-===============
-The source of the file within the cache should always be: ``<package name>/path/to/file``.
-In the case of git, note that the ``<package name>`` is **NOT** the repository name.
-For example, if we cloned the cache for ``dns.dns_objects`` the structure would look like::
-
-    firewheel_repo_dns -- Cloned repository
-    └── firewheel_repo_dns
-        └── dns_objects
-            └── bind9_xenial_debs.tgz
-
-URL Cache
-=========
-If users have access to any file server (HTTP/HTTPS/FTP), they can specify the ``ansible.cache_type`` key as ``url`` in the :ref:`firewheel_configuration`.
-Additional configuration options under the ``ansible`` key are also necessary.
-If these values are not provided, but ``ansible.cache_type`` is ``url``, the user will be prompted for the information.
-
-- ``url`` -- The URL of the server hosting the cached files.
-- ``url_cache_path`` -- The path to the file's base directory from the server. For example: ``http://example.com/<url_cache_path>/file/path/file.txt``.
-- ``use_proxy`` -- (optional) If ``false``, it will not use a proxy, even if one is defined in an environment variable on the target hosts. The default is: ``true``.
-- ``validate_certs`` -- (optional) If ``false``, SSL certificates will not be validated. The default is: ``true``.
-
-If you are using an username or password token, you can specify it in the URL.
-For example: ``https://user:password@server.com/url/cache/path/file/path/file.txt``
-
-Git Cache
-=========
-If users have access to a git server instance, they can specify the ``ansible.cache_type`` key as ``git`` in the :ref:`firewheel_configuration`.
-Additional configuration options under the ``ansible`` key are also necessary.
-If these values are not provided, but ``ansible.cache_type`` is ``git``, the user will be prompted for the information.
-
-- ``git_server`` -- The URL of the git server.
-- ``git_repo_path`` -- The path to the repo from the server. Because this is likely to change for each model component, we recommend not setting this parameter and simply prompting the user for each path.
-- ``git_branch`` -- (optional) The branch name, defaults to ``main``.
-
-If an access token is being used, the user can specify it in the ``git_server`` URL.
-For example: ``https://<token>@github.com/user/repo.git``
-
-S3 Cache
-========
-If users have access to an AWS S3 instance, they can specify the ``ansible.cache_type`` key as ``s3`` in the :ref:`firewheel_configuration`.
-Additional configuration options under the ``ansible`` key are also necessary.
-If these values are not provided, but ``ansible.cache_type`` is ``s3``, the user will be prompted for the information.
-
-- ``s3_endpoint`` -- The S3 instance URL
-- ``s3_bucket`` -- The name of the S3 bucket name
-- ``aws_access_key_id`` -- The AWS access key
-- ``aws_secret_access_key`` -- The AWS secret key
-
-****************
-INSTALL Template
-****************
-
-The file ``src/firewheel/control/utils/templates/INSTALL.template`` contains a template for a Bash-based INSTALL file.
-When users use the :ref:`helper_mc_generate` Helper, this file is automatically added to the MC directory.
-The current template is shown below.
-
-.. dropdown:: An Ansible-based INSTALL template
-
-    .. literalinclude:: ../../../src/firewheel/control/utils/templates/INSTALL.template
-        :language: yaml
-        :caption: This Ansible INSTALL template has escaped the ansible Jinja2 blocks as the :ref:`helper_mc_generate` uses Jinja2 to replace the name of the model component.
-        :name: INSTALL
