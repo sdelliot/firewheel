@@ -1,38 +1,75 @@
 ---
+###################################################################################################
 # This playbook will clone a Git repository and move specified cached files
 # If you are using an access token, you can specify it in the `git_server` URL
 # For example: https://<token>@github.com/user/repo.git
-# The user will need to provide all relevant information including:
-# - ``git_server`` - The URL of the git server
-# - ``git_repo_path`` - The path to the repo from the server
-# - ``git_branch`` - The branch name (optional); default: main
+# The user will need to provide all relevant information.
+# An example configuration is shown below:
+#
+# git_servers:
+#   - server_url: "https://github.com"
+#     repositories:
+#       - path: "firewheel/mc_repo1"
+#       - path: "firewheel/mc_repo2"
+#         branch: "develop"
+#   - server_url: "ssh://git@gitlab.com"
+#     repositories:
+#       - path: "emulytics/firewheel/mc_repo3"
+#         branch: "feature-branch"
+###################################################################################################
 
-- name: Attempt to pull cache from Git repository if URL fails
+- name: Clone Git repositories and move cached files
   block:
-    - name: Check if Git information is provided
+    - name: Check if Git servers information is provided
       ansible.builtin.assert:
         that:
-          - (git_server is defined and git_server != "")
-          - (git_repo_path is defined and git_repo_path != "")
-        success_msg: "Found git creds, trying to pull cache"
-        fail_msg: "No git creds, continuing..."
+          - (git_servers is defined and git_servers | length > 0)
+        success_msg: "Found git servers information, trying to pull caches"
+        fail_msg: "No git servers information provided, continuing..."
         quiet: true
       register: git_cache
 
-    - name: Clone Git repository
-      ansible.builtin.git:
-        repo: "{{ git_server }}/{{ git_repo_path }}"
-        dest: "/tmp/fwcache"
-        clone: true
-        version: "{{ git_branch }} | default('HEAD')"
-        update: true
-      register: git_clone_result
-      ignore_errors: true
+    - name: Clone each repository from each server
+      loop: "{{ git_servers | subelements('repositories') }}"
+      vars:
+        server_url: "{{ item.0.server_url }}"
+        repo_path: "{{ item.1.path }}"
+        repo_branch: "{{ item.1.branch | default('HEAD') }}"
+      block:
+        - name: Clone the repository
+          ansible.builtin.git:
+            repo: "{{ server_url }}/{{ repo_path }}"
+            dest: "/tmp/fwcache/{{ repo_path }}"
+            clone: true
+            version: "{{ repo_branch }}"
+            update: true
+          register: git_clone_result
 
-    - name: Fail if Git clone fails
-      ansible.builtin.fail:
-        msg: "Failed to clone Git repository. Please check the repository information and try again."
-      when: git_clone_result is failed
+        - name: Move cached files after cloning the repository
+          block:
+            - name: Attempt to move each cached file
+              ansible.builtin.copy:
+                src: "/tmp/fwcache/{{ repo_path }}/{{ item.source }}"
+                dest: "{{ item.destination }}"
+                mode: "0660"
+              loop: "{{ cached_files }}"
+              register: move_result
+              ignore_errors: true
+
+            - name: Report file move results
+              ansible.builtin.debug:
+                msg: >
+                  {% for result in move_result.results %}
+                    {% if result is succeeded %}
+                      Successfully moved {{ item.source }} to {{ item.destination }}.
+                    {% endif %}
+                  {% endfor %}
+
+      rescue:
+        - name: Handle git clone failures
+          ansible.builtin.debug:
+            msg: "Cloning repository {{ server_url }}/{{ repo_path }} failed. Continuing..."
+          when: git_clone_result is failed
 
   rescue:
     - name: Rescue the block

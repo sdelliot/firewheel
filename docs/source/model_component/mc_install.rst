@@ -233,37 +233,67 @@ Git Cache
 =========
 If users plan to use a git server for the Model Component cache, they can specify the following options in the :ref:`firewheel_configuration` under the ``ansible`` key.
 
+An example of this configuration is shown below:
 
-.. confval:: git_server
+.. code-block:: yaml
+  :caption: A sample portion of the :ref:`firewheel_configuration`.
 
-    The full URL of the git server (e.g., ``"https://github.com"``).
+  ansible:
+    git_servers:
+      - server_url: "https://github.com"
+        repositories:
+          - path: "firewheel/mc_repo1"
+          - path: "firewheel/mc_repo2"
+            branch: "develop"
+      - server_url: "ssh://git@gitlab.com"
+        repositories:
+          - path: "emulytics/firewheel/mc_repo3"
+            branch: "feature-branch"
 
-    :type: string
+.. confval:: git_servers
+
+    A list of dictionaries containing configuration options for multiple Git servers.
+
+    :type: list
     :required: true
 
-    .. note::
-    
-        If an access token is being used, the user can specify it as part of the URL.
-        For example: ``https://<token>@github.com/user/repo.git``
+    Each dictionary should contain the following keys:
 
+    .. confval:: server_url
 
-.. confval:: git_repo_path
+        The full URL of the git server (e.g., ``"https://github.com"``).
 
-    The path to the git repository containing the cached files. SCP-style URLs are not supported.
-    So when using the ``ssh://`` protocol, please use the following format: ``ssh://username@example.com`` 
-    Currently, users are limited to a single git repository per "installation".
+        :type: string
+        :required: true
 
-    :type: string
-    :required: true
+        .. note::
 
+            If an access token is being used, the user can specify it as part of the URL.
+            For example: ``https://<token>@github.com/user/repo.git``
 
-.. confval:: git_branch
+    .. confval:: repositories
 
-    What version of the repository to check out. This can be the literal string ``HEAD``, a branch name, or a tag name. This is passed to `ansible.builtin.git <https://docs.ansible.com/ansible/latest/collections/ansible/builtin/git_module.html#parameter-version>`_.
+        :type: list
+        :required: true
 
-    :type: string
-    :required: false
-    :default: ``"HEAD"``
+        A list of repositories associated with the Git server. Each repository is represented as a dictionary containing the following keys:
+
+        .. confval:: git_servers/repositories/path
+
+            The path to the git repository containing the cached files. SCP-style URLs are not supported.
+            When using the ``ssh://`` protocol, please use the following format: ``ssh://username@example.com``.
+
+            :type: string
+            :required: true
+
+        .. confval:: git_servers/repositories/branch
+
+            The version of the repository to check out. This can be the literal string ``HEAD``, a branch name, or a tag name. This is passed to `ansible.builtin.git <https://docs.ansible.com/ansible/latest/collections/ansible/builtin/git_module.html#parameter-version>`_.
+
+            :type: string
+            :required: false
+            :default: ``"HEAD"``
+
 
 S3 Cache
 ========

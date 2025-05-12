@@ -1,5 +1,5 @@
 ---
-###############################################################################
+###################################################################################################
 # Playbook: Install Model Component
 # Description:
 #   This Ansible playbook is designed to install extra dependencies for a model component
@@ -17,7 +17,7 @@
 #   6. If the system is online, it includes installation tasks.
 #   7. Performs a final check for cached files and raises a failure message if any required
 #      files are missing.
-###############################################################################
+###################################################################################################
 - name: "Install Model Component: {{ mc_name }}"
   hosts: localhost
   gather_facts: false
