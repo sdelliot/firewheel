@@ -7,9 +7,6 @@ description: Prepare tox-based workflows
 runs:
   using: composite
   steps:
-    - name: Ensure graphviz is installed
-      run: apt-get update; apt-get install -y graphviz
-      shell: bash
     - name: Ensure upgraded pip
       run: pip install --upgrade pip
       shell: bash

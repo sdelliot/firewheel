@@ -22,7 +22,8 @@ keywords = [
     "experimentation",
     "minimega",
 ]
-license = {text = "Apache License (2.0)"}
+license = "Apache-2.0"
+license-files = ["LICENSE", "DISCLAIMER.md", "COPYRIGHT.md", "NOTICE"]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Environment :: Console",
@@ -95,7 +96,7 @@ docs = [
     "sphinx-copybutton",
     "pyenchant",
     "minimega",
-    "doc8",
+    "doc8>=0.10.1,!=1.1.2",
     "pip-licenses",
     "sphinx-design",
 ]
