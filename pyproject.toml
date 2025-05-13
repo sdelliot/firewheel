@@ -31,7 +31,6 @@ classifiers = [
     "Intended Audience :: Information Technology",
     "Intended Audience :: Telecommunications Industry",
     "Intended Audience :: Science/Research",
-    "License :: OSI Approved :: Apache Software License",
     "Natural Language :: English",
     "Operating System :: POSIX :: Linux",
     "Programming Language :: Python :: 3 :: Only",
