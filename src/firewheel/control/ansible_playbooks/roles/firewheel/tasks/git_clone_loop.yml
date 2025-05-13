@@ -20,19 +20,18 @@
 
 - name: Clone the repository
   ansible.builtin.git:
-    repo: "{{ server_url }}/{{ repo_path }}"
-    dest: "/tmp/fwcache/{{ repo_path }}"
+    repo: "{{ firewheel_server_url }}/{{ firewheel_repo_path }}"
+    dest: "/tmp/fwcache/{{ firewheel_repo_path }}"
     clone: true
-    version: "{{ repo_branch }}"
+    version: "{{ firewheel_repo_branch }}"
     update: true
   register: git_clone_result
 
 - name: Attempt to move each cached file
   ansible.builtin.copy:
-    src: "/tmp/fwcache/{{ repo_path }}/{{ item.source }}"
+    src: "/tmp/fwcache/{{ firewheel_repo_path }}/{{ item.source }}"
     dest: "{{ item.destination }}"
     mode: "0660"
   loop: "{{ cached_files }}"
   register: move_result
   ignore_errors: true
-

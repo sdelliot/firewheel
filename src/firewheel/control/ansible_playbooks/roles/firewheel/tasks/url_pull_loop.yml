@@ -23,31 +23,22 @@
 #       - "secondpath/to/file"
 #       - "secondpath/from/file"
 ###################################################################################################
-- name: Attempt to pull cache from URL if offline
-  block:
-    - name: Check if URL information is provided
-      ansible.builtin.assert:
-        that: (file_servers is defined and file_servers | length > 0)
-        fail_msg: "No file server information provided, continuing..."
-        success_msg: "Found file server configuration"
-        quiet: true
-      register: url_cache
 
-    - name: Iterate over each URL/path
-      ansible.builtin.include_role:
-        name: firewheel
-        tasks_from: url_pull_loop.yml
-      loop: "{{ file_servers }}"
-      loop_control:
-        loop_var: server
-      vars:
-        firewheel_url: "{{ server.url }}"
-        firewheel_cache_path: "{{ server.use_proxy }}"
-        firewheel_validate_certs: "{{ server.validate_certs | default(true) }}"
-        firewheel_use_proxy: "{{ server.use_proxy | default(true) }}"
+- name: Download Files
+  block:
+    - name: Download cached files from a URL
+      ansible.builtin.get_url:
+        url: "{{ firewheel_url }}/{{ firewheel_cache_path }}/{{ item.source }}"
+        dest: "{{ item.destination }}"
+        mode: "0660"
+        use_proxy: "{{ firewheel_use_proxy }}"
+        validate_certs: "{{ firewheel_validate_certs }}"
+      loop: "{{ cached_files }}"
+      register: url_download_result
+      ignore_errors: true
 
   rescue:
-    - name: Rescue the block
+    - name: Handle download failures
       ansible.builtin.debug:
-        msg: "No file server information provided"
-      when: url_cache is failed
+        msg: "Pulling file from {{ firewheel_url }}/{{ firewheel_url_cache_path }} failed. Continuing..."
+      when: url_download_result is failed

@@ -37,9 +37,9 @@
       loop_control:
         loop_var: git
       vars:
-        server_url: "{{ git.server_url }}"
-        repo_path: "{{ git.path }}"
-        repo_branch: "{{ git.branch | default('HEAD') }}"
+        firewheel_server_url: "{{ git.server_url }}"
+        firewheel_repo_path: "{{ git.path }}"
+        firewheel_repo_branch: "{{ git.branch | default('HEAD') }}"
   rescue:
     - name: Rescue the block
       ansible.builtin.debug:
