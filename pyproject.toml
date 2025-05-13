@@ -85,7 +85,6 @@ mcs = [
 ]
 format = [
     "ruff==0.11.2",      # Linting/formatting
-    "beautysh~=6.2.1",  # Format/lint shell scripts
 ]
 docs = [
     "Sphinx>=7.0.0,<=8.2.3",
