@@ -180,7 +180,8 @@ If users plan to use a git server for the Model Component cache, they can specif
 An example of this configuration is shown below:
 
 .. code-block:: yaml
-  :caption: A sample portion of the :ref:`firewheel_configuration`.
+  :caption: An example of an Ansible git server portion of the :ref:`firewheel_configuration`.
+
 
   ansible:
     git_servers:
@@ -241,12 +242,15 @@ An example of this configuration is shown below:
 
 S3 Cache
 ========
-If users plan to use an AWS S3 instance for the Model Component cache, they can specify the following options in the :ref:`firewheel_configuration` under the ``ansible`` key.
+Users can use `Amazon Simple Storage Service (S3) <https://aws.amazon.com/s3/>`__ buckets for caching model component binaries.
+To use this, users will need to install  `boto3 <https://pypi.org/project/boto3/>`__, the official Amazon Web Services (AWS) Software Development Kit (SDK) for Python into their FIREWHEEL virtual environment.
+Additionally, if users plan to use an AWS S3 instance for the Model Component cache, they should specify the following options in the :ref:`firewheel_configuration` under the ``ansible`` key.
 
 An example of this configuration is shown below:
 
 .. code-block:: yaml
-  :caption: A sample portion of the :ref:`firewheel_configuration`.
+  :caption: An example of an Ansible S3 portion of the :ref:`firewheel_configuration`.
+
 
   ansible:
     s3_endpoints:
@@ -299,46 +303,81 @@ An example of this configuration is shown below:
         :type: list
         :required: true
 
-URL Cache
-=========
+File Server Cache
+=================
 If users plan to use a file server (HTTP/HTTPS/FTP) for the Model Component cache, they can specify the following options in the :ref:`firewheel_configuration` under the ``ansible`` key.
 
-.. confval:: url
+An example of this configuration is shown below:
 
-    The URL of the server hosting the cached files.
+.. code-block:: yaml
+  :caption: An example of an Ansible file server portion of the :ref:`firewheel_configuration`.
 
-    :type: string
+  ansible:
+    file_servers:
+      - url: "http://example.com"
+        cache_paths:
+          - "path/to/location"
+          - "path/to/other/location"
+      - url: "http://secondexample.com"
+        use_proxy: True
+        validate_certs: False
+        cache_paths:
+          - "secondpath/to/file"
+
+
+.. confval:: file_servers
+
+    A list of dictionaries containing configuration options for multiple file servers.
+
+    :type: list
     :required: true
 
-    .. note::
+    Each dictionary should contain the following keys:
 
-        If you are using an username or password token, you can specify it in the URL.
-        For example: ``https://user:password@server.com``
+    .. confval:: url
+
+        The URL of the server hosting the cached files.
+
+        :type: string
+        :required: true
+
+        .. note::
+
+            If you are using an username or password token, you can specify it in the URL.
+            For example: ``https://user:password@server.com``
 
 
-.. confval:: url_cache_path
+    .. confval:: cache_paths
 
-    The path to base directory of the FIREWHEEL cache. For example in the URL ``http://example.com/files/firewheel/firewheel_repo_linux/ubuntu/ubuntu/htop-1_0_2_debs.tgz``; ``url="http://example.com"``, and ``url_cache_path="files/firewheel"``.
+        A list of intermediate paths to the FIREWHEEL cache. For example in the URL ``http://example.com/files/firewheel/firewheel_repo_linux/ubuntu/ubuntu/htop-1_0_2_debs.tgz`` then ``url="http://example.com"``,  ``url_cache_path="files/firewheel"``, and the ``source=firewheel_repo_linux/ubuntu/ubuntu/htop-1_0_2_debs.tgz``.
+        If no cache path is required, please use a list with empty string entry as the value.
 
-    :type: string
-    :required: true
+        .. code-block:: yaml
+
+          file_servers:
+            - url: "http://example.com"
+              cache_paths:
+                - ""
+
+        :type: list
+        :required: true
 
 
-.. confval:: use_proxy
+    .. confval:: use_proxy
 
-    If ``false``, it will not use a proxy, even if one is defined in an environment variable on the target hosts.
+        If ``false``, it will not use a proxy, even if one is defined in an environment variable on the target hosts.
 
-    :type: boolean
-    :required: false
-    :default: true
+        :type: boolean
+        :required: false
+        :default: true
 
-.. confval:: validate_certs
+    .. confval:: validate_certs
 
-    If ``false``, SSL certificates will not be validated.
+        If ``false``, SSL certificates will not be validated.
 
-    :type: boolean
-    :required: false
-    :default: true
+        :type: boolean
+        :required: false
+        :default: true
 
 ********************************
 Script INSTALL File Requirements

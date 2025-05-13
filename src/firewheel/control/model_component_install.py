@@ -193,7 +193,7 @@ class ModelComponentInstall:
             "vars_path": str(vars_path),
             "tasks_path": str(tasks_path),
             "mc_dir": str(install_path.parent),
-            "install_flag": str(install_path.parent / f".{name}.install"),
+            "install_flag": str(install_path.parent / f".{name}.installed"),
             "mc_name": str(name),
         }
 
