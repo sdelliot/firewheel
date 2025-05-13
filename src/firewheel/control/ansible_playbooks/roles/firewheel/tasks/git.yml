@@ -30,49 +30,23 @@
       register: git_cache
 
     - name: Clone each repository from each server
-      loop: "{{ git_servers | subelements('repositories') }}"
+      ansible.builtin.include_role:
+        name: firewheel
+        tasks_from: git_clone_loop.yml
+      loop: "{{ git_servers }}"
+      loop_control:
+        loop_var: git
       vars:
-        server_url: "{{ item.0.server_url }}"
-        repo_path: "{{ item.1.path }}"
-        repo_branch: "{{ item.1.branch | default('HEAD') }}"
-      block:
-        - name: Clone the repository
-          ansible.builtin.git:
-            repo: "{{ server_url }}/{{ repo_path }}"
-            dest: "/tmp/fwcache/{{ repo_path }}"
-            clone: true
-            version: "{{ repo_branch }}"
-            update: true
-          register: git_clone_result
-
-        - name: Move cached files after cloning the repository
-          block:
-            - name: Attempt to move each cached file
-              ansible.builtin.copy:
-                src: "/tmp/fwcache/{{ repo_path }}/{{ item.source }}"
-                dest: "{{ item.destination }}"
-                mode: "0660"
-              loop: "{{ cached_files }}"
-              register: move_result
-              ignore_errors: true
-
-            - name: Report file move results
-              ansible.builtin.debug:
-                msg: >
-                  {% for result in move_result.results %}
-                    {% if result is succeeded %}
-                      Successfully moved {{ item.source }} to {{ item.destination }}.
-                    {% endif %}
-                  {% endfor %}
-
-      rescue:
-        - name: Handle git clone failures
-          ansible.builtin.debug:
-            msg: "Cloning repository {{ server_url }}/{{ repo_path }} failed. Continuing..."
-          when: git_clone_result is failed
-
+        server_url: "{{ git.server_url }}"
+        repo_path: "{{ git.path }}"
+        repo_branch: "{{ git.branch | default('HEAD') }}"
   rescue:
     - name: Rescue the block
       ansible.builtin.debug:
         msg: "No Git Cache information provided"
       when: git_cache is failed
+
+- name: Clean up git cache
+  ansible.builtin.file:
+    path: "/tmp/fwcache"
+    state: absent

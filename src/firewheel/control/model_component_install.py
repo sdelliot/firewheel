@@ -197,9 +197,63 @@ class ModelComponentInstall:
             "mc_name": str(name),
         }
 
-        # Add any remaining configuration options provided in the FIREWHEEL
-        # configuration
-        ansible_config.update(config["ansible"])
+        # Flatten Git config
+        git_servers = []
+        for server in config["ansible"].get("git_servers", []):
+            server_url = server["server_url"]
+            for repo in server["repositories"]:
+                repo_info = {
+                    "server_url": server_url,
+                    "path": repo["path"]
+                }
+
+                if "branch" in repo:
+                    repo_info["branch"] = repo["branch"]
+
+                git_servers.append(repo_info)
+
+        if git_servers:
+            ansible_config.update({"git_servers":git_servers})
+
+        # Flatten S3 config
+        s3_endpoints = []
+        for endpoint in config["ansible"].get("s3_endpoints", []):
+            s3_endpoint = endpoint["s3_endpoint"]
+            aws_access_key_id = endpoint["aws_access_key_id"]
+            aws_secret_access_key = endpoint["aws_secret_access_key"]
+
+            for bucket in endpoint["buckets"]:
+                bucket_info = {
+                    "s3_endpoint": s3_endpoint,
+                    "aws_access_key_id": aws_access_key_id,
+                    "aws_secret_access_key": aws_secret_access_key,
+                    "bucket": bucket
+                }
+
+            s3_endpoints.append(bucket_info)
+
+        if s3_endpoints:
+            ansible_config.update({"s3_endpoints":s3_endpoints})
+
+        # Flatten file server config
+        file_servers = []
+        for server in config["ansible"].get("file_servers", []):
+            url = server["url"]
+            use_proxy = server["use_proxy"]
+            validate_certs = server["validate_certs"]
+
+            for cache_path in server["cache_paths"]:
+                cache_info = {
+                    "url": url,
+                    "use_proxy": use_proxy,
+                    "validate_certs": validate_certs,
+                    "cache_path": cache_path
+                }
+
+                file_servers.append(cache_info)
+
+        if file_servers:
+            ansible_config.update({"file_servers":file_servers})
 
         playbook_path = Path(__file__).resolve().parent / Path(
             "ansible_playbooks/main.yml"
