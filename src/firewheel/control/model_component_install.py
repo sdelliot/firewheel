@@ -144,6 +144,18 @@ class ModelComponentInstall:
         return script.startswith("#!")
 
     def flatten_git_config(self):
+        """Flatten the Git configuration from the FIREWHEEL ansible config.
+
+        This method extracts Git server information from the FIREWHEEL configuration
+        and flattens it into a list of dictionaries, each containing details about
+        the Git server and its associated repositories.
+
+        Returns:
+            list: A list of dictionaries, where each dictionary contains the following keys:
+                - `server_url`: The URL of the Git server.
+                - `path`: The path of the repository on the server.
+                - `branch` (optional): The branch of the repository, if specified.
+        """
         git_servers = []
         for server in config["ansible"].get("git_servers", []):
             server_url = server["server_url"]
@@ -158,7 +170,20 @@ class ModelComponentInstall:
         return git_servers
 
     def flatten_s3_config(self):
-        # Flatten S3 config
+        """Flatten the S3 configuration from the FIREWHEEL ansible config.
+
+        This method extracts S3 endpoint information from the FIREWHEEL configuration
+        and flattens it into a list of dictionaries, each containing details about
+        the S3 endpoint, including the endpoint URL, AWS access keys, and associated
+        buckets.
+
+        Returns:
+            list: A list of dictionaries, where each dictionary contains the following keys:
+                - `s3_endpoint`: The URL of the S3 endpoint.
+                - `aws_access_key_id`: The AWS access key ID for authentication.
+                - `aws_secret_access_key`: The AWS secret access key for authentication.
+                - `bucket`: The name of the S3 bucket associated with the endpoint.
+        """
         s3_endpoints = []
         for endpoint in config["ansible"].get("s3_endpoints", []):
             s3_endpoint = endpoint["s3_endpoint"]
@@ -178,7 +203,19 @@ class ModelComponentInstall:
         return s3_endpoints
 
     def flatten_file_server_config(self):
-        # Flatten file server config
+        """Flatten the file server configuration from the FIREWHEEL ansible config.
+
+        This method extracts file server information from the FIREWHEEL configuration
+        and flattens it into a list of dictionaries, each containing details about
+        the file server and its associated cache paths.
+
+        Returns:
+            list: A list of dictionaries, where each dictionary contains the following keys:
+                - `url`: The URL of the file server.
+                - `use_proxy`: A boolean indicating whether to use a proxy for the file server.
+                - `validate_certs`: A boolean indicating whether to validate SSL certificates.
+                - `cache_path`: The path for caching files on the server.
+        """
         file_servers = []
         for server in config["ansible"].get("file_servers", []):
             url = server["url"]

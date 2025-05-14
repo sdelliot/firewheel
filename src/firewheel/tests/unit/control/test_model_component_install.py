@@ -285,82 +285,88 @@ def test_run_install_script_insecure_pass(
     result = install_component.run_install_script(insecure=True)
     assert result is True
 
-#@patch("firewheel.control.model_component_install.Path.exists", return_value=True)
-#@patch("firewheel.control.model_component_install.Path.is_dir", return_value=True)
-#@patch("firewheel.control.model_component_install.Path.open", new_callable=MagicMock)
-#def test_run_ansible_playbook_success(mock_open, mock_is_dir, mock_exists, install_component):
-#    """
-#    Test the successful execution of a valid Ansible playbook.
-#    """
-#    # Mock the playbook content
-#    mock_file = MagicMock()
-#    mock_file.read.return_value = "---\n- hosts: localhost\n  vars:\n    cached_files: []"
-#    mock_open.return_value.__enter__.return_value = mock_file
-#
-#    # Mock the return value of ansible_runner.run
-#    mock_runner = MagicMock()
-#    mock_runner.rc = 0
-#    with patch("firewheel.control.model_component_install.ansible_runner.run", return_value=mock_runner):
-#        result = install_component.run_ansible_playbook("test_mc", Path("/mock/path"))
-#    
-#    assert result is True  # Expecting True since the playbook should execute successfully
-
-@patch("firewheel.control.model_component_install.Path.exists", return_value=False)
 @patch("firewheel.control.model_component_install.Path.is_dir", return_value=False)
-def test_run_ansible_playbook_not_a_directory(mock_is_dir, mock_exists, install_component):
+def test_run_ansible_playbook_not_a_directory(mock_is_dir, install_component):
     """
-    Test the behavior when the install_path is not a directory.
+    This test checks if ``install_path`` is not a directory, which should raise a :py:exc:`ValueError`.
+
+    Args:
+        mock_is_dir (MagicMock): Mock for the :py:meth:`pathlib.Path.is_dir` method. Mocks the non-existence of the
+            ``install_script``.
+        install_component (ModelComponentInstall): The instance of :py:class:`ModelComponentInstall` to test.
     """
     with pytest.raises(ValueError, match="Invalid INSTALL file."):
         install_component.run_ansible_playbook("test_mc", Path("/mock/path"))
 
-# vars.yml missing
 @patch("firewheel.control.model_component_install.Path.exists", side_effect=[False, False])
 @patch("firewheel.control.model_component_install.Path.is_dir", return_value=True)
 def test_run_ansible_playbook_missing_vars_file(mock_is_dir, mock_exists, install_component):
     """
-    Test the behavior when the vars.yml file is missing.
+    Test the behavior when the ``vars`` file is missing.
+
+    Args:
+        mock_is_dir (MagicMock): Mock for the :py:meth:`pathlib.Path.is_dir` method.
+        mock_exists (MagicMock): Mock for the :py:meth:`pathlib.Path.exists` method. Mocks the non-existence of the
+            ``vars.yml`` and the non-existence of the ``vars.yaml``.
+        install_component (ModelComponentInstall): The instance of :py:class:`ModelComponentInstall` to test.
     """
     with pytest.raises(ValueError, match="Missing vars.yml file in directory"):
         install_component.run_ansible_playbook("test_mc", Path("/mock/path"))
 
-# tasks.yml missing
 @patch("firewheel.control.model_component_install.Path.exists", side_effect=[True, False, False])
 @patch("firewheel.control.model_component_install.Path.is_dir", return_value=True)
 def test_run_ansible_playbook_missing_tasks_file(mock_is_dir, mock_exists, install_component):
     """
-    Test the behavior when the tasks.yml file is missing.
+    Test the behavior when the ``tasks`` file is missing.
+
+    Args:
+        mock_is_dir (MagicMock): Mock for the :py:meth:`pathlib.Path.is_dir` method.
+        mock_exists (MagicMock): Mock for the :py:meth:`pathlib.Path.exists` method. Mocks the
+            existence of ``vars.yml`` and the non-existence of the ``tasks.yml`` and ``tasks.yaml``.
+        install_component (ModelComponentInstall): The instance of :py:class:`ModelComponentInstall` to test.
     """
     with pytest.raises(ValueError, match="Missing tasks.yml file in directory"):
         install_component.run_ansible_playbook("test_mc", Path("/mock/path"))
-
 
 @patch("firewheel.control.model_component_install.Path.exists", side_effect=[True, True])
 @patch("firewheel.control.model_component_install.Path.is_dir", return_value=True)
 @patch("firewheel.control.model_component_install.ansible_runner.run")
 def test_run_ansible_playbook_failure(mock_run, mock_is_dir, mock_exists, install_component):
     """
-    Test the failure of the run_ansible_playbook method when the playbook execution fails.
+    Test the return value when the Ansible playbook execution fails.
+
+    Args:
+        mock_run (MagicMock): Mock for the :py:meth:`ansible_runner.run` method to simulate a failure.
+        mock_is_dir (MagicMock): Mock for the :py:meth:`pathlib.Path.is_dir` method.
+        mock_exists (MagicMock): Mock for the :py:meth:`pathlib.Path.exists` method.  Mocks the
+            existence of ``vars.yml`` and the existence ``tasks.yml``.
+        install_component (ModelComponentInstall): The instance of :py:class:`ModelComponentInstall` to test.
     """
-    # Mock the return value of ansible_runner.run to simulate failure
     mock_runner = MagicMock()
-    mock_runner.rc = 1  # Simulate a failure return code
+    mock_runner.rc = 1  # Failing return code
     mock_run.return_value = mock_runner
 
     result = install_component.run_ansible_playbook("test_mc", Path("/mock/path"))
-    assert result is False  # Expecting False since the playbook execution fails
-
+    # Expecting False since the playbook execution fails
+    assert result is False
 
 @patch("firewheel.control.model_component_install.Path.exists", side_effect=[True, True])
 @patch("firewheel.control.model_component_install.Path.is_dir", return_value=True)
 @patch("firewheel.control.model_component_install.ansible_runner.run")
 def test_run_ansible_playbook_success(mock_run, mock_is_dir, mock_exists, install_component):
     """
-    Test the failure of the run_ansible_playbook method when the playbook execution fails.
+    Test the successful execution of a valid Ansible playbook.
+
+    Args:
+        mock_config (MagicMock): Mock for the configuration dictionary.
+        mock_is_dir (MagicMock): Mock for the :py:meth:`pathlib.Path.is_dir` method.
+        mock_exists (MagicMock): Mock for the :py:meth:`pathlib.Path.exists` method.  Mocks the
+            existence of ``vars.yml`` and the existence ``tasks.yml``.
+        install_component (ModelComponentInstall): The instance of :py:class:`ModelComponentInstall` to test.
     """
     # Mock the return value of ansible_runner.run to simulate failure
     mock_runner = MagicMock()
-    mock_runner.rc = 0  # Simulate a failure return code
+    mock_runner.rc = 0  # Success return code
     mock_run.return_value = mock_runner
 
     result = install_component.run_ansible_playbook("test_mc", Path("/mock/path"))
@@ -371,10 +377,16 @@ def test_run_ansible_playbook_success(mock_run, mock_is_dir, mock_exists, instal
 @patch("firewheel.control.model_component_install.config", new_callable=MagicMock)
 def test_run_ansible_playbook_git_config(mock_config, mock_is_dir, mock_exists, install_component):
     """
-    Test the flattening of Git configuration in ansible_config.
-    """
+    This test verifies that the Git configuration is correctly flattened from the ansible config.
 
-    # Set up the mock configuration for ansible
+    Args:
+        mock_config (MagicMock): Mock for the configuration dictionary.
+        mock_is_dir (MagicMock): Mock for the :py:meth:`pathlib.Path.is_dir` method.
+        mock_exists (MagicMock): Mock for the :py:meth:`pathlib.Path.exists` method. Mocks the
+            existence of ``vars.yml`` and the existence ``tasks.yml``.
+        install_component (ModelComponentInstall): The instance of :py:class:`ModelComponentInstall` to test.
+    """
+    # Mock configuration with Git servers
     mock_config.__getitem__.side_effect = lambda key: {
         "system": {"default_output_dir": "mock_dir"},
         "ansible": {
@@ -392,7 +404,6 @@ def test_run_ansible_playbook_git_config(mock_config, mock_is_dir, mock_exists, 
 
     result = install_component.flatten_git_config()
 
-    # Check if the config has been updated correctly
     assert len(result) == 2
     assert result[0]["server_url"] == "https://git.example.com"
     assert result[0]["path"] == "repo1"
@@ -404,9 +415,16 @@ def test_run_ansible_playbook_git_config(mock_config, mock_is_dir, mock_exists, 
 @patch("firewheel.control.model_component_install.config", new_callable=MagicMock)
 def test_run_ansible_playbook_s3_config(mock_config, mock_is_dir, mock_exists, install_component):
     """
-    Test the flattening of S3 configuration in ansible_config.
+    This test verifies that the S3 configuration is correctly flattened from the ansible config.
+
+    Args:
+        mock_config (MagicMock): Mock for the configuration dictionary.
+        mock_is_dir (MagicMock): Mock for the :py:meth:`pathlib.Path.is_dir` method.
+        mock_exists (MagicMock): Mock for the :py:meth:`pathlib.Path.exists` method. Mocks the
+            existence of ``vars.yml`` and the existence ``tasks.yml``.
+        install_component (ModelComponentInstall): The instance of :py:class:`ModelComponentInstall` to test.
     """
-    # Set up the mock configuration with S3 endpoints
+    # Mock configuration with S3 endpoints
     mock_config.__getitem__.side_effect = lambda key: {
         "system": {"default_output_dir": "mock_dir"},
         "ansible": {
@@ -423,19 +441,25 @@ def test_run_ansible_playbook_s3_config(mock_config, mock_is_dir, mock_exists, i
 
     result = install_component.flatten_s3_config()
 
-    # Check if the ansible_config has been updated correctly
     assert len(result) == 2
     assert result[0]["s3_endpoint"] == "https://s3.example.com"
-    assert result[1]["bucket"] == "bucket2"
+    assert result[0]["bucket"] == "bucket1"
 
 @patch("firewheel.control.model_component_install.Path.exists", side_effect=[True, True])
 @patch("firewheel.control.model_component_install.Path.is_dir", return_value=True)
 @patch("firewheel.control.model_component_install.config", new_callable=MagicMock)
 def test_run_ansible_playbook_file_server_config(mock_config, mock_is_dir, mock_exists, install_component):
     """
-    Test the flattening of file server configuration in ansible_config.
+    This test verifies that the file server configuration is correctly flattened from the ansible config.
+
+    Args:
+        mock_config (MagicMock): Mock for the configuration dictionary.
+        mock_is_dir (MagicMock): Mock for the :py:meth:`pathlib.Path.is_dir` method.
+        mock_exists (MagicMock): Mock for the :py:meth:`pathlib.Path.exists` method. Mocks the
+            existence of ``vars.yml`` and the existence ``tasks.yml``.
+        install_component (ModelComponentInstall): The instance of :py:class:`ModelComponentInstall` to test.
     """
-    # Set up the mock configuration with file servers
+    # Mock configuration with file servers
     mock_config.__getitem__.side_effect = lambda key: {
         "system": {"default_output_dir": "mock_dir"},
         "ansible": {
@@ -452,7 +476,6 @@ def test_run_ansible_playbook_file_server_config(mock_config, mock_is_dir, mock_
 
     result = install_component.flatten_file_server_config()
 
-    # Check if the ansible_config has been updated correctly
     assert len(result) == 2
     assert result[0]["url"] == "https://files.example.com"
     assert result[0]["cache_path"] == "cache1"
