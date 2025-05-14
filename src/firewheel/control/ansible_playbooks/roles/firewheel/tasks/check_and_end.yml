@@ -39,6 +39,6 @@
   when: all_files_valid
 
 # Exit successfully if there are no issues with cached files
-- name: Exit successfully if there are issues with cached files
+- name: Exit successfully if there are no issues with cached files
   ansible.builtin.meta: end_play
   when: all_files_valid
