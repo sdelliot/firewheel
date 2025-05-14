@@ -380,7 +380,7 @@ def test_run_ansible_playbook_success(
     Test the successful execution of a valid Ansible playbook.
 
     Args:
-        mock_config (MagicMock): Mock for the configuration dictionary.
+        mock_run (MagicMock): Mock for the result from ansible_runner.
         mock_is_dir (MagicMock): Mock for the :py:meth:`pathlib.Path.is_dir` method.
         mock_exists (MagicMock): Mock for the :py:meth:`pathlib.Path.exists` method.  Mocks the
             existence of ``vars.yml`` and the existence ``tasks.yml``.
