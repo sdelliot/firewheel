@@ -166,7 +166,7 @@ Cache Types
 
 Collecting and retrieving files from a cache is automatically supported in Ansible playbooks without MC designer intervention.
 Currently, FIREWHEEL supports caching files in a file server, git repository, or in an Amazon S3 data store.
-If the user sets the necessary settings in the :ref:`firewheel_configuration` for the described types below, than FIREWHEEL will automatically check those locations for the cached file.
+If the user sets the necessary settings in the :ref:`firewheel_configuration` for the described types below, then FIREWHEEL will automatically check those locations for the cached file.
 Users are able to set multiple cache types as FIREWHEEL will check any caches for the required file.
 
 .. note::
