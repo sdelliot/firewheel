@@ -285,113 +285,174 @@ def test_run_install_script_insecure_pass(
     result = install_component.run_install_script(insecure=True)
     assert result is True
 
+#@patch("firewheel.control.model_component_install.Path.exists", return_value=True)
+#@patch("firewheel.control.model_component_install.Path.is_dir", return_value=True)
+#@patch("firewheel.control.model_component_install.Path.open", new_callable=MagicMock)
+#def test_run_ansible_playbook_success(mock_open, mock_is_dir, mock_exists, install_component):
+#    """
+#    Test the successful execution of a valid Ansible playbook.
+#    """
+#    # Mock the playbook content
+#    mock_file = MagicMock()
+#    mock_file.read.return_value = "---\n- hosts: localhost\n  vars:\n    cached_files: []"
+#    mock_open.return_value.__enter__.return_value = mock_file
+#
+#    # Mock the return value of ansible_runner.run
+#    mock_runner = MagicMock()
+#    mock_runner.rc = 0
+#    with patch("firewheel.control.model_component_install.ansible_runner.run", return_value=mock_runner):
+#        result = install_component.run_ansible_playbook("test_mc", Path("/mock/path"))
+#    
+#    assert result is True  # Expecting True since the playbook should execute successfully
 
+@patch("firewheel.control.model_component_install.Path.exists", return_value=False)
+@patch("firewheel.control.model_component_install.Path.is_dir", return_value=False)
+def test_run_ansible_playbook_not_a_directory(mock_is_dir, mock_exists, install_component):
+    """
+    Test the behavior when the install_path is not a directory.
+    """
+    with pytest.raises(ValueError, match="Invalid INSTALL file."):
+        install_component.run_ansible_playbook("test_mc", Path("/mock/path"))
+
+# vars.yml missing
+@patch("firewheel.control.model_component_install.Path.exists", side_effect=[False, False])
+@patch("firewheel.control.model_component_install.Path.is_dir", return_value=True)
+def test_run_ansible_playbook_missing_vars_file(mock_is_dir, mock_exists, install_component):
+    """
+    Test the behavior when the vars.yml file is missing.
+    """
+    with pytest.raises(ValueError, match="Missing vars.yml file in directory"):
+        install_component.run_ansible_playbook("test_mc", Path("/mock/path"))
+
+# tasks.yml missing
+@patch("firewheel.control.model_component_install.Path.exists", side_effect=[True, False, False])
+@patch("firewheel.control.model_component_install.Path.is_dir", return_value=True)
+def test_run_ansible_playbook_missing_tasks_file(mock_is_dir, mock_exists, install_component):
+    """
+    Test the behavior when the tasks.yml file is missing.
+    """
+    with pytest.raises(ValueError, match="Missing tasks.yml file in directory"):
+        install_component.run_ansible_playbook("test_mc", Path("/mock/path"))
+
+
+@patch("firewheel.control.model_component_install.Path.exists", side_effect=[True, True])
+@patch("firewheel.control.model_component_install.Path.is_dir", return_value=True)
 @patch("firewheel.control.model_component_install.ansible_runner.run")
-@patch("firewheel.control.model_component_install.Path.open", new_callable=MagicMock)
-@patch("firewheel.control.model_component_install.Path.exists", return_value=True)
-def test_run_ansible_playbook_success(
-    mock_exists, mock_open, mock_run, install_component
-):
+def test_run_ansible_playbook_failure(mock_run, mock_is_dir, mock_exists, install_component):
     """
-    Test the successful execution of a valid Ansible playbook.
-
-    Mocks the playbook content to simulate a valid YAML structure.
-
-    Args:
-        mock_exists (MagicMock): Mock for the :py:meth:`pathlib.Path.exists` method.
-        mock_open (MagicMock): Mock for the :py:meth:`pathlib.Path.open` method.
-        mock_run (MagicMock): Mock for the ansible_runner.run method.
-        install_component (ModelComponentInstall): The instance of :py:class:`ModelComponentInstall` to test.
+    Test the failure of the run_ansible_playbook method when the playbook execution fails.
     """
-    # Mock the playbook content
-    mock_file = MagicMock()
-    mock_file.read.return_value = "---\n- hosts: localhost"
-    mock_open.return_value.__enter__.return_value = mock_file
-
-    # Mock the return value of ansible_runner.run
-    mock_run.return_value = MagicMock(rc=0)
-
-    result = install_component.run_ansible_playbook(Path("/mock/path/INSTALL"))
-    assert result is True
-
-
-@patch("firewheel.control.model_component_install.ansible_runner.RunnerConfig")
-@patch("firewheel.control.model_component_install.Path.open", new_callable=MagicMock)
-@patch("firewheel.control.model_component_install.config", new_callable=MagicMock)
-def test_run_ansible_playbook_fail(
-    mock_config, mock_open, mock_runner_config, install_component
-):
-    """
-    Test the failure of the :py:meth:`run_ansible_playbook` method when an error occurs.
-
-    Mocks the playbook content and simulates a failure during execution.
-
-    Args:
-        mock_config (MagicMock): Mock for the FIREWHEEL configuration.
-        mock_open (MagicMock): Mock for the :py:meth:`pathlib.Path.open` method.
-        mock_runner_config (MagicMock): Mock for the RunnerConfig.
-        install_component (ModelComponentInstall): The instance of :py:class:`ModelComponentInstall` to test.
-    """
-    # Mock the playbook content
-    mock_file = MagicMock()
-    mock_file.read.return_value = "---\n- hosts: localhost\n  vars:\n    cached_files: [{'destination': 'file.txt'}]"
-    mock_open.return_value.__enter__.return_value = mock_file
-
-    # Set up the mock configuration
-    mock_config.__getitem__.side_effect = lambda key: {
-        "system": {"default_output_dir": "mock_dir"},
-        "ansible": {"cache_type": "git"},
-    }[key]
-
-    # Create a mock for the RunnerConfig
-    mock_runner_config_instance = MagicMock()
-    mock_runner_config_instance.prepare = MagicMock()
-    mock_runner_config.return_value = mock_runner_config_instance
-
     # Mock the return value of ansible_runner.run to simulate failure
     mock_runner = MagicMock()
-    mock_runner.rc = 1
+    mock_runner.rc = 1  # Simulate a failure return code
+    mock_run.return_value = mock_runner
 
-    # Patch the ansible_runner.run to return the mock runner
-    with patch(
-        'firewheel.control.model_component_install.ansible_runner.Runner.run',
-        return_value=("success", 0),
-    ):
-        with patch(
-            "firewheel.control.model_component_install.ansible_runner.run",
-            return_value=mock_runner,
-        ):
-            result = install_component.run_ansible_playbook(Path("/mock/path/INSTALL"))
-
-    assert result is False
+    result = install_component.run_ansible_playbook("test_mc", Path("/mock/path"))
+    assert result is False  # Expecting False since the playbook execution fails
 
 
-@patch("firewheel.control.model_component_install.Path.open", new_callable=MagicMock)
+@patch("firewheel.control.model_component_install.Path.exists", side_effect=[True, True])
+@patch("firewheel.control.model_component_install.Path.is_dir", return_value=True)
+@patch("firewheel.control.model_component_install.ansible_runner.run")
+def test_run_ansible_playbook_success(mock_run, mock_is_dir, mock_exists, install_component):
+    """
+    Test the failure of the run_ansible_playbook method when the playbook execution fails.
+    """
+    # Mock the return value of ansible_runner.run to simulate failure
+    mock_runner = MagicMock()
+    mock_runner.rc = 0  # Simulate a failure return code
+    mock_run.return_value = mock_runner
+
+    result = install_component.run_ansible_playbook("test_mc", Path("/mock/path"))
+    assert result is True  # Expecting False since the playbook execution fails
+
+@patch("firewheel.control.model_component_install.Path.exists", side_effect=[True, True])
+@patch("firewheel.control.model_component_install.Path.is_dir", return_value=True)
 @patch("firewheel.control.model_component_install.config", new_callable=MagicMock)
-def test_run_ansible_playbook_invalid_cache_type(
-    mock_config, mock_open, install_component
-):
+def test_run_ansible_playbook_git_config(mock_config, mock_is_dir, mock_exists, install_component):
     """
-    Test the :py:meth:`run_ansible_playbook` method when an invalid cache type is provided.
-
-    Mocks the playbook content and simulates an invalid cache type scenario.
-
-    Args:
-        mock_config (MagicMock): Mock for the FIREWHEEL configuration.
-        mock_open (MagicMock): Mock for the :py:meth:`pathlib.Path.open` method.
-        install_component (ModelComponentInstall): The instance of :py:class:`ModelComponentInstall` to test.
+    Test the flattening of Git configuration in ansible_config.
     """
-    # Mock the playbook content
-    mock_file = MagicMock()
-    mock_file.read.return_value = "---\n- hosts: localhost\n  vars:\n    cached_files: [{'destination': 'file.txt'}]"
-    mock_open.return_value.__enter__.return_value = mock_file
 
-    # Set up the mock configuration with an invalid cache type
+    # Set up the mock configuration for ansible
     mock_config.__getitem__.side_effect = lambda key: {
         "system": {"default_output_dir": "mock_dir"},
-        "ansible": {"cache_type": "invalid"},
+        "ansible": {
+            "git_servers": [
+                {
+                    "server_url": "https://git.example.com",
+                    "repositories": [
+                        {"path": "repo1", "branch": "main"},
+                        {"path": "repo2"},
+                    ],
+                }
+            ]
+        },
     }[key]
 
-    # Assert that ValueError is raised
-    with pytest.raises(ValueError, match="Available `cache_type` are:"):
-        install_component.run_ansible_playbook(Path("/mock/path/INSTALL"))
+    result = install_component.flatten_git_config()
+
+    # Check if the config has been updated correctly
+    assert len(result) == 2
+    assert result[0]["server_url"] == "https://git.example.com"
+    assert result[0]["path"] == "repo1"
+    assert "branch" in result[0]
+    assert result[1]["path"] == "repo2"
+
+@patch("firewheel.control.model_component_install.Path.exists", side_effect=[True, True])
+@patch("firewheel.control.model_component_install.Path.is_dir", return_value=True)
+@patch("firewheel.control.model_component_install.config", new_callable=MagicMock)
+def test_run_ansible_playbook_s3_config(mock_config, mock_is_dir, mock_exists, install_component):
+    """
+    Test the flattening of S3 configuration in ansible_config.
+    """
+    # Set up the mock configuration with S3 endpoints
+    mock_config.__getitem__.side_effect = lambda key: {
+        "system": {"default_output_dir": "mock_dir"},
+        "ansible": {
+            "s3_endpoints": [
+                {
+                    "s3_endpoint": "https://s3.example.com",
+                    "aws_access_key_id": "mock_access_key",
+                    "aws_secret_access_key": "mock_secret_key",
+                    "buckets": ["bucket1", "bucket2"],
+                }
+            ]
+        },
+    }[key]
+
+    result = install_component.flatten_s3_config()
+
+    # Check if the ansible_config has been updated correctly
+    assert len(result) == 2
+    assert result[0]["s3_endpoint"] == "https://s3.example.com"
+    assert result[1]["bucket"] == "bucket2"
+
+@patch("firewheel.control.model_component_install.Path.exists", side_effect=[True, True])
+@patch("firewheel.control.model_component_install.Path.is_dir", return_value=True)
+@patch("firewheel.control.model_component_install.config", new_callable=MagicMock)
+def test_run_ansible_playbook_file_server_config(mock_config, mock_is_dir, mock_exists, install_component):
+    """
+    Test the flattening of file server configuration in ansible_config.
+    """
+    # Set up the mock configuration with file servers
+    mock_config.__getitem__.side_effect = lambda key: {
+        "system": {"default_output_dir": "mock_dir"},
+        "ansible": {
+            "file_servers": [
+                {
+                    "url": "https://files.example.com",
+                    "use_proxy": True,
+                    "validate_certs": False,
+                    "cache_paths": ["cache1", "cache2"],
+                }
+            ]
+        },
+    }[key]
+
+    result = install_component.flatten_file_server_config()
+
+    # Check if the ansible_config has been updated correctly
+    assert len(result) == 2
+    assert result[0]["url"] == "https://files.example.com"
+    assert result[0]["cache_path"] == "cache1"

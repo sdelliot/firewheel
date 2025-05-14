@@ -143,6 +143,60 @@ class ModelComponentInstall:
             script = file.read()
         return script.startswith("#!")
 
+    def flatten_git_config(self):
+        git_servers = []
+        for server in config["ansible"].get("git_servers", []):
+            server_url = server["server_url"]
+            for repo in server["repositories"]:
+                repo_info = {"server_url": server_url, "path": repo["path"]}
+
+                if "branch" in repo:
+                    repo_info["branch"] = repo["branch"]
+
+                git_servers.append(repo_info)
+
+        return git_servers
+
+    def flatten_s3_config(self):
+        # Flatten S3 config
+        s3_endpoints = []
+        for endpoint in config["ansible"].get("s3_endpoints", []):
+            s3_endpoint = endpoint["s3_endpoint"]
+            aws_access_key_id = endpoint["aws_access_key_id"]
+            aws_secret_access_key = endpoint["aws_secret_access_key"]
+
+            for bucket in endpoint["buckets"]:
+                bucket_info = {
+                    "s3_endpoint": s3_endpoint,
+                    "aws_access_key_id": aws_access_key_id,
+                    "aws_secret_access_key": aws_secret_access_key,
+                    "bucket": bucket,
+                }
+
+                s3_endpoints.append(bucket_info)
+
+        return s3_endpoints
+
+    def flatten_file_server_config(self):
+        # Flatten file server config
+        file_servers = []
+        for server in config["ansible"].get("file_servers", []):
+            url = server["url"]
+            use_proxy = server["use_proxy"]
+            validate_certs = server["validate_certs"]
+
+            for cache_path in server["cache_paths"]:
+                cache_info = {
+                    "url": url,
+                    "use_proxy": use_proxy,
+                    "validate_certs": validate_certs,
+                    "cache_path": cache_path,
+                }
+
+                file_servers.append(cache_info)
+
+        return file_servers
+
     def run_ansible_playbook(self, name, install_path):
         """
         Run the provided Ansible playbook using ansible-runner.
@@ -197,58 +251,15 @@ class ModelComponentInstall:
             "mc_name": str(name),
         }
 
-        # Flatten Git config
-        git_servers = []
-        for server in config["ansible"].get("git_servers", []):
-            server_url = server["server_url"]
-            for repo in server["repositories"]:
-                repo_info = {"server_url": server_url, "path": repo["path"]}
-
-                if "branch" in repo:
-                    repo_info["branch"] = repo["branch"]
-
-                git_servers.append(repo_info)
-
+        git_servers = self.flatten_git_config()
         if git_servers:
             ansible_config.update({"git_servers": git_servers})
 
-        # Flatten S3 config
-        s3_endpoints = []
-        for endpoint in config["ansible"].get("s3_endpoints", []):
-            s3_endpoint = endpoint["s3_endpoint"]
-            aws_access_key_id = endpoint["aws_access_key_id"]
-            aws_secret_access_key = endpoint["aws_secret_access_key"]
-
-            for bucket in endpoint["buckets"]:
-                bucket_info = {
-                    "s3_endpoint": s3_endpoint,
-                    "aws_access_key_id": aws_access_key_id,
-                    "aws_secret_access_key": aws_secret_access_key,
-                    "bucket": bucket,
-                }
-
-            s3_endpoints.append(bucket_info)
-
+        s3_endpoints = self.flatten_s3_config()
         if s3_endpoints:
             ansible_config.update({"s3_endpoints": s3_endpoints})
 
-        # Flatten file server config
-        file_servers = []
-        for server in config["ansible"].get("file_servers", []):
-            url = server["url"]
-            use_proxy = server["use_proxy"]
-            validate_certs = server["validate_certs"]
-
-            for cache_path in server["cache_paths"]:
-                cache_info = {
-                    "url": url,
-                    "use_proxy": use_proxy,
-                    "validate_certs": validate_certs,
-                    "cache_path": cache_path,
-                }
-
-                file_servers.append(cache_info)
-
+        file_servers = self.flatten_file_server_config()
         if file_servers:
             ansible_config.update({"file_servers": file_servers})
 
