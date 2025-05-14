@@ -202,10 +202,7 @@ class ModelComponentInstall:
         for server in config["ansible"].get("git_servers", []):
             server_url = server["server_url"]
             for repo in server["repositories"]:
-                repo_info = {
-                    "server_url": server_url,
-                    "path": repo["path"]
-                }
+                repo_info = {"server_url": server_url, "path": repo["path"]}
 
                 if "branch" in repo:
                     repo_info["branch"] = repo["branch"]
@@ -213,7 +210,7 @@ class ModelComponentInstall:
                 git_servers.append(repo_info)
 
         if git_servers:
-            ansible_config.update({"git_servers":git_servers})
+            ansible_config.update({"git_servers": git_servers})
 
         # Flatten S3 config
         s3_endpoints = []
@@ -227,13 +224,13 @@ class ModelComponentInstall:
                     "s3_endpoint": s3_endpoint,
                     "aws_access_key_id": aws_access_key_id,
                     "aws_secret_access_key": aws_secret_access_key,
-                    "bucket": bucket
+                    "bucket": bucket,
                 }
 
             s3_endpoints.append(bucket_info)
 
         if s3_endpoints:
-            ansible_config.update({"s3_endpoints":s3_endpoints})
+            ansible_config.update({"s3_endpoints": s3_endpoints})
 
         # Flatten file server config
         file_servers = []
@@ -247,13 +244,13 @@ class ModelComponentInstall:
                     "url": url,
                     "use_proxy": use_proxy,
                     "validate_certs": validate_certs,
-                    "cache_path": cache_path
+                    "cache_path": cache_path,
                 }
 
                 file_servers.append(cache_info)
 
         if file_servers:
-            ansible_config.update({"file_servers":file_servers})
+            ansible_config.update({"file_servers": file_servers})
 
         playbook_path = Path(__file__).resolve().parent / Path(
             "ansible_playbooks/main.yml"
