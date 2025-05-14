@@ -210,7 +210,9 @@ class ModelComponentInstall:
             :py:data:`False` otherwise.
 
         Raises:
-            ValueError: If an invalid ``ansible.cache_type`` is provided in the FIREWHEEL config.
+            ValueError: Invalid INSTALL directory structure.
+            ValueError: Missing vars.yml file.
+            ValueError: Missing tasks.yaml file.
         """
         console = Console()
 
