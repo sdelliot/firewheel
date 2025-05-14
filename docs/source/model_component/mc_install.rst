@@ -136,7 +136,7 @@ The full definition for ``cached_files`` is:
 .. confval:: destination
 
     Where the file should be placed.
-    Should include ``{{ mc_path }}`` if the file needs to be relative to the model component directory.
+    Should include ``{{ mc_dir }}`` if the file needs to be relative to the model component directory.
 
     :type: string
     :required: true
