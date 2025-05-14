@@ -105,7 +105,9 @@ The process of collecting cached files is automatically handled by FIREWHEEL and
 These cached files should be defined in ``INSTALL/vars.yml`` and the model component installation is assumed to be complete when all ``cached_files`` are present.
 If no ``cached_files`` are needed, then it can be omitted from ``INSTALL/vars.yml``.
 
-Continuing the example from above, the ``vars.yml`` would look like:
+Continuing the example from above, the end result of ``tasks.yml`` is the creation of the file ``{{ mc_dir }}/vm_resources/debs/htop-1_0_2_debs.tgz``.
+Rather than run the tasks (which assume online access), users could provide this file from a cache.
+The ``vars.yml`` file would look like:
 
 .. code-block:: yaml
   :caption: This is an example ``vars.yml`` file that ensures the final MC state.
