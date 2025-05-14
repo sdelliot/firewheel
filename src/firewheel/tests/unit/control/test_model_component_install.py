@@ -285,6 +285,7 @@ def test_run_install_script_insecure_pass(
     result = install_component.run_install_script(insecure=True)
     assert result is True
 
+
 @patch("firewheel.control.model_component_install.Path.is_dir", return_value=False)
 def test_run_ansible_playbook_not_a_directory(mock_is_dir, install_component):
     """
@@ -298,9 +299,14 @@ def test_run_ansible_playbook_not_a_directory(mock_is_dir, install_component):
     with pytest.raises(ValueError, match="Invalid INSTALL file."):
         install_component.run_ansible_playbook("test_mc", Path("/mock/path"))
 
-@patch("firewheel.control.model_component_install.Path.exists", side_effect=[False, False])
+
+@patch(
+    "firewheel.control.model_component_install.Path.exists", side_effect=[False, False]
+)
 @patch("firewheel.control.model_component_install.Path.is_dir", return_value=True)
-def test_run_ansible_playbook_missing_vars_file(mock_is_dir, mock_exists, install_component):
+def test_run_ansible_playbook_missing_vars_file(
+    mock_is_dir, mock_exists, install_component
+):
     """
     Test the behavior when the ``vars`` file is missing.
 
@@ -313,9 +319,15 @@ def test_run_ansible_playbook_missing_vars_file(mock_is_dir, mock_exists, instal
     with pytest.raises(ValueError, match="Missing vars.yml file in directory"):
         install_component.run_ansible_playbook("test_mc", Path("/mock/path"))
 
-@patch("firewheel.control.model_component_install.Path.exists", side_effect=[True, False, False])
+
+@patch(
+    "firewheel.control.model_component_install.Path.exists",
+    side_effect=[True, False, False],
+)
 @patch("firewheel.control.model_component_install.Path.is_dir", return_value=True)
-def test_run_ansible_playbook_missing_tasks_file(mock_is_dir, mock_exists, install_component):
+def test_run_ansible_playbook_missing_tasks_file(
+    mock_is_dir, mock_exists, install_component
+):
     """
     Test the behavior when the ``tasks`` file is missing.
 
@@ -328,10 +340,15 @@ def test_run_ansible_playbook_missing_tasks_file(mock_is_dir, mock_exists, insta
     with pytest.raises(ValueError, match="Missing tasks.yml file in directory"):
         install_component.run_ansible_playbook("test_mc", Path("/mock/path"))
 
-@patch("firewheel.control.model_component_install.Path.exists", side_effect=[True, True])
+
+@patch(
+    "firewheel.control.model_component_install.Path.exists", side_effect=[True, True]
+)
 @patch("firewheel.control.model_component_install.Path.is_dir", return_value=True)
 @patch("firewheel.control.model_component_install.ansible_runner.run")
-def test_run_ansible_playbook_failure(mock_run, mock_is_dir, mock_exists, install_component):
+def test_run_ansible_playbook_failure(
+    mock_run, mock_is_dir, mock_exists, install_component
+):
     """
     Test the return value when the Ansible playbook execution fails.
 
@@ -350,10 +367,15 @@ def test_run_ansible_playbook_failure(mock_run, mock_is_dir, mock_exists, instal
     # Expecting False since the playbook execution fails
     assert result is False
 
-@patch("firewheel.control.model_component_install.Path.exists", side_effect=[True, True])
+
+@patch(
+    "firewheel.control.model_component_install.Path.exists", side_effect=[True, True]
+)
 @patch("firewheel.control.model_component_install.Path.is_dir", return_value=True)
 @patch("firewheel.control.model_component_install.ansible_runner.run")
-def test_run_ansible_playbook_success(mock_run, mock_is_dir, mock_exists, install_component):
+def test_run_ansible_playbook_success(
+    mock_run, mock_is_dir, mock_exists, install_component
+):
     """
     Test the successful execution of a valid Ansible playbook.
 
@@ -372,10 +394,15 @@ def test_run_ansible_playbook_success(mock_run, mock_is_dir, mock_exists, instal
     result = install_component.run_ansible_playbook("test_mc", Path("/mock/path"))
     assert result is True  # Expecting False since the playbook execution fails
 
-@patch("firewheel.control.model_component_install.Path.exists", side_effect=[True, True])
+
+@patch(
+    "firewheel.control.model_component_install.Path.exists", side_effect=[True, True]
+)
 @patch("firewheel.control.model_component_install.Path.is_dir", return_value=True)
 @patch("firewheel.control.model_component_install.config", new_callable=MagicMock)
-def test_run_ansible_playbook_git_config(mock_config, mock_is_dir, mock_exists, install_component):
+def test_run_ansible_playbook_git_config(
+    mock_config, mock_is_dir, mock_exists, install_component
+):
     """
     This test verifies that the Git configuration is correctly flattened from the ansible config.
 
@@ -410,10 +437,15 @@ def test_run_ansible_playbook_git_config(mock_config, mock_is_dir, mock_exists, 
     assert "branch" in result[0]
     assert result[1]["path"] == "repo2"
 
-@patch("firewheel.control.model_component_install.Path.exists", side_effect=[True, True])
+
+@patch(
+    "firewheel.control.model_component_install.Path.exists", side_effect=[True, True]
+)
 @patch("firewheel.control.model_component_install.Path.is_dir", return_value=True)
 @patch("firewheel.control.model_component_install.config", new_callable=MagicMock)
-def test_run_ansible_playbook_s3_config(mock_config, mock_is_dir, mock_exists, install_component):
+def test_run_ansible_playbook_s3_config(
+    mock_config, mock_is_dir, mock_exists, install_component
+):
     """
     This test verifies that the S3 configuration is correctly flattened from the ansible config.
 
@@ -445,10 +477,15 @@ def test_run_ansible_playbook_s3_config(mock_config, mock_is_dir, mock_exists, i
     assert result[0]["s3_endpoint"] == "https://s3.example.com"
     assert result[0]["bucket"] == "bucket1"
 
-@patch("firewheel.control.model_component_install.Path.exists", side_effect=[True, True])
+
+@patch(
+    "firewheel.control.model_component_install.Path.exists", side_effect=[True, True]
+)
 @patch("firewheel.control.model_component_install.Path.is_dir", return_value=True)
 @patch("firewheel.control.model_component_install.config", new_callable=MagicMock)
-def test_run_ansible_playbook_file_server_config(mock_config, mock_is_dir, mock_exists, install_component):
+def test_run_ansible_playbook_file_server_config(
+    mock_config, mock_is_dir, mock_exists, install_component
+):
     """
     This test verifies that the file server configuration is correctly flattened from the ansible config.
 
