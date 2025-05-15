@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=75.0", "setuptools_scm[toml]>=6.2"]
+requires = ["setuptools>=75.0,<=77.0", "setuptools_scm[toml]>=6.2"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -22,8 +22,7 @@ keywords = [
     "experimentation",
     "minimega",
 ]
-license = "Apache-2.0"
-license-files = ["LICENSE", "DISCLAIMER.md", "COPYRIGHT.md", "NOTICE"]
+license = {text = "Apache-2.0"}
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Environment :: Console",
@@ -112,6 +111,9 @@ firewheel = "firewheel.cli.firewheel_cli:main"
 mcg = "firewheel.control.utils.new_model_component:main"
 prep_fw_tab_completion = "firewheel.cli.completion.prepare_completion_script:main"
 get_fw_tab_completion_script = "firewheel.cli.completion.prepare_completion_script:print_completion_script_path"
+
+[tools.setuptools]
+license-files = ["LICENSE", "DISCLAIMER.md", "COPYRIGHT.md", "NOTICE"]
 
 [tool.setuptools.package-data]
 # Required for tox documentation building
