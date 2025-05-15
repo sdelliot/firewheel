@@ -22,7 +22,7 @@ keywords = [
     "experimentation",
     "minimega",
 ]
-license = "Apache-2.0"
+license = { text = "Apache-2.0" }
 license-files = ["LICENSE", "DISCLAIMER.md", "COPYRIGHT.md", "NOTICE"]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
@@ -76,9 +76,9 @@ dependencies = [
 
 [project.optional-dependencies]
 mcs = [
-    # "firewheel-repo-base",
-    # "firewheel-repo-linux",
-    # "firewheel-repo-vyos",
+    "firewheel-repo-base",
+    "firewheel-repo-linux",
+    "firewheel-repo-vyos",
 ]
 format = [
     "ruff==0.11.2",
@@ -87,7 +87,7 @@ docs = [
     "Sphinx>=7.0.0,<=8.2.3",
     "myst-nb<=1.2.0",
     "sphinx-rtd-theme==3.0.2",
-    "sphinxcontrib-spelling==8.0.1",
+    "sphinxcontrib-spelling>=7.0.0,<=8.0.1",
     "sphinx-copybutton==0.5.2",
     "pyenchant==3.2.2",
     "doc8==1.1.2",
@@ -95,7 +95,7 @@ docs = [
     "sphinx-design==0.6.1",
 ]
 dev = [
-    "firewheel[mcs,format,docs]",
+    "firewheel[format,docs]",
     "pre-commit",
     "tox~=4.0",
 ]
