@@ -64,7 +64,7 @@ def test_install_mc_success(mock_chmod, mock_stat, mock_open, install_component)
 
     with patch("firewheel.control.model_component_install.subprocess.run") as mock_run:
         mock_run.return_value = MagicMock(returncode=0)
-        result = install_component.install_mc("test_mc", Path("/mock/path/INSTALL"))
+        result = install_component.install_mc(Path("/mock/path/INSTALL"))
         assert result is True
 
 
@@ -93,7 +93,7 @@ def test_install_mc_failure(mock_chmod, mock_stat, mock_open, install_component)
 
     with patch("firewheel.control.model_component_install.subprocess.run") as mock_run:
         mock_run.side_effect = subprocess.CalledProcessError(1, "cmd")
-        result = install_component.install_mc("test_mc", Path("/mock/path/INSTALL"))
+        result = install_component.install_mc(Path("/mock/path/INSTALL"))
         assert result is False
 
 
@@ -124,7 +124,7 @@ def test_install_mc_already_installed(
 
     with patch("firewheel.control.model_component_install.subprocess.run") as mock_run:
         mock_run.side_effect = subprocess.CalledProcessError(117, "cmd")
-        result = install_component.install_mc("test_mc", Path("/mock/path/INSTALL"))
+        result = install_component.install_mc(Path("/mock/path/INSTALL"))
         # Expecting True since the return code 117 indicates an already installed
         # model component
         assert result is True
@@ -297,7 +297,7 @@ def test_run_ansible_playbook_not_a_directory(mock_is_dir, install_component):
         install_component (ModelComponentInstall): The instance of :py:class:`ModelComponentInstall` to test.
     """
     with pytest.raises(ValueError, match="Invalid INSTALL file."):
-        install_component.run_ansible_playbook("test_mc", Path("/mock/path"))
+        install_component.run_ansible_playbook(Path("/mock/path"))
 
 
 @patch(
@@ -317,7 +317,7 @@ def test_run_ansible_playbook_missing_vars_file(
         install_component (ModelComponentInstall): The instance of :py:class:`ModelComponentInstall` to test.
     """
     with pytest.raises(ValueError, match="Missing vars.yml file in directory"):
-        install_component.run_ansible_playbook("test_mc", Path("/mock/path"))
+        install_component.run_ansible_playbook(Path("/mock/path"))
 
 
 @patch(
@@ -338,7 +338,7 @@ def test_run_ansible_playbook_missing_tasks_file(
         install_component (ModelComponentInstall): The instance of :py:class:`ModelComponentInstall` to test.
     """
     with pytest.raises(ValueError, match="Missing tasks.yml file in directory"):
-        install_component.run_ansible_playbook("test_mc", Path("/mock/path"))
+        install_component.run_ansible_playbook(Path("/mock/path"))
 
 
 @patch(
@@ -363,7 +363,7 @@ def test_run_ansible_playbook_failure(
     mock_runner.rc = 1  # Failing return code
     mock_run.return_value = mock_runner
 
-    result = install_component.run_ansible_playbook("test_mc", Path("/mock/path"))
+    result = install_component.run_ansible_playbook(Path("/mock/path"))
     # Expecting False since the playbook execution fails
     assert result is False
 
@@ -391,7 +391,7 @@ def test_run_ansible_playbook_success(
     mock_runner.rc = 0  # Success return code
     mock_run.return_value = mock_runner
 
-    result = install_component.run_ansible_playbook("test_mc", Path("/mock/path"))
+    result = install_component.run_ansible_playbook(Path("/mock/path"))
     assert result is True  # Expecting False since the playbook execution fails
 
 

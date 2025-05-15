@@ -76,12 +76,11 @@ class ModelComponentInstall:
         self.mc = mc
         self.log = Log(name="ModelComponentInstall").log
 
-    def install_mc(self, name, install_path):
+    def install_mc(self, install_path):
         """
         Execute a given Model Component's ``INSTALL`` script.
 
         Args:
-            name (str): The name of the Model Component.
             install_path (pathlib.Path): The path of the ``INSTALL`` file.
 
         Returns:
@@ -89,12 +88,12 @@ class ModelComponentInstall:
             installed), False otherwise
         """
         console = Console()
-        console.print(f"[b green]Starting to install [cyan]{name}[/cyan]!")
+        console.print(f"[b green]Starting to install [cyan]{self.mc.name}[/cyan]!")
 
         # Check if the install script has a shebang line
         # if it does not, we should execute it with "ansible-runner"
         if not self.has_shebang(install_path):
-            return self.run_ansible_playbook(name, install_path)
+            return self.run_ansible_playbook(install_path)
 
         console.print(
             "[b yellow]Warning: Use of non-ansible-based INSTALL scripts is deprecated. "
@@ -113,14 +112,14 @@ class ModelComponentInstall:
             subprocess.run(  # nosec
                 [str(install_path)], cwd=install_path.parent, check=True
             )
-            console.print(f"[b green]Installed [cyan]{name}[/cyan]!")
+            console.print(f"[b green]Installed [cyan]{self.mc.name}[/cyan]!")
             return True
         except subprocess.CalledProcessError as exp:
             if exp.returncode == 117:  # Structure needs cleaning
-                console.print(f"[b yellow][cyan]{name}[/cyan] is already installed!")
+                console.print(f"[b yellow][cyan]{self.mc.name}[/cyan] is already installed!")
                 return True
 
-            console.print(f"[b red]Failed to install [cyan]{name}[/cyan]!")
+            console.print(f"[b red]Failed to install [cyan]{self.mc.name}[/cyan]!")
             return False
 
     def has_shebang(self, install_path):
@@ -234,12 +233,11 @@ class ModelComponentInstall:
 
         return file_servers
 
-    def run_ansible_playbook(self, name, install_path):
+    def run_ansible_playbook(self, install_path):
         """
         Run the provided Ansible playbook using ansible-runner.
 
         Args:
-            name (str): The name of the Model Component.
             install_path (pathlib.Path): The path of the Ansible playbook directory.
 
         Returns:
@@ -286,8 +284,8 @@ class ModelComponentInstall:
             "vars_path": str(vars_path),
             "tasks_path": str(tasks_path),
             "mc_dir": str(install_path.parent),
-            "install_flag": str(install_path.parent / f".{name}.installed"),
-            "mc_name": str(name),
+            "install_flag": str(install_path.parent / f".{self.mc.name}.installed"),
+            "mc_name": str(self.mc.name),
         }
 
         git_servers = self.flatten_git_config()
@@ -348,7 +346,7 @@ class ModelComponentInstall:
             return True
 
         if insecure is True:
-            success = self.install_mc(self.mc.name, install_script)
+            success = self.install_mc(install_script)
             if not success:
                 console.print(f"[b red]Failed to install [cyan]{self.mc.name}[/cyan].")
                 return False
@@ -359,7 +357,7 @@ class ModelComponentInstall:
         while True:
             value = InstallPrompt.ask(ask, choices=choices)
             if value == "y":
-                success = self.install_mc(self.mc.name, install_script)
+                success = self.install_mc(install_script)
                 if not success:
                     console.print(
                         f"[b red]Failed to install [cyan]{self.mc.name}[/cyan]"

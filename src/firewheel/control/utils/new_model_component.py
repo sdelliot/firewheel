@@ -821,7 +821,9 @@ class ModelComponentGenerator:
     def create_install(self):
         """
         Create an INSTALL directory based on a template.
-        Also creates tasks.yml and vars.yml in the install_path directory.
+        Also creates ``tasks.yml`` and ``vars.yml`` in the INSTALL directory.
+        Now this directory can be used to create Ansible-based scripts to install
+        unpackaged portions of the model component.
         """
         # Create the INSTALL directory if it doesn't exist
         install_path = Path(self.install_path)
