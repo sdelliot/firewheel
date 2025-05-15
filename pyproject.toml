@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=77.0", "setuptools_scm[toml]>=6.2"]
+requires = ["setuptools>=75.0", "setuptools_scm[toml]>=6.2"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -54,8 +54,6 @@ classifiers = [
     "Topic :: System :: Operating System",
 ]
 dependencies = [
-    "ansible>=6.0.0,<=12.0.0",
-    "ansible-runner>=2.0.0,<=2.4.1",
     "minimega==2.9",
     "ClusterShell<=1.9.3",
     "colorama<=0.4.6",
@@ -86,10 +84,10 @@ format = [
     "ruff==0.11.2",
 ]
 docs = [
-    "Sphinx>=7.0.0,<=8.2.3",
-    "myst-nb>=1.0.0,<=1.2.0",
-    "sphinx-rtd-theme>=3.0.0",
-    "sphinxcontrib-spelling>=7.0.0,<=8.0.1",
+    "Sphinx>=8.0.0,<=8.2.3",
+    "myst-nb==1.2.0",
+    "sphinx-rtd-theme==3.0.2",
+    "sphinxcontrib-spelling==8.0.1",
     "sphinx-copybutton==0.5.2",
     "pyenchant==3.2.2",
     "doc8==1.1.2",
@@ -132,7 +130,6 @@ disallow_any_unimported = true
 show_traceback = true
 pretty = true
 python_version = "3.8"
-new_type_inference = true
 enable_error_code = ["ignore-without-code", "redundant-expr"]
 show_error_code_links = true
 disallow_untyped_calls = false
