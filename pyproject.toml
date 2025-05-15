@@ -76,21 +76,21 @@ dependencies = [
 
 [project.optional-dependencies]
 mcs = [
-    "firewheel-repo-base",
-    "firewheel-repo-linux",
-    "firewheel-repo-vyos",
+    # "firewheel-repo-base",
+    # "firewheel-repo-linux",
+    # "firewheel-repo-vyos",
 ]
 format = [
     "ruff==0.11.2",
 ]
 docs = [
     "Sphinx>=7.0.0,<=8.2.3",
-    "myst-nb==1.2.0",
+    "myst-nb<=1.2.0",
     "sphinx-rtd-theme==3.0.2",
     "sphinxcontrib-spelling==8.0.1",
     "sphinx-copybutton==0.5.2",
     "pyenchant==3.2.2",
-    # "doc8==1.1.2",
+    "doc8==1.1.2",
     "pip-licenses==5.0.0",
     "sphinx-design==0.6.1",
 ]
