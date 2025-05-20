@@ -2,22 +2,22 @@
   ansible.builtin.set_fact:
     all_files_valid: true
 
-- name: Ensure all cached file destinations exist
+- name: Ensure all required file destinations exist
   ansible.builtin.stat:
     path: "{{ item.destination }}"
     checksum_algorithm: "{{ item.checksum_algorithm | default(item.checksum_algo | default('sha1')) }}"
     get_checksum: true
-  register: cached_file_check
-  loop: "{{ cached_files }}"
+  register: required_files_check
+  loop: "{{ required_files }}"
 
-- name: Verify any existing checksums for cached files
+- name: Verify any existing checksums for required files
   ansible.builtin.set_fact:
     all_files_valid: false
   when:
     - item.stat.exists
     - item.item.checksum is defined
     - item.stat.checksum != item.item.checksum
-  loop: "{{ cached_file_check.results }}"
+  loop: "{{ required_files_check.results }}"
   loop_control:
     index_var: index
 
@@ -25,20 +25,20 @@
   ansible.builtin.set_fact:
     all_files_valid: false
   when:
-    - not cached_file_check.results[index].stat.exists
-  loop: "{{ cached_files }}"
+    - not required_files_check.results[index].stat.exists
+  loop: "{{ required_files }}"
   loop_control:
     index_var: index
 
-# Create installation flag if all cached files exist
-- name: Create installation flag if all cached files exist
+# Create installation flag if all required files exist
+- name: Create installation flag if all required files exist
   ansible.builtin.file:
     path: "{{ install_flag }}"
     state: touch
     mode: "660"
   when: all_files_valid
 
-# Exit successfully if there are no issues with cached files
-- name: Exit successfully if there are no issues with cached files
+# Exit successfully if there are no issues with required files
+- name: Exit successfully if there are no issues with required files
   ansible.builtin.meta: end_play
   when: all_files_valid

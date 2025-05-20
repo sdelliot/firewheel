@@ -28,12 +28,17 @@
   block:
     - name: Download cached files from a URL
       ansible.builtin.get_url:
-        url: "{{ firewheel_url }}/{{ firewheel_cache_path }}/{{ item.source }}"
+        url: >
+          {% if item.source is defined %}
+            "{{ firewheel_url }}/{{ firewheel_cache_path }}/{{ item.source }}"
+          {% else %}
+            ""{{ firewheel_url }}/{{ firewheel_cache_path }}/{{ mc_name }}/{{ item.destination | basename }}"
+          {% endif %}
         dest: "{{ item.destination }}"
         mode: "0660"
         use_proxy: "{{ firewheel_use_proxy }}"
         validate_certs: "{{ firewheel_validate_certs }}"
-      loop: "{{ cached_files }}"
+      loop: "{{ required_files }}"
       register: url_download_result
       ignore_errors: true
 

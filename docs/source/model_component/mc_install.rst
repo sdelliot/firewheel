@@ -99,11 +99,11 @@ FIREWHEEL will automatically provide the following variables to the Ansible play
 - ``mc_name`` -- The name of the Model Component.
 - ``mc_dir`` -- The full path to the model component directory.
 
-In addition to any variables the specific tasks need, the ``vars.yml`` *should* have a ``cached_files`` key where a list of the final output files is listed.
+In addition to any variables the specific tasks need, the ``vars.yml`` *should* have a ``required_files`` key where a list of the final output files is listed.
 This is because FIREWHEEL supports caching pre-computed blobs from various resources to enable offline experiment access.
-The process of collecting cached files is automatically handled by FIREWHEEL and using this process is discussed in detail in :ref:`mc_install_cache`.
-These cached files should be defined in ``INSTALL/vars.yml`` and the model component installation is assumed to be complete when all ``cached_files`` are present.
-If no ``cached_files`` are needed, then it can be omitted from ``INSTALL/vars.yml``.
+The process of collecting offline required files is automatically handled by FIREWHEEL and using this process is discussed in detail in :ref:`mc_install_cache`.
+These required files should be defined in ``INSTALL/vars.yml`` and the model component installation is assumed to be complete when all ``required_files`` are present.
+If no ``required_files`` are needed, then it can be omitted from ``INSTALL/vars.yml``.
 
 Continuing the example from above, the end result of ``tasks.yml`` is the creation of the file ``{{ mc_dir }}/vm_resources/debs/htop-1_0_2_debs.tgz``.
 Rather than run the tasks (which assume online access), users could provide this file from a cache.
@@ -112,28 +112,11 @@ The ``vars.yml`` file would look like:
 .. code-block:: yaml
   :caption: This is an example ``vars.yml`` file that ensures the final MC state.
 
-  cached_files:
-    - source: "firewheel_repo_linux/ubuntu/ubuntu/htop-1_0_2_debs.tgz"
-      destination: "{{ mc_dir }}/vm_resources/debs/htop-1_0_2_debs.tgz"
+  required_files:
+    - destination: "{{ mc_dir }}/vm_resources/debs/htop-1_0_2_debs.tgz"
 
 
-The full definition for ``cached_files`` is:
-
-.. confval:: source
-
-    Where the file should be located within the cache. To stand
-    For standardization, this should follow the format: ``<package name>/<path to MC>/file``.
-    In the case of git, note that the ``<package name>`` is **NOT** the repository name.
-    For example, if we git cloned the cache for ``dns.dns_objects`` the structure would look like::
-
-      firewheel_repo_dns -- Cloned repository
-      └── firewheel_repo_dns
-          └── dns_objects
-              └── bind9_xenial_debs.tgz
-
-    :type: string
-    :required: true
-
+The full definition for ``required_files`` is:
 
 .. confval:: destination
 
@@ -143,6 +126,15 @@ The full definition for ``cached_files`` is:
     :type: string
     :required: true
 
+.. confval:: source
+
+    Where the file should be located **within** the cache.
+    This should not be set by MC creators, as it defaults to ``{{ mc_name }}/file``.
+    However, it is available to be modified by end-users.
+
+    :type: string
+    :required: false
+    :default: ``{{ mc_name }}/file``
 
 .. confval:: checksum_algorithm checksum_algo
 
@@ -162,18 +154,18 @@ The full definition for ``cached_files`` is:
 
 .. _mc_install_cache:
 
-***********
-Cache Types
-***********
+***************************
+Setting up an Offline Cache
+***************************
 
 Collecting and retrieving files from a cache is automatically supported in Ansible playbooks without MC designer intervention.
 Currently, FIREWHEEL supports caching files in a file server, git repository, or in an Amazon S3 data store.
 If the user sets the necessary settings in the :ref:`firewheel_configuration` for the described types below, then FIREWHEEL will automatically check those locations for the cached file.
 Users are able to set multiple cache types as FIREWHEEL will check any caches for the required file.
 
-.. note::
-
-  Users setting up a cache **MUST** place cached files using the path: ``<package name>/<path to MC>/file``.
+Users setting up a cache should place cached files using the path: ``{{ mc_name }}/{{ item.destination | basename }}``.
+From the example above, the default ``source`` path would be ``linux.ubuntu/debs/htop-1_0_2_debs.tgz``, where ``linux.ubuntu`` is the name of the associated model component.
+Users can optionally modify this path by setting the ``source`` within the model component variables file.
 
 Git Cache
 =========

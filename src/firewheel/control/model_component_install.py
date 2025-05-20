@@ -116,7 +116,9 @@ class ModelComponentInstall:
             return True
         except subprocess.CalledProcessError as exp:
             if exp.returncode == 117:  # Structure needs cleaning
-                console.print(f"[b yellow][cyan]{self.mc.name}[/cyan] is already installed!")
+                console.print(
+                    f"[b yellow][cyan]{self.mc.name}[/cyan] is already installed!"
+                )
                 return True
 
             console.print(f"[b red]Failed to install [cyan]{self.mc.name}[/cyan]!")
@@ -233,6 +235,29 @@ class ModelComponentInstall:
 
         return file_servers
 
+    def setup_vars_access(self, vars_path):
+        """
+        Set up easy access to ansible variable files by symlinking
+        them to :py:data`sys.prefix`/etc/firewheel. The file should have the
+        name ``mc.name_vars.yml``.
+
+        Args:
+            vars_path (str): The path to the ansible variable file.
+        """
+
+        # Store the variable files in etc/firewheel to make
+        # it easier to access/modify them.
+        target_dir = Path(sys.prefix) / "etc" / "firewheel"
+        target_dir.mkdir(parents=True, exist_ok=True)
+
+        # Define the path as "mc.name_vars.yml"
+        symlink_path = target_dir / f"{self.mc.name}_{Path(vars_path).name}"
+
+        try:
+            symlink_path.symlink_to(vars_path)
+        except OSError:
+            self.log.warning("Could not symlink %s to %s", symlink_path, target_dir)
+
     def run_ansible_playbook(self, install_path):
         """
         Run the provided Ansible playbook using ansible-runner.
@@ -268,6 +293,9 @@ class ModelComponentInstall:
         else:
             console.print(wrong_structure_msg)
             raise ValueError(f"Missing vars.yml file in directory {install_path}.")
+
+        # Symlink this to the default config directory
+        self.setup_vars_access(vars_path)
 
         # Check for tasks file.
         tasks_path = None
