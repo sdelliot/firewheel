@@ -8,22 +8,21 @@
 # - ``mc_dir`` -- The full path to the model component directory.
 #
 # In addition to any variables the specific tasks need, the ``vars.yml`` *should* have a
-# ``required_files`` key where a list of the final output files is listed.
-# This is because FIREWHEEL supports caching pre-computed blobs from various resources to
-# enable offline experiment access. The process of collecting (offline) required files is automatically
+# ``required_files`` key where a list of expected output files is listed.
+# This list of required files enables FIREWHEEL to verify that the final expected state of
+# the model component is correct. Additionally, it supports downloading these files from an
+# offline cache. The process of collecting (offline) required files is automatically
 # handled by FIREWHEEL and using this process is discussed in detail in the documentation.
-# These required files should be defined here and the model component installation is assumed
-# to be complete when all ``required_files`` are present.
-# If no ``required_files`` are needed, then it can be omitted from ``INSTALL/vars.yml``.
+# The model component installation is assumed to be complete when all ``required_files`` are
+# present. If no ``required_files`` are needed, then it can be omitted from ``INSTALL/vars.yml``.
 #
 # NOTE: It is imperative that specific versions of software are used.
 # Without being as specific as possible, experimental results will **NOT** be repeatable.
 # We strongly recommend that any changes to software versions are accompanied by a warning and a
 # new model component version.
 ###################################################################################################
-# If there are files that are required to exist, the final file name should
-# be added to this list. Then offline users may use a storage mechanism
-# for quick retrieval, rather than downloading from the Internet each time.
+# If there are files that are required to exist, the final file name must
+# be added to this list. Without that, the model component state may be incorrect.
 required_files:
 #   - destination: "{{mc_dir}}/vm_resources/file.xz"
 #     checksum_algorithm: "sha256"
