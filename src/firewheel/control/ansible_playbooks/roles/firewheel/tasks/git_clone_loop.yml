@@ -21,7 +21,7 @@
 - name: Clone the repository
   ansible.builtin.git:
     repo: "{{ firewheel_server_url }}/{{ firewheel_repo_path }}"
-    dest: "/tmp/fwcache/{{ firewheel_repo_path }}"
+    dest: "{{ ansible_remote_tmp }}/git"
     clone: true
     version: "{{ firewheel_repo_branch }}"
     update: true
@@ -31,12 +31,17 @@
   ansible.builtin.copy:
     src: >
       {% if item.source is defined %}
-        "/tmp/fwcache/{{ firewheel_repo_path }}/{{ item.source }}"
+        "{{ ansible_remote_tmp }}/git/{{ item.source }}"
       {% else %}
-        "/tmp/fwcache/{{ mc_name }}/{{ item.destination | basename }}"
+        "{{ ansible_remote_tmp }}/git/{{ mc_name }}/{{ item.destination | basename }}"
       {% endif %}
     dest: "{{ item.destination }}"
     mode: "0660"
   loop: "{{ required_files }}"
   register: move_result
   ignore_errors: true
+
+- name: Clean up git cache
+  ansible.builtin.file:
+    path: "{{ ansible_remote_tmp }}/git"
+    state: absent

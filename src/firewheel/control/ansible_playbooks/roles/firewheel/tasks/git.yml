@@ -45,8 +45,3 @@
       ansible.builtin.debug:
         msg: "No Git Cache information provided"
       when: git_cache is failed
-
-- name: Clean up git cache
-  ansible.builtin.file:
-    path: "/tmp/fwcache"
-    state: absent
