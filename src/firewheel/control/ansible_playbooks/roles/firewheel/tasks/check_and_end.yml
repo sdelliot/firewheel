@@ -30,7 +30,6 @@
   loop_control:
     index_var: index
 
-# Create installation flag if all required files exist
 - name: Create installation flag if all required files exist
   ansible.builtin.file:
     path: "{{ install_flag }}"
@@ -38,7 +37,6 @@
     mode: "660"
   when: all_files_valid
 
-# Exit successfully if there are no issues with required files
 - name: Exit successfully if there are no issues with required files
   ansible.builtin.meta: end_play
   when: all_files_valid

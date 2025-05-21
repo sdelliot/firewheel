@@ -7,7 +7,6 @@
 # For example: https://user:password@server.com/url/cache/path/file.txt
 # The user will need to provide all relevant information.
 # An example configuration is shown below:
-# The user should provide the following:
 #
 # file_servers:
 #   - url: "http://example.com"
