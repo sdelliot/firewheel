@@ -11,6 +11,7 @@ When users use the :ref:`helper_mc_generate` Helper, a new INSTALL directory is 
 
 
 When a repository is installed via the :ref:`helper_repository_install` Helper, users have the option to can automatically run each MCs INSTALL script using the ``-s`` flag (see :ref:`helper_repository_install` for more details).
+Alternatively, if an uninstalled model component is used in a firewheel :ref:`helper_experiment`, then it will prompt the user to install the model component.
 
 *****************
 Design Principles
@@ -18,9 +19,9 @@ Design Principles
 
 We recommend that the following principles are adhered to when installing a model component.
 
-1. `Idempotence <https://en.wikipedia.org/wiki/Idempotence>`_ -- The file(s) should be capable of running multiple times without causing issues. This is a core tenant of Ansible and a strong motivator why Ansible Playbooks are the preferred method.
-2. **Reproducibility** -- It is critical that users will download the exact same data that was originally intended by the Model Component creators.
-   If the data/packages differ, than there is a strong possibility that the experimental outcomes will differ and could produce unintended consequences.
+1. `Idempotence <https://en.wikipedia.org/wiki/Idempotence>`_ -- The file(s) should be capable of running multiple times without causing issues. This is a core tenant of Ansible and a strong motivator why Ansible playbooks are the preferred method.
+2. **Reproducibility** -- It is critical that users download the exact same data that was originally intended by the Model Component creators.
+   If the data/packages differ, then there is a strong possibility that the experimental outcomes will differ and could produce unintended consequences.
    Therefore, we strongly recommend that MC creators link to exact versions of software to download, rather than an automatically updating link.
    For example, if the MC was supposed to install a GitLab runner:
 
@@ -100,13 +101,13 @@ FIREWHEEL will automatically provide the following variables to the Ansible play
 - ``mc_dir`` -- The full path to the model component directory.
 
 In addition to any variables the specific tasks need, the ``vars.yml`` *should* have a ``required_files`` key where a list of the final output files is listed.
-This is because FIREWHEEL supports caching pre-computed blobs from various resources to enable offline experiment access.
+This is because the model component installation is assumed to be complete when all ``required_files`` are present.
+As an added benefit, FIREWHEEL supports caching pre-computed blobs from various resources to enable offline experiment access and the ``required_files`` supports this feature.
 The process of collecting offline required files is automatically handled by FIREWHEEL and using this process is discussed in detail in :ref:`mc_install_cache`.
-These required files should be defined in ``INSTALL/vars.yml`` and the model component installation is assumed to be complete when all ``required_files`` are present.
 If no ``required_files`` are needed, then it can be omitted from ``INSTALL/vars.yml``.
 
 Continuing the example from above, the end result of ``tasks.yml`` is the creation of the file ``{{ mc_dir }}/vm_resources/debs/htop-1_0_2_debs.tgz``.
-Rather than run the tasks (which assume online access), users could provide this file from a cache.
+Therefore, this file is *required* to exist for the model component to be completely installed.
 The ``vars.yml`` file would look like:
 
 .. code-block:: yaml
@@ -130,13 +131,13 @@ The full definition for ``required_files`` is:
 
     Where the file should be located **within** the cache.
     This should not be set by MC creators, as it defaults to ``{{ mc_name }}/file``.
-    However, it is available to be modified by end-users.
+    However, it is available to be modified by end-users if desired.
 
     :type: string
     :required: false
     :default: ``{{ mc_name }}/file``
 
-.. confval:: checksum_algorithm checksum_algo
+.. confval:: checksum_algorithm
 
     Algorithm to determine checksum of file.
     Must be supported by `ansible.builtin.stat <https://docs.ansible.com/ansible/latest/collections/ansible/builtin/stat_module.html#parameter-checksum_algorithm>`_ (e.g, ``"sha1"``, ``"sha256"``, etc.).
@@ -160,12 +161,12 @@ Setting up an Offline Cache
 
 Collecting and retrieving files from a cache is automatically supported in Ansible playbooks without MC designer intervention.
 Currently, FIREWHEEL supports caching files in a file server, git repository, or in an Amazon S3 data store.
-If the user sets the necessary settings in the :ref:`firewheel_configuration` for the described types below, then FIREWHEEL will automatically check those locations for the cached file.
+If the user sets the necessary settings in the :ref:`firewheel_configuration` for the described types below, then FIREWHEEL will automatically check those locations for any model component ``required_files``.
 Users are able to set multiple cache types as FIREWHEEL will check any caches for the required file.
 
 Users setting up a cache should place cached files using the path: ``{{ mc_name }}/{{ item.destination | basename }}``.
-From the example above, the default ``source`` path would be ``linux.ubuntu/debs/htop-1_0_2_debs.tgz``, where ``linux.ubuntu`` is the name of the associated model component.
-Users can optionally modify this path by setting the ``source`` within the model component variables file.
+From the example above, the default ``source`` path would be ``linux.ubuntu/htop-1_0_2_debs.tgz``, where ``linux.ubuntu`` is the name of the associated model component.
+Users can optionally modify this path by setting the :confval:`source` within the model component variables file.
 
 Git Cache
 =========
@@ -188,6 +189,9 @@ An example of this configuration is shown below:
         repositories:
           - path: "emulytics/firewheel/mc_repo3"
             branch: "feature-branch"
+      - server_url: "https://user:ACCESS-TOKEN@github.com/"
+        repositories:
+          - path: "firewheel/mc_repo4"
 
 .. confval:: git_servers
 
@@ -208,7 +212,7 @@ An example of this configuration is shown below:
         .. note::
 
             If an access token is being used, the user can specify it as part of the URL.
-            For example: ``https://<token>@github.com/user/repo.git``
+            For example: ``https://user:ACCESS-TOKEN@github.com/user/repo.git``
 
     .. confval:: repositories
 
@@ -219,7 +223,7 @@ An example of this configuration is shown below:
 
         .. confval:: path
 
-            The path to the git repository containing the cached files. SCP-style URLs are not supported.
+            The path to the git repository containing the cached files. SCP-style URLs are **not** supported.
             When using the ``ssh://`` protocol, please use the following format: ``ssh://username@example.com``.
 
             :type: string
@@ -248,13 +252,13 @@ An example of this configuration is shown below:
 
   ansible:
     s3_endpoints:
-      - s3_endpoint: "s3.us-east-1.amazonaws.com"
+      - s3_endpoint: "https://s3.us-east-1.amazonaws.com"
         aws_access_key_id: "AKIAIOSFODNN7EXAMPLE"
         aws_secret_access_key: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
         buckets:
           - "firewheel_bucket1"
           - "firewheel_bucket2"
-      - s3_endpoint: "s3.us-east-2.amazonaws.com"
+      - s3_endpoint: "https://custom-s3-endpoint:8000"
         aws_access_key_id: "AJIAIOSFODNN7EXAMPLE"
         aws_secret_access_key: "wKalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
         buckets:
@@ -292,7 +296,7 @@ An example of this configuration is shown below:
 
     .. confval:: s3_buckets
 
-        A list of buckets associated with the S3 server. Each bucket is represented as string.
+        A list of buckets associated with the S3 server where each bucket is represented as a string.
 
         :type: list
         :required: true
@@ -343,7 +347,7 @@ An example of this configuration is shown below:
 
     .. confval:: cache_paths
 
-        A list of intermediate paths to the FIREWHEEL cache. For example in the URL ``http://example.com/files/firewheel/firewheel_repo_linux/ubuntu/ubuntu/htop-1_0_2_debs.tgz`` then ``url="http://example.com"``,  ``url_cache_path="files/firewheel"``, and the ``source=firewheel_repo_linux/ubuntu/ubuntu/htop-1_0_2_debs.tgz``.
+        A list of intermediate paths to the FIREWHEEL cache. For example in the URL ``http://example.com/files/firewheel/firewheel_repo_linux/linux.ubuntu/htop-1_0_2_debs.tgz`` then ``url="http://example.com"``,  ``url_cache_path="files/firewheel/firewheel_repo_linux"``, and the ``source=linux.ubuntu/htop-1_0_2_debs.tgz``.
         If no cache path is required, please use a list with empty string entry as the value.
 
         .. code-block:: yaml
