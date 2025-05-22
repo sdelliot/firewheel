@@ -1,7 +1,7 @@
 ---
 ###################################################################################################
 # This playbook will loop through all values in the `required_files` variable
-# and collected those cached files from an S3 instance.
+# and collected those files from an S3 instance.
 # The user will need to provide all relevant information.
 # An example configuration is shown below:
 #
