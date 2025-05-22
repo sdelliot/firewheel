@@ -14,11 +14,11 @@
 # Example tasks
 #- name: Create directory for downloading HTOP
 #  ansible.builtin.file:
-#    path: "{{mc_dir}}/vm_resources"
+#    path: "{{ '{{' }} mc_dir {{ '}}' }}/vm_resources"
 #    state: directory
 #
 #- name: Download htop Package
 #  ansible.builtin.get_url:
 #    url: "http://archive.ubuntu.com/ubuntu/pool/universe/h/htop/htop_1.0.2-3_amd64.deb"
-#    dest: "{{mc_dir}}/vm_resources/htop_1.0.2-3_amd64.deb"
+#    dest: "{{ '{{' }} mc_dir {{ '}}' }}/vm_resources/htop_1.0.2-3_amd64.deb"
 #    checksum: "sha256:0311d8a26689935ca53e8e9252cb2d95a1fdc2f8278f4edb5733f555dad984a9"
