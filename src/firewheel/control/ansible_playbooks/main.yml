@@ -4,19 +4,18 @@
 # Description:
 #   This Ansible playbook is designed to install extra dependencies for a model component
 #   such as file retrieval or data processing. It does this by first checking if the necessary
-#   files are available via a cache mechanism, including Git, S3, and a standard file server (via a URL)
-#   If a cache is not available, than it checks for online access and, if needed executes the tasks
-#   that are provided in the model component ``INSTALL`` file.
+#   files are available via a cache mechanism, including Git, S3, and a standard file server
+#   (via a URL). If a cache is not available, than it provides a naive check for online access
+#   and, if needed executes the tasks that are provided in the model component
+#   ``INSTALL/tasks.yml`` file.
 #
 #   The playbook performs the following steps:
 #   1. Imports variables from the specified model component.
-#   2. Checks for the existence of required files using the 'firewheel' role.
-#   3. Attempts to retrieve files from cache using the 'firewheel' role.
-#   4. Checks the online status of the system by pinging an external address.
-#   5. If all cache retrieval methods fail and the system is offline, it raises a failure message.
-#   6. If the system is online, it includes installation tasks.
-#   7. Performs a final check for cached files and raises a failure message if any required
-#      files are missing.
+#   2. Attempts to retrieve required files from cache using the 'firewheel' role.
+#   3. Checks the online status of the system by pinging 8.8.8.8.
+#   4. If all cache retrieval methods fail and the system is offline, it raises a failure message.
+#   5. If the system is online, it runs the model component-provided tasks.
+#   6. Performs a final check for required files.
 ###################################################################################################
 - name: "Install Model Component: {{ mc_name }}"
   hosts: localhost
