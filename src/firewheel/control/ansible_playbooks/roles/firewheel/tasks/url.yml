@@ -15,7 +15,7 @@
 #     cache_paths:
 #       - "some/intermediate/path"
 #       - "another/path"
-#   - url: "http://example2.com"
+#   - url: "https://user:password@server.com"
 #     use_proxy: True
 #     validate_certs: False
 #     cache_paths:

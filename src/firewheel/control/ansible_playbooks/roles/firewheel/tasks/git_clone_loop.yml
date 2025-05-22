@@ -1,7 +1,7 @@
 ---
 ###################################################################################################
 # This playbook will clone a Git repository and move specified cached files
-# If you are using an access token, you can specify it in the `git_server` URL
+# If you are using an access token, you can specify it in the `server_url`.
 # For example: https://<token>@github.com/user/repo.git
 # The user will need to provide all relevant information.
 # An example configuration is shown below:
@@ -16,6 +16,9 @@
 #     repositories:
 #       - path: "emulytics/firewheel/mc_repo3"
 #         branch: "feature-branch"
+#   - server_url: "https://<token>@github.com/"
+#     repositories:
+#       - path: "firewheel/mc_repo4"
 ###################################################################################################
 
 - name: Clone the repository
