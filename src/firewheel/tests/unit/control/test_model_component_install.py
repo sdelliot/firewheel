@@ -152,15 +152,15 @@ def test_has_shebang_valid(mock_open, install_component):
 @patch("firewheel.control.model_component_install.Path.open", new_callable=MagicMock)
 def test_has_shebang_invalid(mock_open, install_component):
     """
-    Test the :py:meth:`has_shebang` method with a valid Ansible playbook.
+    Test the :py:meth:`has_shebang` method with a bash script without a shebang.
 
     Args:
         mock_open (MagicMock): Mock for the :py:meth:`pathlib.Path.open` method.
         install_component (ModelComponentInstall): The instance of :py:class:`ModelComponentInstall` to test.
     """
-    # Mock the behavior of the file read to simulate invalid YAML
+    # Mock the behavior of the file read to simulate an invalid bash script
     mock_file = MagicMock()
-    mock_file.read.return_value = "---\n- hosts: localhost\n  vars:\n    cached_files: [{'destination': 'file.txt'}]"
+    mock_file.read.return_value = "echo 'testing'"
     mock_open.return_value.__enter__.return_value = mock_file
 
     result = install_component.has_shebang(Path("/mock/path/INSTALL"))
