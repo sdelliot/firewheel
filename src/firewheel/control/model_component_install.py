@@ -18,10 +18,10 @@ class InstallPrompt(PromptBase[str]):
     response_type = str
     msg = (
         "[prompt.invalid.choice]Please select one of the available options:\n"
-        "y - yes, install execute this script\n"
-        "n - no, do not execute this script\n"
-        "v - view, see the script text\n"
-        "vc - view color, see the script text with color support, must use "
+        "y - yes, continue to install model component\n"
+        "n - no, do not install model component\n"
+        "v - view, see the INSTALL text\n"
+        "vc - view color, see the INSTALL text with color support, must use "
         "a system pager which supports this behavior (e.g. PAGER='less -R')\n"
         "q - quit, exit immediately\n"
     )
@@ -51,10 +51,10 @@ class ModelComponentInstall:
 
     When installing a Model Component, users will have a variety of choices to select:
 
-        - ``y`` - yes, install execute this script
-        - ``n`` - no, do not execute this script
-        - ``v`` - view, see the script text
-        - ``vc`` - view color, see the script text with color support, must use a system pager
+        - ``y`` - yes, continue to install model component
+        - ``n`` - no, do not install model component
+        - ``v`` - view, see the INSTALL text
+        - ``vc`` - view color, see the INSTALL text with color support, must use a system pager
           which supports this behavior (e.g. ``PAGER='less -R'``)
         - ``q`` - quit, exit immediately
 
@@ -101,7 +101,7 @@ class ModelComponentInstall:
         )
 
         # Make the install file executable
-        # We assume that it can be run with a "shebang" line
+        # At this point it can be run with a "shebang" line
         install_path.chmod(
             install_path.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH
         )
@@ -145,8 +145,7 @@ class ModelComponentInstall:
         return script.startswith("#!")
 
     def flatten_git_config(self):
-        """Flatten the Git configuration from the FIREWHEEL ansible config.
-
+        """
         This method extracts Git server information from the FIREWHEEL configuration
         and flattens it into a list of dictionaries, each containing details about
         the Git server and its associated repositories.
@@ -171,8 +170,7 @@ class ModelComponentInstall:
         return git_servers
 
     def flatten_s3_config(self):
-        """Flatten the S3 configuration from the FIREWHEEL ansible config.
-
+        """
         This method extracts S3 endpoint information from the FIREWHEEL configuration
         and flattens it into a list of dictionaries, each containing details about
         the S3 endpoint, including the endpoint URL, AWS access keys, and associated
@@ -204,8 +202,7 @@ class ModelComponentInstall:
         return s3_endpoints
 
     def flatten_file_server_config(self):
-        """Flatten the file server configuration from the FIREWHEEL ansible config.
-
+        """
         This method extracts file server information from the FIREWHEEL configuration
         and flattens it into a list of dictionaries, each containing details about
         the file server and its associated cache paths.
@@ -260,7 +257,8 @@ class ModelComponentInstall:
 
     def run_ansible_playbook(self, install_path):
         """
-        Run the provided Ansible playbook using ansible-runner.
+        Run the provided Ansible playbook using
+        `ansible-runner <https://pypi.org/project/ansible-runner/>`_.
 
         Args:
             install_path (pathlib.Path): The path of the Ansible playbook directory.
@@ -284,7 +282,7 @@ class ModelComponentInstall:
             console.print(wrong_structure_msg)
             raise ValueError("Invalid INSTALL file.")
 
-        # Check for vars file.
+        # Check for variables file.
         vars_path = None
         if Path(install_path / "vars.yml").exists():
             vars_path = Path(install_path / "vars.yml")
@@ -332,7 +330,7 @@ class ModelComponentInstall:
             "ansible_playbooks/main.yml"
         )
 
-        # Run the Ansible playbooks
+        # Run the Ansible playbook
         ret = ansible_runner.run(
             private_data_dir=str(install_path.parent),
             playbook=str(playbook_path),
@@ -345,11 +343,9 @@ class ModelComponentInstall:
                 f"[b green]Successfully executed Ansible playbook [cyan]{install_path}[/cyan]!"
             )
             return True
-        else:
-            console.print(
-                f"[b red]Ansible playbook [cyan]{install_path}[/cyan] failed: {ret}."
-            )
-            return False
+
+        console.print(f"[b red]Ansible playbook [cyan]{install_path}[/cyan] failed: {ret}.")
+        return False
 
     def run_install_script(self, insecure=False):
         """
