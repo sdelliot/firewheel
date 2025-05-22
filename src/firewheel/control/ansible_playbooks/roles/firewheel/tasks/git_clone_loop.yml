@@ -29,12 +29,7 @@
 
 - name: Attempt to move each cached file
   ansible.builtin.copy:
-    src: >
-      {% if item.source is defined %}
-        "{{ ansible_remote_tmp }}/git/{{ item.source }}"
-      {% else %}
-        "{{ ansible_remote_tmp }}/git/{{ mc_name }}/{{ item.destination | basename }}"
-      {% endif %}
+    src: "{{ ansible_remote_tmp }}/git/{{ item.source if item.source is defined else mc_name + '/' + item.destination | basename }}"
     dest: "{{ item.destination }}"
     mode: "0660"
   loop: "{{ required_files }}"

@@ -24,12 +24,7 @@
     - name: Download cached files from S3
       amazon.aws.s3_object:
         bucket: "{{ firewheel_s3_bucket }}"
-        object: >
-          {% if item.source is defined %}
-            "{{ item.source }}"
-          {% else %}
-            "{{ mc_name }}/{{ item.destination | basename }}"
-          {% endif %}
+        object: "{{ item.source if item.source is defined else mc_name + '/' + item.destination | basename }}"
         dest: "{{ item.destination }}"
         mode: get
         aws_access_key: "{{ firewheel_aws_access_key_id }}"
