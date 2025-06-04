@@ -10,7 +10,7 @@ Alternatively, ``INSTALL`` can be an executable script (as denoted by a `shebang
 When users use the :ref:`helper_mc_generate` Helper, a new INSTALL directory is created with sample ``tasks.yml`` and ``vars.yml`` automatically included.
 
 
-When a repository is installed via the :ref:`helper_repository_install` Helper, users have the option to can automatically run each MCs INSTALL script using the ``-s`` flag (see :ref:`helper_repository_install` for more details).
+When a repository is installed via the :ref:`helper_repository_install` Helper, users have the option to automatically run each MC's INSTALL script using the ``-s`` flag (see :ref:`helper_repository_install` for more details).
 Alternatively, if an uninstalled model component is used in a firewheel :ref:`helper_experiment`, then it will prompt the user to install the model component.
 
 *****************
