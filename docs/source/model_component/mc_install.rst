@@ -5,7 +5,7 @@ Model Component INSTALL file
 ############################
 
 Some Model Components may require additional Python packages to be installed within FIREWHEEL's virtual environment or for data to be downloaded.
-In this case, the Model Component can have an ``INSTALL`` directory, which contains a valid `Ansible Playbook <https://docs.ansible.com/ansible/latest/playbook_guide/playbooks_intro.html>`_ (recommend method).
+In this case, the Model Component can have an ``INSTALL`` directory, which contains a valid `Ansible Playbook <https://docs.ansible.com/ansible/latest/playbook_guide/playbooks_intro.html>`_ (recommended method).
 Alternatively, ``INSTALL`` can be an executable script (as denoted by a `shebang <https://en.wikipedia.org/wiki/Shebang_(Unix)>`_ line), though this is not recommend and support will be removed in a future releases.
 When users use the :ref:`helper_mc_generate` Helper, a new INSTALL directory is created with sample ``tasks.yml`` and ``vars.yml`` automatically included.
 
