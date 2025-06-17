@@ -344,7 +344,7 @@ class ModelComponentInstall:
             )
             return True
 
-        console.print(f"[b red]Ansible playbook [cyan]{install_path}[/cyan] failed: {ret}.")
+        console.print(f"[b red]Ansible playbook [cyan]{install_path}[/cyan] failed.")
         return False
 
     def run_install_script(self, insecure=False):
