@@ -150,6 +150,10 @@ The full definition for ``required_files`` is:
 
     The hash of the file.
 
+    .. warning::
+
+      While having a `reproducible build (https://reproducible-builds.org/)`_ process (and a stable checksum/hash) is ideal for cyber experimentation, there are many challenges to making this a reality. Notably, many `archive tools <https://reproducible-builds.org/docs/archives/>` include metadata such as timestamps that make it difficult to create an identical checksum each time. Unless these issues have been accounted for within ``tasks.yml``, this field should be avoided. For more information see: https://reproducible-builds.org/.
+
     :type: string
     :required: false
 
