@@ -35,13 +35,13 @@
 
 - name: Check for required files in the repository
   ansible.builtin.stat:
-    path: "{{ ansible_remote_tmp }}/git/{{ item }}"
+    path: "{{ ansible_remote_tmp }}/git/{{ item.source if item.source is defined else mc_name + '/'+ item.destination | basename }}"
   loop: "{{ required_files }}"
   register: file_check_results
 
 - name: LFS pull required files
   ansible.builtin.shell:
-    cmd: "git lfs pull --include={{ item }}"
+    cmd: "git lfs pull --include={{ item.source if item.source is defined else mc_name + '/'+ item.destination | basename }}"
     chdir: "{{ ansible_remote_tmp }}/git"
   loop: "{{ required_files }}"
   when: "item in file_check_results.results | selectattr('stat.exists', 'equalto', True) | map(attribute='item') | list"
