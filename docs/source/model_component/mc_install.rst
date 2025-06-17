@@ -170,7 +170,16 @@ Users can optionally modify this path by setting the :confval:`source` within th
 
 Git Cache
 =========
-If users plan to use a git server for the Model Component cache, they can specify the following options in the :ref:`firewheel_configuration` under the ``ansible`` key.
+Users can use `git <https://git-scm.com>`__ repositories for caching model component binaries.
+To use this, users will need to install  `git <https://git-scm.com>`__ and `git-lfs <https://git-lfs.com>`__ on their :ref:`cluster-control-node` to appropriately clone their repositories.
+This caching mechanism is set up so that repositories are initially cloned *without* downloading any large file storage (LFS) for performance reasons.
+Then if a ``required_file`` is identified without that repository, the file is subsequently downloaded and moved into place.
+
+.. note::
+
+  Users may also need to execute ``git lfs install`` to set up Git LFS for their user account.
+
+If users plan to use git repositories for the Model Component cache, they should specify the following options in the :ref:`firewheel_configuration` under the ``ansible`` key.
 
 An example of this configuration is shown below:
 
