@@ -23,29 +23,13 @@ stages:
   - deploy
 
 ###############################
-# Functional/Performance Testings
+# Performance Testings
 #
 # These jobs create an environment for running a stress-test for FIREWHEEL's
 # performance or enabling functionality-based tests for various FIREWHEEL
 # model components.
 #
 ###############################
-
-functional-test:
-  before_script:
-    - pushd /opt/firewheel/
-    - python3.10 -m venv venv
-    - source /opt/firewheel/venv/bin/activate
-    - popd
-    - !reference [.install_firewheel, script]
-    - !reference [.configure_firewheel, script]
-    - !reference [.install_mcs, script]
-  stage: test
-  needs: []
-  tags:
-    - ubuntu2204
-  script:
-    - echo "This placeholder enables functional testing of various model components."
 
 performance-ubuntu2204:
   stage: test
