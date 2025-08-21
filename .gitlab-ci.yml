@@ -25,9 +25,8 @@ stages:
 ###############################
 # Performance Testings
 #
-# These jobs create an environment for running a stress-test for FIREWHEEL's
-# performance or enabling functionality-based tests for various FIREWHEEL
-# model components.
+# These anchors create an environment for running a stress-test for FIREWHEEL's
+# performance.
 #
 ###############################
 
