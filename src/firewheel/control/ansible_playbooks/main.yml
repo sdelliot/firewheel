@@ -70,6 +70,19 @@
         msg: "All cache file methods have failed and system does not appear to be online. Please provide valid cache information."
       when: (ping_result.rc | default(0)) != 0
 
+    # Process each package in INSTALL/pkgs
+    - name: Find package files in INSTALL/pkgs
+      ansible.builtin.find:
+        paths: "{{ pkgs_dir }}"
+        patterns: "*.yml"
+      register: pkg_files
+
+    - name: Process each package
+      ansible.builtin.include_tasks: roles/firewheel/tasks/pkgs_tasks.yml
+      vars:
+        pkg_file: "{{ item.path }}"
+      loop: "{{ pkg_files.files }}"
+
     # If we don't have any cached files and are online
     # then we need to run the MC Install tasks
     - name: "Include tasks (if needed) for: {{ mc_name }}"
