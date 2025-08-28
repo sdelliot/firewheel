@@ -21,7 +21,7 @@
 #     cache_paths:
 #       - "secondpath/intermediate/path"
 ###################################################################################################
-- name: Attempt to pull cache from URL if offline
+- name: Attempt to pull from URL cache
   block:
     - name: Check if URL information is provided
       ansible.builtin.assert:

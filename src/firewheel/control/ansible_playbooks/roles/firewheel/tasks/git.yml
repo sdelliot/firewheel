@@ -21,7 +21,7 @@
 #       - path: "firewheel/mc_repo4"
 ###################################################################################################
 
-- name: Clone Git repositories and move cached files
+- name: Attempt to use Git cache
   block:
     - name: Check if Git servers information is provided
       ansible.builtin.assert:

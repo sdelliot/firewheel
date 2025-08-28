@@ -23,9 +23,9 @@
 #       - "secondpath/from/file"
 ###################################################################################################
 
-- name: Download Files
+- name: Trying URL cache
   block:
-    - name: Download cached files from a URL
+    - name: "Attempting to download cached files from: {{ firewheel_url }}"
       ansible.builtin.get_url:
         url: "{{ firewheel_url }}/{{ firewheel_cache_path }}/{{ item.source if item.source is defined else mc_name + '/' + item.destination | basename }}"
         dest: "{{ item.destination }}"

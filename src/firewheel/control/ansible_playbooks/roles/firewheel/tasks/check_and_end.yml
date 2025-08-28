@@ -10,7 +10,7 @@
   ansible.builtin.set_fact:
     all_files_valid: true
 
-- name: Ensure all required file destinations exist
+- name: Inspecting `required_files`
   ansible.builtin.stat:
     path: "{{ item.destination }}"
     checksum_algorithm: "{{ item.checksum_algorithm | default(item.checksum_algo | default('sha1')) }}"
@@ -18,7 +18,7 @@
   register: required_files_check
   loop: "{{ required_files }}"
 
-- name: Verify any existing checksums for required files
+- name: Verifying checksums for required files (if needed)
   ansible.builtin.set_fact:
     all_files_valid: false
   when:
@@ -29,7 +29,7 @@
   loop_control:
     index_var: index
 
-- name: Check for missing files
+- name: Identify missing required files
   ansible.builtin.set_fact:
     all_files_valid: false
   when:

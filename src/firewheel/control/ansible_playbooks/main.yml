@@ -25,17 +25,17 @@
       ansible.builtin.include_vars:
         file: "{{ vars_path }}"
 
-    - name: Check for needed files
+    - name: Checking for required files
       ansible.builtin.include_role:
         name: firewheel
         tasks_from: check_and_end.yml
 
-    - name: Ensure destination directory exists
+    - name: Create all destination directories
       ansible.builtin.file:
         path: "{{ item.destination | dirname }}"
         state: directory
         mode: "0755"
-        loop: "{{ required_files }}"
+      loop: "{{ required_files }}"
 
     - name: Checking git cache
       ansible.builtin.include_role:
@@ -57,7 +57,7 @@
         - (git_clone_result is not defined) or (git_clone_result is failed)
         - (s3_download_result is not defined) or (s3_download_result is failed)
 
-    - name: Check for needed files
+    - name: Checking for required files
       ansible.builtin.include_role:
         name: firewheel
         tasks_from: check_and_end.yml
@@ -83,7 +83,7 @@
       ansible.builtin.include_tasks: "{{ tasks_path }}"
       when: (ping_result.rc | default(1)) == 0
 
-    - name: Check for needed files
+    - name: Checking for required files
       ansible.builtin.include_role:
         name: firewheel
         tasks_from: check_and_end.yml

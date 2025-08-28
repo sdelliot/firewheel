@@ -33,7 +33,7 @@
     GIT_LFS_SKIP_SMUDGE: "1"
   register: git_clone_result
 
-- name: Check for required files in the repository
+- name: "Identfying files in {{ firewheel_repo_path }}"
   ansible.builtin.stat:
     path: "{{ ansible_remote_tmp }}/git/{{ item.source if item.source is defined else mc_name + '/'+ item.destination | basename }}"
   loop: "{{ required_files }}"

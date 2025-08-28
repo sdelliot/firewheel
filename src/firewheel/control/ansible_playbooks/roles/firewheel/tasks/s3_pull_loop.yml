@@ -19,9 +19,9 @@
 #       - "firewheel_bucket3"
 ###################################################################################################
 
-- name: Download S3 Files
+- name: Trying S3 cache
   block:
-    - name: Download cached files from S3
+    - name: "Attempt to download cached files from {{ firewheel_s3_bucket }}"
       amazon.aws.s3_object:
         bucket: "{{ firewheel_s3_bucket }}"
         object: "{{ item.source if item.source is defined else mc_name + '/' + item.destination | basename }}"

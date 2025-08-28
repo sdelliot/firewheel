@@ -20,7 +20,7 @@
 ###################################################################################################
 
 
-- name: Attempt to pull cache from S3 if Git fails
+- name: Attempt to use S3 cache
   block:
     - name: Check if S3 information is provided
       ansible.builtin.assert:
