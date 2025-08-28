@@ -30,6 +30,13 @@
         name: firewheel
         tasks_from: check_and_end.yml
 
+    - name: Ensure destination directory exists
+      ansible.builtin.file:
+        path: "{{ item.destination | dirname }}"
+        state: directory
+        mode: "0755"
+        loop: "{{ required_files }}"
+
     - name: Checking git cache
       ansible.builtin.include_role:
         name: firewheel
