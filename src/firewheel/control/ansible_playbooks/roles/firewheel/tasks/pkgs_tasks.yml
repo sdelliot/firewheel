@@ -2,7 +2,7 @@
 ###################################################################################################
 # Tasks File: pkgs_tasks.yml
 # Description:
-#   **This is not a replacement for `required_files`. This replaces a common download pattern for 
+#   **This is not a replacement for `required_files`. This replaces a common download pattern for
 #   external packages and packages included here should be entered into required_files separately.**
 #   This Ansible tasks file is designed to process individual packages defined in the `INSTALL/pkgs`
 #   directory. Each package is represented as a `.yml` file containing metadata about the package,
@@ -40,6 +40,7 @@
 - name: Load package variables
   ansible.builtin.include_vars:
     file: "{{ pkg_file }}"
+  failed_when: pkg_file is not defined or pkg_file|length == 0
 
 - name: Set default target_subdir if not specified
   ansible.builtin.set_fact:
@@ -47,23 +48,27 @@
 
 - name: Create target subdirectory
   ansible.builtin.file:
-    path: "{{ mc_dir }}/{{ target_subdir }}"
+    path: "{{ mc_dir }}/{{ target_subdir }}/{{ name }}"
     state: directory
 
-- name: Download and verify files for package: {{ name }}
+- name: "Download and verify files for package: {{ name }}"
   ansible.builtin.get_url:
     url: "{{ item.url }}"
     dest: "{{ mc_dir }}/{{ target_subdir }}/{{ name }}/{{ item.dest }}"
     checksum: "sha256:{{ item.sha256 }}"
   loop: "{{ files }}"
+  when: files is defined and files|length > 0
+  failed_when: item.url is not defined or item.sha256 is not defined
 
 - name: Compress package directory into tarball
   ansible.builtin.archive:
     path: "{{ mc_dir }}/{{ target_subdir }}/{{ name }}"
     dest: "{{ mc_dir }}/{{ target_subdir }}/{{ target }}"
     format: gz
+  when: target is defined and target|length > 0
 
 - name: Remove package directory
   ansible.builtin.file:
     path: "{{ mc_dir }}/{{ target_subdir }}/{{ name }}"
     state: absent
+  when: target_subdir is defined and name is defined and name|length > 0
