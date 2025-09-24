@@ -5,131 +5,10 @@
 # on a variety of operating systems and versions of
 # Python.
 #
-# It makes heavy use of YAML Anchors and extends to save space.
-# see: https://docs.gitlab.com/ce/ci/yaml/README.html#anchors
-#
 ###############################
 
-###############################
-# Change pip's cache directory to be inside the project
-# directory since we can only cache local items.
-###############################
-variables:
-  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
-  RUNNER_AFTER_SCRIPT_TIMEOUT: 3h
-
-
-###############################
-# Pip's cache doesn't store the python packages
-# https://pip.pypa.io/en/stable/reference/pip_install/#caching
-#
-# If you want to also cache the installed packages, you have to install
-# them in a virtualenv and cache it as well.
-###############################
-cache:
-  paths:
-    - "$CI_PROJECT_DIR/.cache/pip"
-    - venv/
-    - .cache/pip
-
-
-###############################
-# Setting up before_script anchors to speed up the exectution of
-# pipeline jobs which do not require each component.
-# See: https://docs.gitlab.com/ee/ci/yaml/#yaml-anchors-for-before_script-and-after_script
-#
-# This includes:
-# * create_venv: Creating a Python 3.9 virtual environment
-# * install_firewheel: Install FIREWHEEL and any dependencies.
-# * configure_firewheel: Configure FIREWHEEL for use by the job.
-# * install_mcs: Clone the base and linux Model Component repositories
-#   so that the functional tests can run.
-###############################
-.create_venv_docker: &create_venv_docker
-  - python --version ; pip --version
-  - pip install $PIP_ARGS virtualenv
-  - virtualenv venv
-  - source venv/bin/activate
-
-.create_venv: &create_venv
-  - pushd /opt/firewheel/
-  - python3.9 -m venv venv
-  - source /opt/firewheel/venv/bin/activate
-  - popd
-
-.install_firewheel_docker: &install_firewheel_docker
-  - python -m pip install $PIP_ARGS -U build setuptools pip
-  - python -m build
-  - python -m pip install -e .[dev]
-
-.install_firewheel: &install_firewheel
-  - sudo killall minimega  # Make sure minimega is not running
-  - sudo systemctl restart minimega
-  - *install_firewheel_docker
-
-.set_config: &set_config
-  - firewheel config set -s system.default_output_dir "$(pwd)/logs"
-  - firewheel config set -s cluster.compute $(hostname)
-  - firewheel config set -s cluster.control $(hostname)
-  - firewheel config set -s discovery.hostname 127.0.0.1
-  - firewheel config set -s grpc.hostname 127.0.0.1
-  - firewheel config set -s minimega.experiment_interface lo
-  - firewheel config set -s minimega.install_dir /opt/minimega
-  - firewheel config set -s python.venv $(pwd)/venv
-  - firewheel config set -s python.bin python3
-
-.configure_firewheel_docker: &configure_firewheel_docker
-  - *set_config
-  - firewheel config set -s system.default_group root
-  - python ./src/firewheel/lib/grpc/firewheel_grpc_server.py &
-
-.configure_firewheel: &configure_firewheel
-  - *set_config
-  - firewheel init
-  - firewheel sync
-  - firewheel restart hard
-
-.install_mcs_docker: &install_mcs_docker
-  - mkdir model_components
-  - pip install $PIP_ARGS firewheel-repo-base firewheel-repo-tutorials
-  - pushd model_components
-  - git clone https://gitlab-ci-token:${CI_JOB_TOKEN}@${CI_SERVER_HOST}/firewheel/model_components/linux.git
-  - git clone https://gitlab-ci-token:${CI_JOB_TOKEN}@${CI_SERVER_HOST}/firewheel/model_components/utilities.git
-  - git clone https://gitlab-ci-token:${CI_JOB_TOKEN}@${CI_SERVER_HOST}/firewheel/model_components/layer2.git
-  - git clone https://gitlab-ci-token:${CI_JOB_TOKEN}@${CI_SERVER_HOST}/firewheel/model_components/ntp.git
-  - git clone https://gitlab-ci-token:${CI_JOB_TOKEN}@${CI_SERVER_HOST}/firewheel/model_components/dns.git
-  - git clone https://gitlab-ci-token:${CI_JOB_TOKEN}@${CI_SERVER_HOST}/firewheel/model_components/vyos.git
-  - firewheel repository install linux
-  - firewheel repository install utilities
-  - firewheel repository install layer2
-  - firewheel repository install ntp
-  - firewheel repository install dns
-  - firewheel repository install vyos
-  - popd
-
-
-.install_mcs: &install_mcs
-  - pushd /opt/firewheel/
-  - *install_mcs_docker
-  - pushd model_components
-  - git clone https://gitlab-ci-token:${CI_JOB_TOKEN}@${CI_SERVER_HOST}/${NTP_BIN_REPO_PATH} /tmp/ntp
-  - git clone https://gitlab-ci-token:${CI_JOB_TOKEN}@${CI_SERVER_HOST}/${DNS_BIN_REPO_PATH} /tmp/dns
-  - git clone https://gitlab-ci-token:${CI_JOB_TOKEN}@${CI_SERVER_HOST}/${VYOS_BIN_REPO_PATH} /tmp/vyos
-  - git clone https://gitlab-ci-token:${CI_JOB_TOKEN}@${CI_SERVER_HOST}/${LINUX_BIN_REPO_PATH} /tmp/linux
-  - mv /tmp/ntp/ntp/ntp-trusty-server.tar /opt/firewheel/model_components/ntp/src/firewheel_repo_ntp/ntp/vm_resources/
-  - mv /tmp/dns/dns_objects/vm_resources/bind9_xenial_debs.tgz /opt/firewheel/model_components/dns/src/firewheel_repo_dns/dns_objects/vm_resources/bind9_xenial_debs.tgz
-  - mv /tmp/vyos/vyos-1.1.8/vyos-1.1.8.qc2.xz /opt/firewheel/model_components/vyos/src/firewheel_repo_vyos/vyos-1.1.8/
-  - mv /tmp/linux/linux/vm_resources/*.tgz /opt/firewheel/model_components/linux/src/firewheel_repo_linux/linux/vm_resources
-  - mv /tmp/linux/ubuntu/ubuntu/vm_resources/debs/*.tgz /opt/firewheel/model_components/linux/src/firewheel_repo_linux/ubuntu/ubuntu/vm_resources/debs/
-  - mv /tmp/linux/ubuntu/bionic/images/ubuntu* /opt/firewheel/model_components/linux/src/firewheel_repo_linux/ubuntu/bionic/images/
-  - mv /tmp/linux/ubuntu/jammy/images/ubuntu* /opt/firewheel/model_components/linux/src/firewheel_repo_linux/ubuntu/jammy/images/
-  - mv /tmp/linux/ubuntu/jammy/vm_resources/debs/*.tgz /opt/firewheel/model_components/linux/src/firewheel_repo_linux/ubuntu/jammy/vm_resources/debs/
-  - mv /tmp/linux/ubuntu/trusty/images/ubuntu* /opt/firewheel/model_components/linux/src/firewheel_repo_linux/ubuntu/trusty/images/
-  - mv /tmp/linux/ubuntu/trusty/vm_resources/debs/*.tgz /opt/firewheel/model_components/linux/src/firewheel_repo_linux/ubuntu/trusty/vm_resources/debs/
-  - mv /tmp/linux/ubuntu/xenial/images/ubuntu* /opt/firewheel/model_components/linux/src/firewheel_repo_linux/ubuntu/xenial/images/
-  - popd
-  - popd
-
+include:
+  - local: .gitlab/ci/setup.yml
 
 ###############################
 # Creating a few defaults and setting up the Pipeline stages.
@@ -137,355 +16,11 @@ cache:
 default:
   tags:
     - vm
-  before_script:
-    - *create_venv
-    - *install_firewheel
-    - *configure_firewheel
 
 stages:
   - lint
   - test
   - deploy
-
-
-###############################
-# Unit Testing
-#
-# These anchors create an environment for running FIREWHEEL's
-# unit tests. There is one anchor `all-unit` which runs
-# on Python versions 3.8, 3.9, 3.10, 3.11, 3.12, 3.13.
-#
-# Unit tests for Python 3.8 is run on Ubuntu 22.04.
-# Unit tests for Python 3.9 is run on Ubuntu 22.04 and RHEL 8.
-# Unit tests for Python 3.10 is run on Ubuntu 22.04.
-# Unit tests for Python 3.11 is run on Ubuntu 22.04.
-# Unit tests for Python 3.12 is run on Ubuntu 22.04.
-# Unit tests for Python 3.13 is run on Ubuntu 22.04.
-#
-###############################
-.all-unit:
-  stage: test
-  before_script:
-    - sudo apt update
-    - sudo apt-get install -y python3.8 python3.8-dev python3.8-venv
-    - sudo apt-get install -y python3.9 python3.9-dev python3.9-venv
-    - sudo apt-get install -y python3.11 python3.11-dev python3.11-venv
-    - sudo apt-get install -y python3.12 python3.12-dev python3.12-venv
-    - sudo apt-get install -y python3.13 python3.13-dev python3.13-venv
-    - *create_venv
-    - *install_firewheel
-    - *configure_firewheel
-    - *install_mcs
-
-unit-py38-ubuntu2204:
-  extends: .all-unit
-  tags:
-    - ubuntu2204
-  script:
-    - tox -e py38
-  artifacts:
-    paths:
-      - logs
-    when: on_failure
-    exclude:
-        - logs/fw_cli/**
-        - logs/fw_grpc/**
-        - logs/fw_grpc_unittest/**
-        - logs/discovery.log
-    name: "${CI_PROJECT_NAME}_${CI_JOB_NAME}_${CI_COMMIT_REF_NAME}_logs"
-
-unit-py39-ubuntu2204:
-  extends: .all-unit
-  before_script:
-    - *create_venv
-    - *install_firewheel
-    - *configure_firewheel
-    - *install_mcs
-  tags:
-    - ubuntu2204
-  coverage: '/(?i)total.*? (100(?:\.0+)?\%|[1-9]?\d(?:\.\d+)?\%)$/'
-  script:
-    - tox -e py39
-  artifacts:
-    paths:
-      - htmlcov/
-
-unit-py310-ubuntu2204:
-  extends: .all-unit
-  tags:
-    - ubuntu2204
-  script:
-    - tox -e py310
-  artifacts:
-    paths:
-      - logs
-    when: on_failure
-    exclude:
-        - logs/fw_cli/**
-        - logs/fw_grpc/**
-        - logs/fw_grpc_unittest/**
-        - logs/discovery.log
-    name: "${CI_PROJECT_NAME}_${CI_JOB_NAME}_${CI_COMMIT_REF_NAME}_logs"
-
-unit-py311-ubuntu2204:
-  extends: .all-unit
-  tags:
-    - ubuntu2204
-  script:
-    - tox -e py311
-  artifacts:
-    paths:
-      - logs
-    when: on_failure
-    exclude:
-        - logs/fw_cli/**
-        - logs/fw_grpc/**
-        - logs/fw_grpc_unittest/**
-        - logs/discovery.log
-    name: "${CI_PROJECT_NAME}_${CI_JOB_NAME}_${CI_COMMIT_REF_NAME}_logs"
-
-unit-py312-ubuntu2204:
-  extends: .all-unit
-  tags:
-    - ubuntu2204
-  script:
-    - tox -e py312
-  artifacts:
-    paths:
-      - logs
-    when: on_failure
-    exclude:
-        - logs/fw_cli/**
-        - logs/fw_grpc/**
-        - logs/fw_grpc_unittest/**
-        - logs/discovery.log
-    name: "${CI_PROJECT_NAME}_${CI_JOB_NAME}_${CI_COMMIT_REF_NAME}_logs"
-
-unit-py313-ubuntu2204:
-  extends: .all-unit
-  tags:
-    - ubuntu2204
-  script:
-    - tox -e py313
-  artifacts:
-    paths:
-      - logs
-    when: on_failure
-    exclude:
-        - logs/fw_cli/**
-        - logs/fw_grpc/**
-        - logs/fw_grpc_unittest/**
-        - logs/discovery.log
-    name: "${CI_PROJECT_NAME}_${CI_JOB_NAME}_${CI_COMMIT_REF_NAME}_logs"
-
-unit-py39-rhel8:
-  stage: test
-  before_script:
-    - *create_venv
-    - *install_firewheel
-    - *configure_firewheel
-    - *install_mcs
-  tags:
-    - rhel8
-  needs: []
-  script:
-    - tox -e py39
-  artifacts:
-    paths:
-      - logs
-    when: on_failure
-    exclude:
-      - logs/fw_cli/**
-      - logs/fw_grpc/**
-      - logs/fw_grpc_unittest/**
-      - logs/discovery.log
-    name: "${CI_PROJECT_NAME}_${CI_JOB_NAME}_${CI_COMMIT_REF_NAME}_logs"
-
-
-###############################
-# Functional Testings
-#
-# These anchors create an environment for running FIREWHEEL's
-# functional tests. Currently only the minimal test are run.
-# There are anchors for Python versions 3.9, 3.10, 3.11, 3.12, 3.13
-#
-###############################
-.py39-functional:
-  before_script:
-    - *create_venv
-    - *install_firewheel
-    - *configure_firewheel
-    - *install_mcs
-  stage: test
-  script:
-    - PYTHONWARNINGS=error PYTHONDEVMODE=1 firewheel test functional minimal
-  artifacts:
-    paths:
-      - logs
-    when: on_failure
-    exclude:
-        - logs/fw_cli/**
-        - logs/fw_grpc/**
-        - logs/fw_grpc_unittest/**
-        - logs/discovery.log
-    name: "${CI_PROJECT_NAME}_${CI_JOB_NAME}_${CI_COMMIT_REF_NAME}_logs"
-
-.py310-functional:
-  before_script:
-    - pushd /opt/firewheel/
-    - python3.10 -m venv venv
-    - source /opt/firewheel/venv/bin/activate
-    - popd
-    - *install_firewheel
-    - *configure_firewheel
-    - *install_mcs
-  stage: test
-  script:
-    - PYTHONDEVMODE=1 firewheel test functional minimal
-  artifacts:
-    paths:
-      - logs
-    when: on_failure
-    exclude:
-        - logs/fw_cli/**
-        - logs/fw_grpc/**
-        - logs/fw_grpc_unittest/**
-        - logs/discovery.log
-    name: "${CI_PROJECT_NAME}_${CI_JOB_NAME}_${CI_COMMIT_REF_NAME}_logs"
-
-.py311-functional:
-  before_script:
-    - pushd /opt/firewheel/
-    - python3.11 -m venv venv
-    - source /opt/firewheel/venv/bin/activate
-    - popd
-    - *install_firewheel
-    - *configure_firewheel
-    - *install_mcs
-  stage: test
-  script:
-    - PYTHONDEVMODE=1 firewheel test functional minimal
-  artifacts:
-    paths:
-      - logs
-    when: on_failure
-    exclude:
-      - logs/fw_cli/**
-      - logs/fw_grpc/**
-      - logs/fw_grpc_unittest/**
-      - logs/discovery.log
-    name: "${CI_PROJECT_NAME}_${CI_JOB_NAME}_${CI_COMMIT_REF_NAME}_logs"
-
-.py312-functional:
-  before_script:
-    - sudo apt update
-    - sudo apt-get install -y python3.12 python3.12-dev python3.12-venv
-    - pushd /opt/firewheel/
-    - python3.12 -m venv fwpy
-    - source /opt/firewheel/fwpy/bin/activate
-    - popd
-    - *install_firewheel
-    - *configure_firewheel
-    - *install_mcs
-  stage: test
-  script:
-    - PYTHONDEVMODE=1 firewheel test functional minimal
-  artifacts:
-    paths:
-      - logs
-    when: on_failure
-    exclude:
-      - logs/fw_cli/**
-      - logs/fw_grpc/**
-      - logs/fw_grpc_unittest/**
-      - logs/discovery.log
-    name: "${CI_PROJECT_NAME}_${CI_JOB_NAME}_${CI_COMMIT_REF_NAME}_logs"
-
-.py313-functional:
-  before_script:
-    - sudo apt update
-    - sudo apt-get install -y python3.13 python3.13-dev python3.13-venv
-    - pushd /opt/firewheel/
-    - python3.13 -m venv fwpy
-    - source /opt/firewheel/fwpy/bin/activate
-    - popd
-    - *install_firewheel
-    - *configure_firewheel
-    - *install_mcs
-  stage: test
-  script:
-    - PYTHONDEVMODE=1 firewheel test functional minimal
-  artifacts:
-    paths:
-      - logs
-    when: on_failure
-    exclude:
-      - logs/fw_cli/**
-      - logs/fw_grpc/**
-      - logs/fw_grpc_unittest/**
-      - logs/discovery.log
-    name: "${CI_PROJECT_NAME}_${CI_JOB_NAME}_${CI_COMMIT_REF_NAME}_logs"
-
-###############################
-# RHEL 8 Functional Tests
-#
-# This includes testing for Python 3.9
-# These tests are run only on the default branch.
-###############################
-functional-py39-rhel8:
-  extends: .py39-functional
-  script:
-    - PYTHONDEVMODE=1 firewheel test functional minimal
-  artifacts:
-    paths:
-      - logs
-    when: on_failure
-    exclude:
-      - logs/fw_cli/**
-      - logs/fw_grpc/**
-      - logs/fw_grpc_unittest/**
-      - logs/discovery.log
-    name: "${CI_PROJECT_NAME}_${CI_JOB_NAME}_${CI_COMMIT_REF_NAME}_logs"
-  tags:
-    - rhel8
-
-
-###############################
-# Ubuntu 22.04 Functional Tests
-#
-# This includes testing for Python 3.9-3.13
-# Python 3.9 and 3.13 is run on on all branches.
-###############################
-functional-py39-ubuntu2204:
-  extends: .py39-functional
-  tags:
-    - ubuntu2204
-
-functional-py310-ubuntu2204:
-  extends: .py310-functional
-  tags:
-    - ubuntu2204
-  rules:
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-
-functional-py311-ubuntu2204:
-  extends: .py311-functional
-  tags:
-    - ubuntu2204
-  rules:
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-
-functional-py312-ubuntu2204:
-  extends: .py312-functional
-  tags:
-    - ubuntu2204
-  rules:
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-
-functional-py313-ubuntu2204:
-  extends: .py313-functional
-  tags:
-    - ubuntu2204
 
 ###############################
 # Performance Testings
@@ -496,18 +31,18 @@ functional-py313-ubuntu2204:
 ###############################
 
 performance-ubuntu2204:
-  before_script:
-    - pushd /opt/firewheel/
-    - python3.10 -m venv venv
-    - source /opt/firewheel/venv/bin/activate
-    - popd
-    - *install_firewheel
-    - *configure_firewheel
-    - *install_mcs
   stage: test
-  needs: []
   tags:
     - ubuntu2204
+  needs: []
+  variables:
+    BASE_PYTHON: python3.10
+  before_script:
+    - !reference [.create_venv, before_script]
+    - !reference [.install_firewheel, before_script]
+    - !reference [.configure_firewheel, before_script]
+    - !reference [.install_mcs, before_script]
+    - !reference [.provision_mcs, before_script]
   script:
     - pushd /opt/firewheel
     # Enable FW to cache images
@@ -515,91 +50,26 @@ performance-ubuntu2204:
     # Create a network with a lot of vertices and edges
     - firewheel experiment --no-install --profile tests.vm_gen:10000 tests.connect_all:10 minimega.schedules_ready
     - python -m pip install $PIP_ARGS snakeviz
-    - python -m pip install $PIP_ARGS "pywebcopy==7.0.2" lxml_html_clean
-    # There are a few flaws with pywebcopy and we need to patch it first
-    - |
-        sed -i '575i\
-                if not url:\
-                    self.logger.debug("Invalid URL, re-encoded the resource as [%s]" % (match.group(0)))\
-                    return match.group(0)\
-                if ans.response is not None and not ans.response.ok:\
-                    self.logger.debug("Invalid Response, re-encoded the resource as [%s]" % (match.group(0)))\
-                    return match.group(0)' /opt/firewheel/venv/lib/python3.10/site-packages/pywebcopy/elements.py
-    - |
-        tr -d '\r' < /opt/firewheel/venv/lib/python3.10/site-packages/pywebcopy/elements.py > /tmp/elements.py && mv /tmp/elements.py /opt/firewheel/venv/lib/python3.10/site-packages/pywebcopy/elements.py
-    - snakeviz -p 8888 -s firewheel_profile.prof &
-    - sleep 5
-    - python -m pywebcopy -p --url=http://127.0.0.1:8888/snakeviz/%2Fopt%2Ffirewheel%2Ffirewheel_profile.prof --location=$HOME/$CI_PROJECT_DIR/profile
-    - pkill snakeviz
+    - wget https://gist.githubusercontent.com/MSSandroid/6402e2e99e31633386a312b283839e0d/raw/4890a4ac54c3dae72a634da92f84c2adc7480056/snakeviz_static_html.py -O snakeviz_static_html.py
+    - python snakeviz_static_html.py firewheel_profile.prof
+    - mv firewheel_profile.html $HOME/$CI_PROJECT_DIR/profile
     - popd
   artifacts:
     paths:
       - profile
-
-
-###############################
-# Lint Stages
-#
-# This includes:
-# * lint-code: Linting all executable code
-# * lint-docs: Linting the documentation
-###############################
-lint-code:
-  image: $DOCKER_REGISTRY/python:3.11
-  stage: lint
-  before_script:
-    - *create_venv_docker
-    - *install_firewheel_docker
-    - *configure_firewheel_docker
-    - firewheel init
-    - firewheel sync
-
-  script:
-    - touch logs/fw_cli/__init__.py
-    - touch logs/fw_cli/vm/__init__.py
-    - touch logs/fw_cli/tshoot/__init__.py
-    - touch logs/fw_cli/tmux/__init__.py
-    - touch logs/fw_cli/test/__init__.py
-    - touch logs/fw_cli/example_helpers/__init__.py
-    - touch logs/fw_cli/mc/__init__.py
-    - touch logs/fw_cli/mm/__init__.py
-    - touch logs/fw_cli/pull/__init__.py
-    - touch logs/fw_cli/push/__init__.py
-    - touch logs/fw_cli/repository/__init__.py
-    - touch logs/fw_cli/restart/__init__.py
-    - touch logs/fw_cli/stop/__init__.py
-    - tox -e lint -- logs/fw_cli/*/ logs/fw_cli
-  tags:
-    - $CI_DOCKER_RUNNER
-
-lint-docs:
-  image: $DOCKER_REGISTRY/python:3.11
-  stage: lint
-  before_script:
-    - *create_venv_docker
-    - *install_firewheel_docker
-    - *configure_firewheel_docker
-    - *install_mcs_docker
-    - firewheel init
-    - firewheel sync
-  script:
-    - tox -e lint-docs -- logs/fw_cli
-  tags:
-    - $CI_DOCKER_RUNNER
-
 
 ###############################
 # Create Documentation
 ###############################
 docs:
   image: $DOCKER_REGISTRY/python:3.11
-  before_script:
-    - *create_venv_docker
-    - *install_firewheel_docker
-    - *configure_firewheel_docker
-    - *install_mcs_docker
   stage: lint
   needs: []
+  before_script:
+    - !reference [.create_venv, before_script]
+    - !reference [.install_firewheel_package, before_script]
+    - !reference [.configure_firewheel_docker, before_script]
+    - !reference [.install_mcs, before_script]
   script:
     - tox -e dependencies,docs
     - mkdir documentation
@@ -614,7 +84,6 @@ docs:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
   tags:
     - $CI_DOCKER_RUNNER
-
 
 pages:
   image: $DOCKER_REGISTRY/python:3.11
@@ -633,3 +102,28 @@ pages:
       - public
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+build:
+  image: $DOCKER_REGISTRY/python:3.11
+  stage: deploy
+  before_script:
+    - apt-get update && apt-get install -y git git-lfs
+    - !reference [.create_venv, before_script]
+    - python -m pip install $PIP_ARGS --upgrade wheel setuptools pip build twine
+  script:
+    - git lfs pull
+    - python -m build
+    - TWINE_PASSWORD=${CI_JOB_TOKEN} TWINE_USERNAME=gitlab-ci-token python -m twine upload --verbose --repository-url ${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/pypi dist/*
+  artifacts:
+    paths:
+      - dist/*.whl
+  needs: []
+  tags:
+    - $CI_DOCKER_RUNNER
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "release"'
+      when: always
+    - if: '$CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/'
+      when: always
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      allow_failure: true

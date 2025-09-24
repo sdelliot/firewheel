@@ -1,14 +1,18 @@
+import os
 import cmd
 import pprint
 import argparse
 import operator
+import subprocess
 from inspect import cleandoc
 from pathlib import Path
 
 import yaml
+from rich.console import Console
 
 from firewheel.config import Config
 from firewheel.lib.log import Log
+from firewheel.cli.utils import cli_output_theme
 
 
 class ConfigureFirewheel(cmd.Cmd):
@@ -19,6 +23,8 @@ class ConfigureFirewheel(cmd.Cmd):
     """
 
     doc_header = "Get or set the FIREWHEEL configuration using sub-commands:"
+    # Create a class-level console for consistent colored output
+    console = Console(theme=cli_output_theme)
 
     def __init__(self) -> None:
         """Initialize the :py:class:`cmd.Cmd` and the class logger.
@@ -63,6 +69,61 @@ class ConfigureFirewheel(cmd.Cmd):
             help="Path of the configuration file to be reset.",
         )
         return parser
+
+    def define_edit_parser(self) -> argparse.ArgumentParser:
+        """Create an :py:class:`argparse.ArgumentParser` for :ref:`command_config_edit`.
+
+        Returns:
+            argparse.ArgumentParser: The parser needed for :ref:`command_config_edit`.
+        """
+        parser = argparse.ArgumentParser(
+            description=str(
+                "Edit the FIREWHEEL configuration with a text editor. "
+                "The user must set either the VISUAL or EDITOR environment variable "
+                "or use the provided flag to override these environment variables."
+            ),
+            prog="firewheel config edit",
+            add_help=False,
+        )
+        parser.add_argument(
+            "-e",
+            "--editor",
+            required=False,
+            default="",
+            help="Use the specified text editor.",
+        )
+        return parser
+
+    def do_edit(self, args: str = "") -> None:
+        """
+        Edit the FIREWHEEL config with the default text editor as determined by
+        the ``VISUAL`` or ``EDITOR`` environment variables.
+        If no editor is found an error message is output.
+
+        Args:
+            args (str): A string of arguments passed in by the user.
+        """
+        # Get the parser for the reset command
+        parser = self.define_edit_parser()
+        cmd_args = self._handle_parsing(parser, args)
+
+        # Check for VISUAL, then EDITOR
+        editor = cmd_args.editor or os.environ.get("VISUAL") or os.environ.get("EDITOR")
+
+        if not editor:
+            self.help_edit()
+            return
+
+        # Attempt to open the file with the chosen editor
+        try:
+            subprocess.run([editor, Config(writable=True).config_path], check=True)
+        except (FileNotFoundError, subprocess.CalledProcessError):
+            self.console.print(
+                f"Error: Failed to open FIREWHEEL configuration with '{editor}'.\n",
+                style="error",
+            )
+            self.help_edit()
+            return
 
     def do_reset(self, args: str = "") -> None:
         """
@@ -214,6 +275,22 @@ class ConfigureFirewheel(cmd.Cmd):
         else:
             parser.print_help()
 
+    def do_path(self, args: str = "") -> None:
+        """
+        Enable a user to learn the path to the FIREWHEEL configuration file.
+
+        Args:
+            args (str): A string of arguments which are passed in by the user.
+                For this method, the string should be empty.
+        """
+        if args:
+            self.console.print(
+                "Error: The `path` command does not accept arguments.", style="error"
+            )
+            self.help_path()
+        else:
+            print(Config().config_path)
+
     def emptyline(self) -> None:
         """Print help when a blank line is entered.
 
@@ -262,6 +339,18 @@ class ConfigureFirewheel(cmd.Cmd):
                 command_string += "\n\n"
         return command_string
 
+    def _help_edit(self) -> str:
+        """Help message for the :py:meth:`do_edit` sub-command.
+
+        Returns:
+            str: The help message.
+        """
+        return self.define_edit_parser().format_help()
+
+    def help_edit(self) -> None:
+        """Print help for the :py:meth:`do_edit` sub-command."""
+        print(self._help_edit())
+
     def _help_reset(self) -> str:
         """Help message for the :py:meth:`do_reset` sub-command.
 
@@ -297,6 +386,18 @@ class ConfigureFirewheel(cmd.Cmd):
     def help_get(self) -> None:
         """Print help for the :py:meth:`do_get` sub-command."""
         print(self._help_get())
+
+    def _help_path(self) -> str:
+        """Help message for the :py:meth`do_path` sub-command.
+
+        Returns:
+            str: The help message.
+        """
+        return "Prints the path to the current FIREWHEEL configuration."
+
+    def help_path(self) -> None:
+        """Print help for the :py:meth:`do_path` sub-command."""
+        print(self._help_path())
 
     def _help_help(self) -> str:
         """Help message for the help sub-command.
