@@ -66,8 +66,7 @@ def save_vm_state(experiment_name="firewheel_experiment", complete=False):
 
     # Make the API call to "namespace save"
     try:
-        # mm_api.mm.ns_snapshot(name=experiment_name)
-        mm_api.mm.ns_hosts()
+        mm_api.mm.ns_save(name=experiment_name)
         console.print("[green]Namespace saved successfully.[/green]")
     except minimega.Error as exp:
         console.print(f"[red]Error saving namespace: {exp}[/red]")
@@ -181,10 +180,10 @@ def save_vm_state(experiment_name="firewheel_experiment", complete=False):
             )
 
         # Compress the temporary directory into a single archive
-        archive_file = Path(f"{experiment_name}_backup.tar.gz")
+        archive_file = Path(f"{experiment_name}_backup")
         try:
             with console.status("[yellow]Compressing data...[/yellow]", spinner="line"):
-                shutil.make_archive(archive_file.stem, "gztar", temp_path)
+                shutil.make_archive(archive_file, "gztar", temp_path)
             console.print(f"[green]Compressed data saved to [cyan]{archive_file}[/cyan] successfully.[/green]")
         except OSError as exc:
             console.print(f"[red]Error compressing the temporary directory: {exc}[/red]")

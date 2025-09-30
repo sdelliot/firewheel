@@ -25,6 +25,8 @@ import tempfile
 from pathlib import Path
 from rich.console import Console
 
+import minimega
+
 from firewheel.lib.minimega.api import minimegaAPI
 from firewheel.lib.minimega.file_store import FileStore
 from firewheel.vm_resource_manager.vm_mapping import VMMapping
@@ -50,6 +52,8 @@ def load_vm_state(archive_path):
     if not archive_file.exists():
         console.print(f"[red]Error: Archive file [cyan]{archive_file}[/cyan] does not exist.[/red]")
         return 1
+
+    experiment_name = archive_file.name.split("_")[0]
 
     # Create a temporary directory to extract the archive
     with tempfile.TemporaryDirectory() as temp_dir:
@@ -86,7 +90,7 @@ def load_vm_state(archive_path):
             return 1
 
         # Restore VM State/HDD files
-        exp_files = temp_path / "saved" / experiment_name  # Adjust based on your structure
+        exp_files = temp_path / experiment_name  # Adjust based on your structure
         try:
             if exp_files.exists():
                 shutil.copytree(exp_files, saved_exp.get_file_path(experiment_name))
@@ -109,6 +113,27 @@ def load_vm_state(archive_path):
                     return 1
         else:
             console.print(f"[yellow]No schedule files found in [cyan]{schedule_dir}[/cyan].[/yellow]")
+
+        # Now that everything is in the correct place, we need to run the various minimega scripts:
+        # First we should launch the VM resource handlers
+        vmr_mm_script = "launch_cmds.mm"
+        mm_api = minimegaAPI()
+
+        try:
+            mm_api.mm.read(vmr_mm_script)
+            console.print("[green]Started VM Resource scripts.[/green]")
+        except minimega.Error as exp:
+            console.print(f"[red]Error starting VM resource scripts: {exp}[/red]")
+            return 1
+
+        # Start the VMs
+        saved_vm_state_script = saved_exp.get_file_path(experiment_name) / "launch.mm"
+        try:
+            mm_api.mm.read(saved_vm_state_script)
+            console.print("[green]Started VM Resource scripts.[/green]")
+        except minimega.Error as exp:
+            console.print(f"[red]Error starting VM resource scripts: {exp}[/red]")
+            return 1
 
     return 0
 
