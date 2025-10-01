@@ -127,9 +127,10 @@ def save_vm_state(experiment_name="firewheel_experiment", complete=False):
                 TimeRemainingColumn()) as progress:
             task = progress.add_task("[green]Copying schedule files...", total=len(schedule_db_paths))
 
+            schedule_dir = temp_path / "schedules"
             for file in schedule_db_paths:
                 try:
-                    shutil.copy(file, temp_path)
+                    shutil.copy(file, schedule_dir)
                 except OSError as exc:
                     console.print(f"[red]Error copying schedule file {file}: {exc}[/red]")
                     return 1

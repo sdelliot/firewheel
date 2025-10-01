@@ -83,7 +83,7 @@ def load_vm_state(archive_path):
             with open(mapping_file, "r", encoding="utf-8") as f:
                 mapping = json.load(f)
             # Assuming there's a method to restore mapping in VMMapping
-            vm_mapping.restore(mapping)
+            vm_mapping.batch_put(mapping)
             console.print(f"[green]Restored VM mapping states from [cyan]{mapping_file}[/cyan] successfully.[/green]")
         except Exception as e:
             console.print(f"[red]Error restoring VM mapping states from file: {e}[/red]")
@@ -102,7 +102,7 @@ def load_vm_state(archive_path):
             return 1
 
         # Restore schedule files
-        schedule_dir = temp_path / "schedules"  # Assuming schedules are stored in a directory
+        schedule_dir = temp_path / "schedules"
         if schedule_dir.exists():
             for file in schedule_dir.glob("*"):
                 try:
