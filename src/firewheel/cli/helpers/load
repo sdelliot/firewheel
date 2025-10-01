@@ -14,7 +14,7 @@ Example
 
 DONE
 
-RUN Python ON control
+RUN LocalPython ON control
 #!/usr/bin/env python
 import sys
 import json
@@ -53,7 +53,7 @@ def load_vm_state(archive_path):
         console.print(f"[red]Error: Archive file [cyan]{archive_file}[/cyan] does not exist.[/red]")
         return 1
 
-    experiment_name = archive_file.name.split("_")[0]
+    experiment_name = archive_file.name.split("_backup")[0]
 
     # Create a temporary directory to extract the archive
     with tempfile.TemporaryDirectory() as temp_dir:
@@ -97,6 +97,8 @@ def load_vm_state(archive_path):
                 console.print(f"[green]Restored VM State/HDD files from [cyan]{exp_files}[/cyan] to [cyan]{saved_exp.get_file_path(experiment_name)}[/cyan].[/green]")
             else:
                 console.print(f"[yellow]The VM State/HDD files at [cyan]{exp_files}[/cyan] do not exist.[/yellow]")
+        except FileExistsError:
+                console.print(f"[yellow]The VM State/HDD files at [cyan]{exp_files}[/cyan] already exist. Using in-place files instead.[/yellow]")
         except OSError as exc:
             console.print(f"[red]Error restoring VM State/HD directory [cyan]{exp_files}[/cyan]: {exc}[/red]")
             return 1
