@@ -128,6 +128,7 @@ def save_vm_state(experiment_name="firewheel_experiment", complete=False):
             task = progress.add_task("[green]Copying schedule files...", total=len(schedule_db_paths))
 
             schedule_dir = temp_path / "schedules"
+            schedule_dir.mkdir(parents=True, exist_ok=True)
             for file in schedule_db_paths:
                 try:
                     shutil.copy(file, schedule_dir)

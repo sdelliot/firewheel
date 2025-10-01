@@ -108,7 +108,7 @@ def load_vm_state(archive_path):
         if schedule_dir.exists():
             for file in schedule_dir.glob("*"):
                 try:
-                    shutil.copy(file, schedule_db.cache.get_path(file.name))
+                    shutil.copy(file, schedule_db.cache.cache)
                     console.print(f"[green]Restored schedule file [cyan]{file}[/cyan] successfully.[/green]")
                 except OSError as exc:
                     console.print(f"[red]Error restoring schedule file [cyan]{file}[/cyan]: {exc}[/red]")
@@ -118,30 +118,30 @@ def load_vm_state(archive_path):
 
         # Now that everything is in the correct place, we need to run the various minimega scripts:
         # First we should launch the VM resource handlers
-        vmr_mm_script = "launch_cmds.mm"
+        vmr_mm_script = temp_path / "launch_cmds.mm"
         mm_api = minimegaAPI()
 
         try:
-            mm_api.mm.read(vmr_mm_script)
+            mm_api.mm.read(str(vmr_mm_script))
             console.print("[green]Started VM Resource scripts.[/green]")
         except minimega.Error as exp:
             console.print(f"[red]Error starting VM resource scripts: {exp}[/red]")
             return 1
 
         # Start the VMs
-        saved_vm_state_script = saved_exp.get_file_path(experiment_name) / "launch.mm"
+        saved_vm_state_script = Path(saved_exp.get_file_path(experiment_name)) / "launch.mm"
         try:
-            mm_api.mm.read(saved_vm_state_script)
-            console.print("[green]Started VM Resource scripts.[/green]")
+            mm_api.mm.read(str(saved_vm_state_script))
+            console.print("[green]Started saved VMs.[/green]")
         except minimega.Error as exp:
-            console.print(f"[red]Error starting VM resource scripts: {exp}[/red]")
+            console.print(f"[red]Error starting VMs: {exp}[/red]")
             return 1
 
     return 0
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Load VM state and schedule files.")
-    parser.add_argument("--archive", type=str, required=True, help="Path to the compressed backup file.")
+    parser.add_argument("-a", "--archive", type=str, required=True, help="Path to the compressed backup file.")
     args = parser.parse_args()
     sys.exit(load_vm_state(archive_path=args.archive))
 DONE
