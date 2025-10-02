@@ -63,10 +63,10 @@ def load_vm_state(archive_path):
         temp_path = Path(temp_dir)
 
         # Extract the archive
-        # TODO: Make a spinner while we wait
         try:
             with tarfile.open(archive_file, "r:gz") as tar:
-                tar.extractall(path=temp_path)
+                with console.status("[yellow]Decompressing experiment archive...[/yellow]", spinner="line"):
+                    tar.extractall(path=temp_path)
             console.print(f"[green]Extracted data from [cyan]{archive_file}[/cyan] to [cyan]{temp_path}[/cyan].[/green]")
         except Exception as e:
             console.print(f"[red]Error extracting the archive: {e}[/red]")
@@ -137,7 +137,7 @@ def load_vm_state(archive_path):
                 ],
                 check=True
             )
-            console.print(f"[green]Started VM Resource scripts: status={launch_handlers_ret}.[/green]")
+            console.print(f"[green]Started VM Resource scripts: ret={launch_handlers_ret.returncode}.[/green]")
         except minimega.Error as exp:
             console.print(f"[red]Error starting VM resource scripts: {exp}[/red]")
             return 1
@@ -155,7 +155,7 @@ def load_vm_state(archive_path):
                 ],
                 check=True
             )
-            console.print(f"[green]Started saved VMs: status={launch_vms_ret}.[/green]")
+            console.print(f"[green]Started saved VMs: ret={launch_vms_ret.returncode}.[/green]")
         except minimega.Error as exp:
             console.print(f"[red]Error starting VMs: {exp}[/red]")
             return 1

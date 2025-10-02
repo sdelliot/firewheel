@@ -66,7 +66,8 @@ def save_vm_state(experiment_name="firewheel_experiment", complete=False):
 
     # Make the API call to "namespace save"
     try:
-        mm_api.mm.ns_save(name=experiment_name)
+        with console.status("[yellow]Calling minimega to save namespace...[/yellow]", spinner="line"):
+            mm_api.mm.ns_save(name=experiment_name)
         console.print("[green]Namespace saved successfully.[/green]")
     except minimega.Error as exp:
         console.print(f"[red]Error saving namespace: {exp}[/red]")
