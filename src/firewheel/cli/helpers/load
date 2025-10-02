@@ -16,17 +16,20 @@ DONE
 
 RUN LocalPython ON control
 #!/usr/bin/env python
+import os
 import sys
 import json
 import shutil
 import argparse
 import tarfile
 import tempfile
+import subprocess
 from pathlib import Path
 from rich.console import Console
 
 import minimega
 
+from firewheel.config import config as fw_config
 from firewheel.lib.minimega.api import minimegaAPI
 from firewheel.lib.minimega.file_store import FileStore
 from firewheel.vm_resource_manager.vm_mapping import VMMapping
@@ -60,6 +63,7 @@ def load_vm_state(archive_path):
         temp_path = Path(temp_dir)
 
         # Extract the archive
+        # TODO: Make a spinner while we wait
         try:
             with tarfile.open(archive_file, "r:gz") as tar:
                 tar.extractall(path=temp_path)
@@ -119,11 +123,21 @@ def load_vm_state(archive_path):
         # Now that everything is in the correct place, we need to run the various minimega scripts:
         # First we should launch the VM resource handlers
         vmr_mm_script = temp_path / "launch_cmds.mm"
-        mm_api = minimegaAPI()
-
+        minimega_bin_path = os.path.join(
+            fw_config["minimega"]["install_dir"], "bin", "minimega"
+        )
         try:
-            mm_api.mm.read(str(vmr_mm_script))
-            console.print("[green]Started VM Resource scripts.[/green]")
+            launch_handlers_ret = subprocess.run(
+                [
+                    minimega_bin_path,
+                    f"-base={fw_config['minimega']['base_dir']}",
+                    "-e",
+                    "read",
+                    str(vmr_mm_script),
+                ],
+                check=True
+            )
+            console.print(f"[green]Started VM Resource scripts: status={launch_handlers_ret}.[/green]")
         except minimega.Error as exp:
             console.print(f"[red]Error starting VM resource scripts: {exp}[/red]")
             return 1
@@ -131,8 +145,17 @@ def load_vm_state(archive_path):
         # Start the VMs
         saved_vm_state_script = Path(saved_exp.get_file_path(experiment_name)) / "launch.mm"
         try:
-            mm_api.mm.read(str(saved_vm_state_script))
-            console.print("[green]Started saved VMs.[/green]")
+            launch_vms_ret = subprocess.run(
+                [
+                    minimega_bin_path,
+                    f"-base={fw_config['minimega']['base_dir']}",
+                    "-e",
+                    "read",
+                    str(saved_vm_state_script),
+                ],
+                check=True
+            )
+            console.print(f"[green]Started saved VMs: status={launch_vms_ret}.[/green]")
         except minimega.Error as exp:
             console.print(f"[red]Error starting VMs: {exp}[/red]")
             return 1
