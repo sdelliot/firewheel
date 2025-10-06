@@ -7,22 +7,32 @@ FIREWHEEL Documentation
 
 .. toctree::
    :hidden:
+   :caption: FIREWHEEL
+   :maxdepth: 2
 
    emulytics
-   system/index
    quickstart
-   concepts
    install/index
+   system/index
    tutorials/index
-   model_components/index
    cli/index
-   code/index
-   developer/contributing
-   developer/code_of_conduct
-   developer/license
-   developer/security
-   developer/changelog
+
+.. toctree::
+   :hidden:
+   :caption: Developers
+   :maxdepth: 2
+
+   model_components/index
+   developer/index
+   developer/code/index
    glossary
+
+.. toctree::
+   :hidden:
+   :caption: Resources
+   :maxdepth: 1
+
+   cheat_sheet
 
 .. only:: html
 
