@@ -225,9 +225,12 @@ class ConfigureFirewheel(cmd.Cmd):
             dict: The updated original dictionary.
         """
         for key, value in updates.items():
-            if isinstance(value, dict) and key in original:
-                # If the key exists and the value is a dictionary, recurse
-                self._update_nested_dict(original[key], value)
+            if isinstance(value, dict):
+                if key in original and isinstance(original[key], dict):
+                    # If the key exists and both values are dictionaries, recurse
+                    self._update_nested_dict(original[key], value)
+                else:
+                    original[key] = value
             else:
                 # Update or add the key in the original dictionary
                 original[key] = value
