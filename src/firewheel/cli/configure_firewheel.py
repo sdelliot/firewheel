@@ -158,7 +158,7 @@ class ConfigureFirewheel(cmd.Cmd):
             argparse.ArgumentTypeError: If the input string is not a valid JSON.
         """
         try:
-            return json.loads(json_string.replace("'", ""))
+            return json.loads(json_string)
         except json.decoder.JSONDecodeError as exc:
             raise argparse.ArgumentTypeError(f"Invalid JSON string: {json_string}\n\n") from exc
 
