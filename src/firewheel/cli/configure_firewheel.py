@@ -213,7 +213,7 @@ class ConfigureFirewheel(cmd.Cmd):
     def _update_nested_dict(self, original: dict, updates: dict) -> dict:
         """
         This function recursively updates the original dictionary with values
-        from the updates dictionary. If a key in the updates dictionary is a
+        from the updates dictionary. If a key in the ``updates`` dictionary is a
         nested dictionary, it will update the corresponding key in the original
         dictionary without removing any existing keys that are not specified in updates.
 
