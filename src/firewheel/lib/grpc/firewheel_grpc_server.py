@@ -80,7 +80,7 @@ class FirewheelServicer(firewheel_grpc_pb2_grpc.FirewheelServicer):
                 "vm_mappings": {},
                 "not_ready_vmms": set(),
                 "ready_states": {VMState.NA.value, VMState.CONFIGURED.value},
-                "experiment_start_times": [],
+                "experiment_start_time": None,
                 "experiment_launch_time": None,
             }
 
@@ -162,11 +162,11 @@ class FirewheelServicer(firewheel_grpc_pb2_grpc.FirewheelServicer):
         """
         db = request.db
         with self._db_lock:
-            if self.dbs[db]["experiment_start_times"]:
-                return self.dbs[db]["experiment_start_times"][0]
+            if self.dbs[db]["experiment_start_time"]:
+                return self.dbs[db]["experiment_start_time"]
 
-            self.dbs[db]["experiment_start_times"].append(request)
-            return self.dbs[db]["experiment_start_times"][0]
+            self.dbs[db]["experiment_start_time"] = request
+            return self.dbs[db]["experiment_start_time"]
 
     def GetExperimentStartTime(self, request, context):  # noqa: N802,ARG002
         """
@@ -182,7 +182,7 @@ class FirewheelServicer(firewheel_grpc_pb2_grpc.FirewheelServicer):
         db = request.db
         with self._db_lock:
             with contextlib.suppress(IndexError):
-                return self.dbs[db]["experiment_start_times"][0]
+                return self.dbs[db]["experiment_start_time"]
 
         error_details = "IndexError. No start time available yet."
         error_code = grpc.StatusCode.OUT_OF_RANGE
@@ -206,7 +206,7 @@ class FirewheelServicer(firewheel_grpc_pb2_grpc.FirewheelServicer):
             with contextlib.suppress(KeyError):
                 self.dbs[db]["experiment_launch_time"] = None
             with contextlib.suppress(KeyError):
-                self.dbs[db]["experiment_start_times"] = []
+                self.dbs[db]["experiment_start_time"] = None
         return firewheel_grpc_pb2.InitializeExperimentStartTimeResponse()
 
     def CountVMMappingsNotReady(self, request, context):  # noqa: N802,ARG002
