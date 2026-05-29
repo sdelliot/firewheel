@@ -1,6 +1,5 @@
 import os
 import copy
-import json
 import time
 import threading
 import contextlib
@@ -10,7 +9,6 @@ from concurrent import futures
 from importlib.metadata import version
 
 import grpc
-from google.protobuf.json_format import Parse
 
 from firewheel.config import Config
 from firewheel.lib.log import Log
