@@ -70,55 +70,6 @@ class FirewheelServicer(firewheel_grpc_pb2_grpc.FirewheelServicer):
             os.makedirs(os.path.join(self.cache_dir, db), exist_ok=True)
             self._init_db(db)
 
-    def _read_repository_db_from_file(self, db):
-        """
-        Utility function for reading the RepositoryDb from a file.
-
-        Args:
-            db (RepositoryDb): The database to read.
-
-        Returns:
-            bool: True on success, False otherwise.
-
-        Raises:
-            RuntimeError: If the repository path does not exist.
-        """
-        path = os.path.join(self.cache_dir, db, "repositories")
-        with self._db_lock:
-            self.dbs[db]["repositories"] = {}
-
-        try:
-            with open(path, "r", encoding="utf8") as repositories_file:
-                for repository_line in repositories_file:
-                    self.log.debug("repository_line=%s", repository_line)
-                    repository = firewheel_grpc_pb2.Repository()
-                    try:
-                        repository = Parse(repository_line, repository)
-                        self.log.info("loaded repository=%s", repository)
-                        if not repository.path:
-                            raise RuntimeError("Repository path does not exist.")
-                    # pylint: disable=broad-except
-                    except Exception as exp:
-                        self.log.exception(exp)
-                        self.log.info("skipping a malformed repository")
-                        continue
-                    with self._db_lock:
-                        self.dbs[db]["repositories"][repository.path] = repository
-                return True
-        except (FileNotFoundError, json.decoder.JSONDecodeError) as exp:
-            self.log.info(
-                "Unable to read repositories from cache_file=%s. Exception=%s",
-                path,
-                exp,
-            )
-            self.log.info(
-                "Initializing db=%s/repositories to %s",
-                db,
-                {},
-            )
-            self._write_repository_db_to_file(db)
-            return False
-
     def _init_db(self, db_name):
         """
         Initializes the database with name db_name.
