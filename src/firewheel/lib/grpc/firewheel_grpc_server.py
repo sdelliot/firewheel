@@ -114,7 +114,7 @@ class FirewheelServicer(firewheel_grpc_pb2_grpc.FirewheelServicer):
             self.log.info(
                 "Initializing db=%s/repositories to %s",
                 db,
-                self.dbs[db]["repositories"],
+                {},
             )
             self._write_repository_db_to_file(db)
             return False
@@ -231,18 +231,19 @@ class FirewheelServicer(firewheel_grpc_pb2_grpc.FirewheelServicer):
             firewheel_grpc_pb2.ExperimentStartTime: The set experiment start time.
         """
         db = request.db
-        try:
-            return self.dbs[db]["experiment_start_times"][0]
-        except IndexError:
-            error_details = "IndexError. No start time available yet."
-            error_code = grpc.StatusCode.OUT_OF_RANGE
-            context.abort(code=error_code, details=error_details)
+        with self._db_lock:
+            with contextlib.suppress(IndexError):
+                return self.dbs[db]["experiment_start_times"][0]
+
+        error_details = "IndexError. No start time available yet."
+        error_code = grpc.StatusCode.OUT_OF_RANGE
+        context.abort(code=error_code, details=error_details)
 
         return None
 
     def InitializeExperimentStartTime(self, request, context):  # noqa: N802,ARG002
         """
-        Initializes the experiment launch time.
+        Initializes the experiment timing state.
 
         Args:
             request (firewheel_grpc_pb2.InitializeExperimentStartTimeRequest): The gRPC request.
