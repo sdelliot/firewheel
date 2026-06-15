@@ -37,6 +37,24 @@ from firewheel.lib.experiment_utils import (
 )
 
 
+def _make_base_backup(root: Path) -> None:
+    """Create a minimal backup directory."""
+    (root / VM_MAPPING_FILENAME).write_text("{}", encoding="utf-8")
+    (root / EXPERIMENT_TIME_FILENAME).write_text("{}", encoding="utf-8")
+    (root / "launch.mm").write_text("launch", encoding="utf-8")
+    (root / SCHEDULES_DIRNAME).mkdir()
+    manifest = {
+        "format_version": FORMAT_VERSION,
+        "experiment_dir_name": root.name,
+        "files": {
+            "launch_cmds": None,
+            "imagestore_cache": None,
+            "vm_resource_cache": None,
+        },
+    }
+    (root / MANIFEST_FILENAME).write_text(json.dumps(manifest), encoding="utf-8")
+
+
 def test_is_supported_archive() -> None:
     """Verify supported tar archive suffixes are recognized."""
     assert is_supported_archive(Path("a.tar.gz")) is True
@@ -283,3 +301,152 @@ def test_create_resume_schedule_entry() -> None:
     result = create_resume_schedule_entry(sched_db, console, "vm1")
 
     assert result[-1].data == [{"resume": True}]
+
+def test_list_saved_experiments_no_root() -> None:
+    """Verify missing saved root returns an empty list."""
+    with patch("firewheel.lib.experiment_utils.FileStore") as mock_store_cls:
+        mock_store_cls.return_value.cache = "/path/that/does/not/exist"
+        assert list_saved_experiments() == []
+
+
+def test_list_saved_experiments_skips_non_dirs(tmp_path: Path) -> None:
+    """Verify non-directory entries are ignored."""
+    saved_root = tmp_path / "saved"
+    saved_root.mkdir()
+    (saved_root / "note.txt").write_text("ignore", encoding="utf-8")
+
+    with patch("firewheel.lib.experiment_utils.FileStore") as mock_store_cls:
+        mock_store_cls.return_value.cache = str(saved_root)
+        assert list_saved_experiments() == []
+
+
+def test_print_saved_experiments_handles_oserror() -> None:
+    """Verify listing errors are reported."""
+    console = Console(record=True)
+    with patch(
+        "firewheel.lib.experiment_utils.list_saved_experiments",
+        side_effect=OSError("boom"),
+    ):
+        ret = print_saved_experiments(console)
+
+    assert ret == 1
+    assert "Failed to list saved experiments" in console.export_text()
+
+
+def test_delete_saved_experiment_not_directory(tmp_path: Path) -> None:
+    """Verify deleting a non-directory saved path fails."""
+    console = Console(record=True)
+    target = tmp_path / "exp1"
+    target.write_text("not dir", encoding="utf-8")
+
+    with patch(
+        "firewheel.lib.experiment_utils.get_saved_experiment_path",
+        return_value=target,
+    ):
+        ret = delete_saved_experiment(console, "exp1")
+
+    assert ret == 1
+    assert "is not a directory" in console.export_text()
+
+
+def test_delete_saved_experiment_access_error() -> None:
+    """Verify path access errors are reported."""
+    console = Console(record=True)
+    with patch(
+        "firewheel.lib.experiment_utils.get_saved_experiment_path",
+        side_effect=OSError("access fail"),
+    ):
+        ret = delete_saved_experiment(console, "exp1")
+
+    assert ret == 1
+    assert "Failed to access saved experiments" in console.export_text()
+
+
+def test_extract_archive_safely_raises_oserror(tmp_path: Path) -> None:
+    """Verify unreadable archives raise OSError."""
+    archive = tmp_path / "bad.tar"
+    archive.write_bytes(b"not a tar")
+
+    with pytest.raises(OSError):
+        extract_archive_safely(archive, tmp_path / "dest")
+
+
+def test_validate_backup_directory_missing_root(tmp_path: Path) -> None:
+    """Verify missing backup roots raise FileNotFoundError."""
+    with pytest.raises(FileNotFoundError):
+        validate_backup_directory(tmp_path / "missing")
+
+
+def test_validate_backup_directory_not_directory(tmp_path: Path) -> None:
+    """Verify non-directory roots raise NotADirectoryError."""
+    root = tmp_path / "backup"
+    root.write_text("nope", encoding="utf-8")
+
+    with pytest.raises(NotADirectoryError):
+        validate_backup_directory(root)
+
+
+def test_validate_backup_directory_dir_name_mismatch(tmp_path: Path) -> None:
+    """Verify manifest/root name mismatches raise ValueError."""
+    root = tmp_path / "backup"
+    root.mkdir()
+    _make_base_backup(root)
+
+    manifest = json.loads((root / MANIFEST_FILENAME).read_text(encoding="utf-8"))
+    manifest["experiment_dir_name"] = "other_name"
+    (root / MANIFEST_FILENAME).write_text(json.dumps(manifest), encoding="utf-8")
+
+    with pytest.raises(ValueError):
+        validate_backup_directory(root)
+
+
+def test_validate_backup_directory_schedule_not_dir(tmp_path: Path) -> None:
+    """Verify schedules path must be a directory."""
+    root = tmp_path / "backup"
+    root.mkdir()
+    _make_base_backup(root)
+    (root / SCHEDULES_DIRNAME).rmdir()
+    (root / SCHEDULES_DIRNAME).write_text("bad", encoding="utf-8")
+
+    with pytest.raises(NotADirectoryError):
+        validate_backup_directory(root)
+
+
+def test_validate_backup_directory_missing_optional_launch_cmds(tmp_path: Path) -> None:
+    """Verify missing manifest-referenced launch_cmds raises FileNotFoundError."""
+    root = tmp_path / "backup"
+    root.mkdir()
+    _make_base_backup(root)
+
+    manifest = json.loads((root / MANIFEST_FILENAME).read_text(encoding="utf-8"))
+    manifest["files"]["launch_cmds"] = "launch_cmds.mm"
+    (root / MANIFEST_FILENAME).write_text(json.dumps(manifest), encoding="utf-8")
+
+    with pytest.raises(FileNotFoundError):
+        validate_backup_directory(root)
+
+
+def test_validate_backup_directory_missing_optional_cache_dir(tmp_path: Path) -> None:
+    """Verify missing manifest-referenced cache dir raises FileNotFoundError."""
+    root = tmp_path / "backup"
+    root.mkdir()
+    _make_base_backup(root)
+
+    manifest = json.loads((root / MANIFEST_FILENAME).read_text(encoding="utf-8"))
+    manifest["files"]["imagestore_cache"] = "imagestore_cache"
+    (root / MANIFEST_FILENAME).write_text(json.dumps(manifest), encoding="utf-8")
+
+    with pytest.raises(FileNotFoundError):
+        validate_backup_directory(root)
+
+
+def test_create_resume_schedule_entry_missing_schedule_exits() -> None:
+    """Verify missing schedules terminate with an error."""
+    from firewheel.lib.experiment_utils import create_resume_schedule_entry
+
+    sched_db = Mock()
+    sched_db.get.return_value = None
+    console = Console(record=True)
+
+    with pytest.raises(SystemExit):
+        create_resume_schedule_entry(sched_db, console, "vm1")

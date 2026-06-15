@@ -303,3 +303,87 @@ def test_close() -> None:
     client = _build_client_without_init()
     client.close()
     client.chan.close.assert_called_once()
+
+def test_init_with_explicit_logger_and_no_required_connection(monkeypatch) -> None:
+    """Verify constructor accepts an injected logger."""
+    fake_channel = Mock()
+    fake_stub = Mock()
+    fake_log = Mock()
+
+    from firewheel.config import config
+
+    monkeypatch.setitem(config["grpc"], "hostname", "127.0.0.1")
+    monkeypatch.setitem(config["grpc"], "port", "50051")
+    monkeypatch.setitem(config["grpc"], "db", "prod")
+
+    import firewheel.lib.grpc.firewheel_grpc_client as module
+
+    original_check = module.FirewheelGrpcClient.check_connection
+    module.FirewheelGrpcClient.check_connection = lambda self, error=True: False
+    try:
+        import unittest.mock as umock
+
+        with umock.patch("firewheel.lib.grpc.firewheel_grpc_client.grpc.insecure_channel", return_value=fake_channel), umock.patch(
+            "firewheel.lib.grpc.firewheel_grpc_client.firewheel_grpc_pb2_grpc.FirewheelStub",
+            return_value=fake_stub,
+        ):
+            client = FirewheelGrpcClient(log=fake_log, require_connection=False)
+    finally:
+        module.FirewheelGrpcClient.check_connection = original_check
+
+    assert client.log is fake_log
+    assert client.connected is False
+
+
+def test_get_info_logs_non_unavailable_rpc_error() -> None:
+    """Verify unexpected RPC errors are logged."""
+    client = _build_client_without_init()
+    client.stub.GetInfo.side_effect = _RpcException(grpc.StatusCode.INTERNAL)
+
+    assert client.get_info() is None
+    assert client.log.exception.called
+
+
+def test_get_experiment_launch_time_logs_unexpected_rpc_error() -> None:
+    """Verify unexpected launch time RPC errors are logged."""
+    client = _build_client_without_init()
+    client.stub.GetExperimentLaunchTime.side_effect = _RpcException(grpc.StatusCode.INTERNAL)
+
+    assert client.get_experiment_launch_time() is None
+    assert client.log.exception.called
+
+
+def test_get_experiment_start_time_logs_unexpected_rpc_error() -> None:
+    """Verify unexpected start time RPC errors are logged."""
+    client = _build_client_without_init()
+    client.stub.GetExperimentStartTime.side_effect = _RpcException(grpc.StatusCode.INTERNAL)
+
+    assert client.get_experiment_start_time() is None
+    assert client.log.exception.called
+
+
+def test_get_vm_mapping_by_uuid_logs_unexpected_rpc_error() -> None:
+    """Verify unexpected UUID lookup RPC errors are logged."""
+    client = _build_client_without_init()
+    client.stub.GetVMMappingByUUID.side_effect = _RpcException(grpc.StatusCode.INTERNAL)
+
+    assert client.get_vm_mapping_by_uuid("uuid") is None
+    assert client.log.exception.called
+
+
+def test_set_vm_time_by_uuid_logs_unexpected_rpc_error() -> None:
+    """Verify unexpected VM time RPC errors are logged."""
+    client = _build_client_without_init()
+    client.stub.SetVMTimeByUUID.side_effect = _RpcException(grpc.StatusCode.INTERNAL)
+
+    assert client.set_vm_time_by_uuid({"server_uuid": "u", "current_time": "1"}) is None
+    assert client.log.exception.called
+
+
+def test_set_vm_state_by_uuid_logs_unexpected_rpc_error() -> None:
+    """Verify unexpected VM state RPC errors are logged."""
+    client = _build_client_without_init()
+    client.stub.SetVMStateByUUID.side_effect = _RpcException(grpc.StatusCode.INTERNAL)
+
+    assert client.set_vm_state_by_uuid({"server_uuid": "u", "state": "READY"}) is None
+    assert client.log.exception.called

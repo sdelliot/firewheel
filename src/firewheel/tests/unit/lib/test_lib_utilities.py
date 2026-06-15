@@ -372,3 +372,77 @@ def test_retry_uses_object_logger_when_available() -> None:
         assert obj.run() == "done"
 
     assert obj.log.debug.called
+
+def test_directories_are_identical_false_if_not_directories(tmp_path: Path) -> None:
+    """Verify non-directory inputs return False."""
+    source = tmp_path / "source.txt"
+    destination = tmp_path / "destination.txt"
+    source.write_text("a", encoding="utf-8")
+    destination.write_text("b", encoding="utf-8")
+
+    assert directories_are_identical(source, destination) is False
+
+
+def test_copytree_if_needed_replaces_file_destination(tmp_path: Path) -> None:
+    """Verify force mode replaces a non-directory destination."""
+    source = tmp_path / "source"
+    source.mkdir()
+    (source / "file.txt").write_text("payload", encoding="utf-8")
+
+    destination = tmp_path / "destination"
+    destination.write_text("old", encoding="utf-8")
+
+    assert copytree_if_needed(source, destination, force=True) is True
+    assert destination.is_dir()
+    assert (destination / "file.txt").read_text(encoding="utf-8") == "payload"
+
+
+def test_copyfile_if_needed_replaces_directory_destination(tmp_path: Path) -> None:
+    """Verify force mode replaces a directory destination."""
+    source = tmp_path / "source.txt"
+    source.write_text("payload", encoding="utf-8")
+
+    destination = tmp_path / "destination"
+    destination.mkdir()
+    (destination / "nested.txt").write_text("old", encoding="utf-8")
+
+    assert copyfile_if_needed(source, destination, force=True) is True
+    assert destination.is_file()
+    assert destination.read_text(encoding="utf-8") == "payload"
+
+
+def test_files_are_identical_false_if_destination_is_directory(tmp_path: Path) -> None:
+    """Verify file comparison returns False for non-file destination."""
+    source = tmp_path / "source.txt"
+    source.write_text("data", encoding="utf-8")
+    destination = tmp_path / "dest"
+    destination.mkdir()
+
+    assert files_are_identical(source, destination) is False
+
+
+def test_retry_defaults_to_exception_tuple() -> None:
+    """Verify retry defaults to catching Exception when not provided."""
+    calls = {"count": 0}
+
+    @retry(2, base_delay=1, exp_factor=1)
+    def flaky() -> str:
+        calls["count"] += 1
+        if calls["count"] == 1:
+            raise RuntimeError("temporary")
+        return "ok"
+
+    with patch("firewheel.lib.utilities.sleep"):
+        assert flaky() == "ok"
+    assert calls["count"] == 2
+
+
+def test_retry_does_not_catch_unlisted_exception() -> None:
+    """Verify retry does not catch exceptions outside the configured tuple."""
+
+    @retry(3, exceptions=(ValueError,), base_delay=1, exp_factor=1)
+    def fail() -> None:
+        raise RuntimeError("not caught")
+
+    with pytest.raises(RuntimeError):
+        fail()

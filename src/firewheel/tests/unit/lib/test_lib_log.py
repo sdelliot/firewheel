@@ -75,3 +75,62 @@ def test_utclog_uses_gmtime(tmp_path, monkeypatch) -> None:
     logger = UTCLog("test_utc_log").log
     formatter = logger.handlers[0].formatter
     assert formatter.converter is not None
+
+def test_log_warns_on_missing_group(tmp_path, monkeypatch) -> None:
+    """Verify missing configured group emits a warning path."""
+    from firewheel.config import config
+
+    monkeypatch.setitem(config["logging"], "root_dir", str(tmp_path))
+    monkeypatch.setitem(config["logging"], "firewheel_log", "group_missing.log")
+    monkeypatch.setitem(config["logging"], "level", "INFO")
+    monkeypatch.setitem(config["system"], "default_group", "definitely_missing_group")
+
+    logger = Log("test_log_missing_group").log
+    assert logger.handlers
+    assert isinstance(logger.handlers[0], logging.FileHandler)
+
+
+def test_log_warning_on_chown_failure(tmp_path, monkeypatch) -> None:
+    """Verify chown failures are tolerated and logger still initializes."""
+    from firewheel.config import config
+
+    monkeypatch.setitem(config["logging"], "root_dir", str(tmp_path))
+    monkeypatch.setitem(config["logging"], "firewheel_log", "chown_failure.log")
+    monkeypatch.setitem(config["logging"], "level", "INFO")
+    monkeypatch.setitem(config["system"], "default_group", "root")
+
+    class FakeGroup:
+        """Simple group record."""
+
+        gr_gid = 99999
+
+    class FakeStat:
+        """Simple stat record."""
+
+        st_gid = 12345
+
+    with patch("firewheel.lib.log.grp.getgrnam", return_value=FakeGroup()), patch(
+        "firewheel.lib.log.os.stat", return_value=FakeStat()
+    ), patch("firewheel.lib.log.os.getgid", return_value=1), patch(
+        "firewheel.lib.log.os.chown", side_effect=OSError("bad chown")
+    ):
+        logger = Log("test_log_chown_failure").log
+
+    assert logger.handlers
+    assert isinstance(logger.handlers[0], logging.FileHandler)
+
+
+def test_log_second_try_also_fails_uses_nullhandler(tmp_path, monkeypatch) -> None:
+    """Verify logger falls back to NullHandler if both file opens fail."""
+    from firewheel.config import config
+
+    monkeypatch.setitem(config["logging"], "root_dir", str(tmp_path))
+    monkeypatch.setitem(config["logging"], "firewheel_log", "double_fail.log")
+    monkeypatch.setitem(config["logging"], "level", "INFO")
+    monkeypatch.setitem(config["system"], "default_group", "")
+
+    with patch("firewheel.lib.log.logging.FileHandler", side_effect=IOError("fail")):
+        logger = Log("test_log_double_fail").log
+
+    assert logger.handlers
+    assert isinstance(logger.handlers[0], logging.NullHandler)

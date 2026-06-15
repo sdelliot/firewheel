@@ -307,3 +307,75 @@ def test_serve_startup_path() -> None:
     assert serve_result is None
     server.start.assert_called_once()
     server.stop.assert_called_once_with(0)
+
+
+def test_read_repository_db_from_missing_file_initializes() -> None:
+    """Verify missing repository cache initializes and returns False."""
+    servicer = _build_servicer_without_init()
+    servicer.dbs["prod"]["repositories"] = {}
+
+    with patch("builtins.open", side_effect=FileNotFoundError), patch.object(
+        servicer, "_write_repository_db_to_file"
+    ) as write_db:
+        result = servicer._read_repository_db_from_file("prod")
+
+    assert result is False
+    write_db.assert_called_once_with("prod")
+
+
+def test_read_repository_db_from_file_skips_malformed_lines() -> None:
+    """Verify malformed repository lines are skipped."""
+    servicer = _build_servicer_without_init()
+    servicer.dbs["prod"]["repositories"] = {}
+
+    mocked_file = mock_open(read_data='{"bad": "line"}\n')
+    with patch("builtins.open", mocked_file), patch(
+        "firewheel.lib.grpc.firewheel_grpc_server.Parse",
+        side_effect=Exception("parse fail"),
+    ):
+        result = servicer._read_repository_db_from_file("prod")
+
+    assert result is True
+    assert servicer.dbs["prod"]["repositories"] == {}
+
+
+def test_set_vm_state_by_uuid_missing_aborts() -> None:
+    """Verify missing VM mapping during state update aborts."""
+    servicer = _build_servicer_without_init()
+
+    request = __import__("unittest").mock.Mock()
+    request.db = "prod"
+    request.server_uuid = "missing"
+    request.state = "RUNNING"
+
+    with pytest.raises(RuntimeError) as exc:
+        servicer.SetVMStateByUUID(request, _AbortContext())
+
+    assert exc.value.args[0][0] == grpc.StatusCode.OUT_OF_RANGE
+
+
+def test_serve_returns_when_bind_fails() -> None:
+    """Verify serve returns cleanly when add_insecure_port fails."""
+    server = __import__("unittest").mock.Mock()
+    server.add_insecure_port.side_effect = RuntimeError("bind fail")
+
+    with patch(
+        "firewheel.lib.grpc.firewheel_grpc_server.FirewheelServicer"
+    ) as servicer_cls, patch(
+        "firewheel.lib.grpc.firewheel_grpc_server.Config"
+    ) as config_cls, patch(
+        "firewheel.lib.grpc.firewheel_grpc_server.grpc.server",
+        return_value=server,
+    ), patch(
+        "firewheel.lib.grpc.firewheel_grpc_server.firewheel_grpc_pb2_grpc.add_FirewheelServicer_to_server"
+    ):
+        config_cls.return_value.get_config.return_value = {
+            "grpc": {"hostname": "127.0.0.1", "port": "50051", "threads": 2}
+        }
+        result = __import__(
+            "firewheel.lib.grpc.firewheel_grpc_server",
+            fromlist=["serve"],
+        ).serve()
+
+    assert result is None
+    servicer_cls.return_value.log.warning.assert_called_once()

@@ -291,3 +291,123 @@ def test_get_cpu_commit_ratio() -> None:
     with patch.object(api, "get_hosts", return_value={"cpus": 8, "cpucommit": 4}):
         assert api.get_cpu_commit_ratio() == 0.5
 
+def _build_api_without_init() -> minimegaAPI:
+    """Create a minimegaAPI instance without invoking __init__."""
+    api = object.__new__(minimegaAPI)
+    api.log = Mock()
+    api.mm = Mock()
+    api.mm_base = "/tmp/mm"
+    api.mm_socket = "/tmp/mm/minimega"
+    return api
+
+
+def test_init_raises_when_socket_missing(monkeypatch) -> None:
+    """Verify constructor raises when minimega socket is absent."""
+    from firewheel.config import config
+
+    monkeypatch.setitem(config["minimega"], "base_dir", "/tmp/mm")
+    monkeypatch.setitem(config["minimega"], "namespace", None)
+    monkeypatch.setitem(config["cluster"], "control", ["headnode"])
+
+    with patch("firewheel.lib.minimega.api.os.path.exists", return_value=False):
+        with pytest.raises(RuntimeError):
+            minimegaAPI()
+
+
+def test_init_raises_on_minimega_connection_failure(monkeypatch) -> None:
+    """Verify constructor wraps connection failures as RuntimeError."""
+    from firewheel.config import config
+
+    monkeypatch.setitem(config["minimega"], "base_dir", "/tmp/mm")
+    monkeypatch.setitem(config["minimega"], "namespace", None)
+    monkeypatch.setitem(config["cluster"], "control", ["headnode"])
+
+    with patch("firewheel.lib.minimega.api.os.path.exists", return_value=True), patch(
+        "firewheel.lib.minimega.api.minimega.minimega",
+        side_effect=Exception("connect fail"),
+    ):
+        with pytest.raises(RuntimeError):
+            minimegaAPI()
+
+
+def test_init_raises_timeout_from_check_version(monkeypatch) -> None:
+    """Verify constructor propagates TimeoutError from version check."""
+    from firewheel.config import config
+
+    monkeypatch.setitem(config["minimega"], "base_dir", "/tmp/mm")
+    monkeypatch.setitem(config["minimega"], "namespace", None)
+    monkeypatch.setitem(config["cluster"], "control", ["headnode"])
+
+    mm_obj = Mock()
+
+    with patch("firewheel.lib.minimega.api.os.path.exists", return_value=True), patch(
+        "firewheel.lib.minimega.api.minimega.minimega", return_value=mm_obj
+    ), patch.object(
+        minimegaAPI, "_check_version", side_effect=TimeoutError("timeout")
+    ):
+        with pytest.raises(TimeoutError):
+            minimegaAPI()
+
+
+def test_mmr_map_ignores_empty_tabular() -> None:
+    """Verify empty tabular responses are skipped."""
+    raw = [{"Header": ["a"], "Tabular": [], "Host": "host1"}]
+    assert minimegaAPI.mmr_map(raw) == {}
+
+
+def test_parse_host_none_returns_none() -> None:
+    """Verify parsing a falsey host item returns None."""
+    api = _build_api_without_init()
+    assert api._parse_host(None) is None
+
+
+def test_get_hosts_single_hit() -> None:
+    """Verify specific host lookup returns parsed host."""
+    api = _build_api_without_init()
+    api.mm.host.return_value = [
+        {
+            "Header": ["cpus", "cpucommit", "memtotal", "memcommit"],
+            "Tabular": [["8", "4", "1024", "512"]],
+            "Host": "host1",
+        }
+    ]
+
+    host = api.get_hosts(host_key="host1")
+    assert host["hostname"] == "host1"
+    assert host["cpus"] == 8
+
+
+def test_run_minimega_script_raises_calledprocesserror(monkeypatch, tmp_path: Path) -> None:
+    """Verify subprocess failures are re-raised by run_minimega_script."""
+    from firewheel.config import config
+
+    monkeypatch.setitem(config["minimega"], "install_dir", "/opt/minimega")
+    api = _build_api_without_init()
+
+    script = tmp_path / "launch.mm"
+    script.write_text("vm info", encoding="utf-8")
+
+    with patch(
+        "firewheel.lib.minimega.api.subprocess.run",
+        side_effect=subprocess.CalledProcessError(1, ["minimega"]),
+    ):
+        with pytest.raises(subprocess.CalledProcessError):
+            api.run_minimega_script(script)
+
+
+def test_run_minimega_script_raises_oserror(monkeypatch, tmp_path: Path) -> None:
+    """Verify launch failures are re-raised by run_minimega_script."""
+    from firewheel.config import config
+
+    monkeypatch.setitem(config["minimega"], "install_dir", "/opt/minimega")
+    api = _build_api_without_init()
+
+    script = tmp_path / "launch.mm"
+    script.write_text("vm info", encoding="utf-8")
+
+    with patch(
+        "firewheel.lib.minimega.api.subprocess.run",
+        side_effect=OSError("cannot launch"),
+    ):
+        with pytest.raises(OSError):
+            api.run_minimega_script(script)

@@ -380,3 +380,316 @@ def test_remove_file() -> None:
 
     store.mm_api.mm.file_delete.assert_called_once_with("saved/file.txt")
     store.mm_api.mm.mesh_send.assert_called_once_with("all", "file delete saved/file.txt")
+
+
+def test_wait_for_lock_exits_when_lock_disappears(tmp_path: Path) -> None:
+    """Verify lock wait loop exits once the lock directory is removed."""
+    store = _build_filestore(tmp_path)
+    target = tmp_path / "target"
+    lock_dir = Path(str(target) + "-lock")
+    lock_dir.mkdir()
+
+    calls = {"count": 0}
+
+    def fake_sleep(_interval: float) -> None:
+        calls["count"] += 1
+        if calls["count"] == 2:
+            lock_dir.rmdir()
+
+    with patch("firewheel.lib.minimega.file_store.time.sleep", side_effect=fake_sleep):
+        store._wait_for_lock(str(target))
+
+    assert calls["count"] >= 2
+
+
+def test_wait_for_lock_warns_after_five_minutes(tmp_path: Path) -> None:
+    """Verify long waits emit a warning."""
+    store = _build_filestore(tmp_path)
+    target = tmp_path / "target"
+    lock_dir = Path(str(target) + "-lock")
+    lock_dir.mkdir()
+
+    count = {"value": 0}
+
+    def fake_exists(_path: str) -> bool:
+        count["value"] += 1
+        return count["value"] < 1202
+
+    with patch("firewheel.lib.minimega.file_store.os.path.exists", side_effect=fake_exists), patch(
+        "firewheel.lib.minimega.file_store.time.sleep"
+    ):
+        store._wait_for_lock(str(target))
+
+    assert store.log.warning.called
+
+
+def test_file_lock_when_get_lock_raises(tmp_path: Path) -> None:
+    """Verify file_lock yields None if lock acquisition fails."""
+    store = _build_filestore(tmp_path)
+
+    with patch.object(store, "_get_lock", side_effect=OSError("lock fail")):
+        with store.file_lock(str(tmp_path / "target")) as acquired:
+            assert acquired is None
+
+
+def test_minimega_get_data_download_timeout_waits_for_other(tmp_path: Path) -> None:
+    """Verify timeout during local fetch waits for another downloader."""
+    store = _build_filestore(tmp_path)
+    host_file_path = str(tmp_path / "saved" / "file.txt")
+    Path(host_file_path).parent.mkdir(parents=True, exist_ok=True)
+
+    with patch.object(
+        store, "file_lock"
+    ) as file_lock, patch.object(
+        store, "_minimega_get_file", side_effect=TimeoutError("busy")
+    ), patch.object(
+        store, "_wait_for_lock"
+    ) as wait_for_lock:
+        file_lock.return_value.__enter__.return_value = True
+        file_lock.return_value.__exit__.return_value = False
+
+        local_path, error = store._minimega_get_data(host_file_path, "file.txt", False)
+
+    assert local_path == host_file_path
+    assert error == ""
+    wait_for_lock.assert_called_once_with(host_file_path)
+
+
+def test_minimega_get_data_existing_file_only_waits_for_lock(tmp_path: Path) -> None:
+    """Verify existing cached files only wait on any outstanding lock."""
+    store = _build_filestore(tmp_path)
+    host_file_path = tmp_path / "saved" / "file.txt"
+    host_file_path.parent.mkdir(parents=True, exist_ok=True)
+    host_file_path.write_text("data", encoding="utf-8")
+
+    with patch.object(store, "_wait_for_lock") as wait_for_lock:
+        local_path, error = store._minimega_get_data(str(host_file_path), "file.txt", False)
+
+    assert local_path == str(host_file_path)
+    assert error == ""
+    wait_for_lock.assert_called_once_with(str(host_file_path))
+
+
+def test_minimega_get_data_failed_download_removes_partial(tmp_path: Path) -> None:
+    """Verify failed downloads remove the partial destination."""
+    store = _build_filestore(tmp_path)
+    host_file_path = tmp_path / "saved" / "file.txt"
+    host_file_path.parent.mkdir(parents=True, exist_ok=True)
+    host_file_path.write_text("partial", encoding="utf-8")
+
+    with patch.object(store, "file_lock") as file_lock, patch.object(
+        store, "_minimega_get_file", return_value=False
+    ):
+        file_lock.return_value.__enter__.return_value = True
+        file_lock.return_value.__exit__.return_value = False
+
+        local_path, error = store._minimega_get_data(str(host_file_path), "file.txt", False)
+
+    assert local_path == ""
+    assert error == "failed"
+    assert not host_file_path.exists()
+
+
+def test_minimega_get_data_xz_decompress_error(tmp_path: Path) -> None:
+    """Verify xz decompression failures return the correct error."""
+    store = _build_filestore(tmp_path)
+    host_file_path = tmp_path / "saved" / "file"
+    host_file_path.parent.mkdir(parents=True, exist_ok=True)
+
+    def fake_get_file(cache_location: str, filename: str) -> bool:
+        Path(cache_location).write_bytes(b"not really xz")
+        return True
+
+    with patch.object(store, "file_lock") as file_lock, patch.object(
+        store, "_minimega_get_file", side_effect=fake_get_file
+    ):
+        file_lock.return_value.__enter__.return_value = True
+        file_lock.return_value.__exit__.return_value = False
+
+        local_path, error = store._minimega_get_data(str(host_file_path), "file.xz", True)
+
+    assert local_path == ""
+    assert error == "decompress"
+
+
+def test_minimega_get_data_tar_decompress_error(tmp_path: Path) -> None:
+    """Verify tar decompression failures return the correct error."""
+    store = _build_filestore(tmp_path)
+    host_file_path = tmp_path / "saved" / "archive"
+    host_file_path.parent.mkdir(parents=True, exist_ok=True)
+
+    def fake_get_file(cache_location: str, filename: str) -> bool:
+        Path(cache_location).write_bytes(b"not a tar archive")
+        return True
+
+    with patch.object(store, "file_lock") as file_lock, patch.object(
+        store, "_minimega_get_file", side_effect=fake_get_file
+    ):
+        file_lock.return_value.__enter__.return_value = True
+        file_lock.return_value.__exit__.return_value = False
+
+        local_path, error = store._minimega_get_data(str(host_file_path), "archive.tar", True)
+
+    assert local_path == ""
+    assert error == "decompress"
+
+
+def test_minimega_get_file_raises_filenotfound_on_file_get(tmp_path: Path) -> None:
+    """Verify file_get no-such-file errors are mapped to FileNotFoundError."""
+    store = _build_filestore(tmp_path)
+
+    class FakeError(Exception):
+        """Simple stand-in minimega error."""
+
+    cache_location = str(tmp_path / "saved" / "file.txt")
+
+    with patch("firewheel.lib.minimega.file_store.MinimegaError", FakeError):
+        store.mm_api.mm.file_get.side_effect = FakeError("no such file")
+        with pytest.raises(FileNotFoundError):
+            store._minimega_get_file(cache_location, "file.txt")
+
+
+def test_minimega_get_file_allows_already_in_flight(tmp_path: Path) -> None:
+    """Verify already-in-flight download errors are tolerated."""
+    store = _build_filestore(tmp_path)
+    cache_location = str(tmp_path / "saved" / "file.txt")
+
+    class FakeError(Exception):
+        """Simple stand-in minimega error."""
+
+    with patch("firewheel.lib.minimega.file_store.MinimegaError", FakeError), patch(
+        "firewheel.lib.minimega.file_store.time.sleep"
+    ):
+        store.mm_api.mm.file_get.side_effect = FakeError("already in flight")
+        store.mm_api.mm.file_status.return_value = [{"Tabular": []}]
+        store.mm_api.mm.disk_info.return_value = [
+            {"Header": ["backingfile"], "Tabular": [[""]], "Host": "host1"}
+        ]
+        store.mm_api.mmr_map.return_value = {"backingfile": ""}
+        assert store._minimega_get_file(cache_location, "file.txt") is True
+
+
+def test_minimega_get_file_raises_generic_minimega_error(tmp_path: Path) -> None:
+    """Verify unexpected file_get errors are re-raised as MinimegaError."""
+    store = _build_filestore(tmp_path)
+    cache_location = str(tmp_path / "saved" / "file.txt")
+
+    class FakeError(Exception):
+        """Simple stand-in minimega error."""
+
+    with patch("firewheel.lib.minimega.file_store.MinimegaError", FakeError):
+        store.mm_api.mm.file_get.side_effect = FakeError("other failure")
+        with pytest.raises(FakeError):
+            store._minimega_get_file(cache_location, "file.txt")
+
+
+def test_minimega_get_file_raises_filenotfound_on_disk_info(tmp_path: Path) -> None:
+    """Verify disk_info no-such-file errors are mapped to FileNotFoundError."""
+    store = _build_filestore(tmp_path)
+    cache_location = str(tmp_path / "saved" / "file.txt")
+    Path(cache_location).parent.mkdir(parents=True, exist_ok=True)
+    Path(cache_location).write_text("data", encoding="utf-8")
+
+    class FakeError(Exception):
+        """Simple stand-in minimega error."""
+
+    with patch("firewheel.lib.minimega.file_store.MinimegaError", FakeError), patch(
+        "firewheel.lib.minimega.file_store.time.sleep"
+    ):
+        store.mm_api.mm.file_status.return_value = [{"Tabular": []}]
+        store.mm_api.mm.disk_info.side_effect = FakeError("file not found")
+        with pytest.raises(FileNotFoundError):
+            store._minimega_get_file(cache_location, "file.txt")
+
+
+def test_add_image_file(monkeypatch, tmp_path: Path) -> None:
+    """Verify add_image_file uploads, decompresses, and broadcasts."""
+    from firewheel.config import config
+
+    monkeypatch.setitem(config["minimega"], "files_dir", str(tmp_path))
+    store = _build_filestore(tmp_path)
+    store.store = "saved"
+    store.add_file = Mock()
+    store.remove_file = Mock()
+    store.get_path = Mock(return_value=str(tmp_path / "saved" / "image.qcow2"))
+    store.broadcast_get_file = Mock(return_value=True)
+
+    assert store.add_image_file("/tmp/image.qcow2.xz", force=True) is True
+    store.add_file.assert_called_once()
+    store.remove_file.assert_called_once_with("image.qcow2")
+    store.broadcast_get_file.assert_called_once_with("saved/image.qcow2")
+
+
+def test_check_mesh_file_consistency_inconsistent_mesh_size() -> None:
+    """Verify mesh size mismatch marks a file inconsistent."""
+    store = _build_filestore(Path("/tmp"))
+    store.mm_api.get_mesh_size.return_value = 3
+    store.mm_api.mm.file_list.return_value = [{"Tabular": []}]
+    store.mm_api.mm.mesh_send.return_value = [{"Tabular": []}]
+
+    result = store._check_mesh_file_consistency("saved/file")
+    assert result["consistent"] is False
+    assert result["exists"] is False
+
+
+def test_check_mesh_transfer_returns_false_when_not_consistent() -> None:
+    """Verify mesh transfer returns False when final consistency fails."""
+    store = _build_filestore(Path("/tmp"))
+    store.mm_api.mm.mesh_send.return_value = [{"Host": "host1", "Header": ["filename"], "Tabular": []}]
+    store.mm_api.mmr_map.return_value = {"host1": []}
+    store._check_mesh_file_consistency = Mock(
+        return_value={"consistent": False, "exists": True}
+    )
+
+    assert store._check_mesh_transfer("saved/file") is False
+
+
+def test_broadcast_get_file_breaks_on_already_in_flight() -> None:
+    """Verify broadcast tolerates already-in-flight mesh transfer errors."""
+    store = _build_filestore(Path("/tmp"))
+    store.mm_api.get_mesh_size.return_value = 2
+    store.mm_api.mm.mesh_send.side_effect = Exception("already in flight")
+    store._check_mesh_transfer = Mock(return_value=True)
+
+    assert store.broadcast_get_file("saved/file") is True
+
+
+def test_add_file_raises_on_copy_failure(tmp_path: Path, monkeypatch) -> None:
+    """Verify add_file propagates copy failures."""
+    from firewheel.config import config
+
+    monkeypatch.setitem(config["minimega"], "files_dir", str(tmp_path))
+    store = _build_filestore(tmp_path)
+    store.store = "saved"
+    source = tmp_path / "source.txt"
+    source.write_text("payload", encoding="utf-8")
+    (tmp_path / "saved").mkdir(parents=True, exist_ok=True)
+
+    with patch("firewheel.lib.minimega.file_store.shutil.copy2", side_effect=OSError("copy fail")):
+        with pytest.raises(OSError):
+            store.add_file(str(source), force=False)
+
+
+def test_add_file_raises_on_mesh_send_failure(tmp_path: Path, monkeypatch) -> None:
+    """Verify add_file wraps mesh broadcast failures as OSError."""
+    from firewheel.config import config
+
+    monkeypatch.setitem(config["minimega"], "files_dir", str(tmp_path))
+    store = _build_filestore(tmp_path)
+    store.store = "saved"
+    source = tmp_path / "source.txt"
+    source.write_text("payload", encoding="utf-8")
+    (tmp_path / "saved").mkdir(parents=True, exist_ok=True)
+    store.mm_api.mm.mesh_send.side_effect = Exception("mesh fail")
+
+    with pytest.raises(OSError):
+        store.add_file(str(source), force=False)
+
+
+def test_remove_file_raises_oserror() -> None:
+    """Verify remove_file wraps backend failures as OSError."""
+    store = _build_filestore(Path("/tmp"))
+    store.mm_api.mm.file_delete.side_effect = Exception("delete fail")
+
+    with pytest.raises(OSError):
+        store.remove_file("file.txt")

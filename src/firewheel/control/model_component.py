@@ -543,7 +543,9 @@ class ModelComponent:
                 path = os.path.join(self.path, end_path)
                 try:
                     modified_time = os.path.getmtime(path)
-                    last_modified_date = datetime.fromtimestamp(modified_time, timezone.utc)
+                    last_modified_date = datetime.fromtimestamp(
+                        modified_time, timezone.utc
+                    )
                 except OSError as exp:
                     # The image does not exist. This is a problem...unless the
                     # image is already in the file store then it may or may not be an
