@@ -5,7 +5,7 @@ import time
 import shutil
 import tarfile
 from io import BufferedReader
-from lzma import LZMADecompressor, LZMAError
+from lzma import LZMAError, LZMADecompressor
 from types import TracebackType
 from typing import Dict, List, Tuple, Union, Optional, Generator
 from logging import Logger
