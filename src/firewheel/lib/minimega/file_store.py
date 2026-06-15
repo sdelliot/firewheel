@@ -263,13 +263,13 @@ class FileStore:
         """
 
         if filename.endswith(".xz"):
-            filename = filename.rstrip(".xz")
+            filename = filename.removesuffix(".xz")
         elif filename.endswith(".tar.gz"):
-            filename = filename.replace(".tar.gz", "")
+            filename = filename.removesuffix(".tar.gz", "")
         elif filename.endswith(".tar"):
-            filename = filename.rstrip(".tar")
+            filename = filename.removesuffix(".tar")
         elif filename.endswith(".tgz"):
-            filename = filename.rstrip(".tgz")
+            filename = filename.removesuffix(".tgz")
 
         return filename
 
