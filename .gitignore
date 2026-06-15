@@ -51,7 +51,7 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
+./lib/
 lib64/
 parts/
 sdist/
@@ -235,8 +235,5 @@ src/firewheel/firewheel.yaml
 
 # Bash completion script (auto generated)
 firewheel_completion.sh
-
-# Include the `src/firewheel/lib` directory
-!src/firewheel/lib
 
 experiment.history
