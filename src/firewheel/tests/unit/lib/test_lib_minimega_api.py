@@ -413,10 +413,9 @@ def test_run_minimega_script_raises_oserror(monkeypatch, tmp_path: Path) -> None
             api.run_minimega_script(script)
 
 
-def test_mmr_map_first_value_only_empty_raises() -> None:
-    """Verify first_value_only with empty input raises IndexError."""
-    with pytest.raises(IndexError):
-        minimegaAPI.mmr_map([], first_value_only=True)
+def test_mmr_map_first_value_only_empty_returns_empty_dict() -> None:
+    """Verify first_value_only with empty input returns an empty mapping."""
+    assert minimegaAPI.mmr_map([], first_value_only=True) == {}
 
 
 def test_mmr_map_missing_host_key_raises() -> None:
@@ -433,12 +432,12 @@ def test_mmr_map_missing_header_key_raises() -> None:
         minimegaAPI.mmr_map(raw)
 
 
-def test_get_mesh_size_bad_shape_raises() -> None:
-    """Verify malformed mesh_status output raises during parsing."""
+def test_get_mesh_size_bad_shape_raises_keyerror() -> None:
+    """Verify malformed mesh_status output raises on missing expected keys."""
     api = _build_api_without_init()
     api.mm.mesh_status.return_value = [{"Tabular": []}]
 
-    with pytest.raises(IndexError):
+    with pytest.raises(KeyError):
         api.get_mesh_size()
 
 

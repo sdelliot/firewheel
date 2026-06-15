@@ -700,21 +700,21 @@ def test_remove_file_raises_oserror() -> None:
 
 def test_strip_extension_removes_only_tar_suffix() -> None:
     """Verify .tar suffix stripping removes only the exact suffix."""
-    store = _build_filestore()
+    store = _build_filestore(Path("/tmp"))
 
     assert store._strip_extension("foobar.tar") == "foobar"
 
 
 def test_strip_extension_removes_only_tgz_suffix() -> None:
     """Verify .tgz suffix stripping removes only the exact suffix."""
-    store = _build_filestore()
+    store = _build_filestore(Path("/tmp"))
 
     assert store._strip_extension("pizza.tgz") == "pizza"
 
 
 def test_strip_extension_removes_only_xz_suffix() -> None:
     """Verify .xz suffix stripping removes only the exact suffix."""
-    store = _build_filestore()
+    store = _build_filestore(Path("/tmp"))
 
     assert store._strip_extension("buzz.xz") == "buzz"
     
