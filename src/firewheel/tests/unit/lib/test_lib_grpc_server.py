@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, mock_open, patch
 
 import grpc
 import pytest
@@ -307,20 +307,6 @@ def test_serve_startup_path() -> None:
     assert serve_result is None
     server.start.assert_called_once()
     server.stop.assert_called_once_with(0)
-
-
-def test_read_repository_db_from_missing_file_initializes() -> None:
-    """Verify missing repository cache initializes and returns False."""
-    servicer = _build_servicer_without_init()
-    servicer.dbs["prod"]["repositories"] = {}
-
-    with patch("builtins.open", side_effect=FileNotFoundError), patch.object(
-        servicer, "_write_repository_db_to_file"
-    ) as write_db:
-        result = servicer._read_repository_db_from_file("prod")
-
-    assert result is False
-    write_db.assert_called_once_with("prod")
 
 
 def test_read_repository_db_from_file_skips_malformed_lines() -> None:

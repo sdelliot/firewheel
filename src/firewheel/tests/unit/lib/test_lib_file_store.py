@@ -475,10 +475,13 @@ def test_minimega_get_data_failed_download_removes_partial(tmp_path: Path) -> No
     store = _build_filestore(tmp_path)
     host_file_path = tmp_path / "saved" / "file.txt"
     host_file_path.parent.mkdir(parents=True, exist_ok=True)
-    host_file_path.write_text("partial", encoding="utf-8")
+
+    def fake_get_file(cache_location: str, _filename: str) -> bool:
+        Path(cache_location).write_text("partial", encoding="utf-8")
+        return False
 
     with patch.object(store, "file_lock") as file_lock, patch.object(
-        store, "_minimega_get_file", return_value=False
+        store, "_minimega_get_file", side_effect=fake_get_file
     ):
         file_lock.return_value.__enter__.return_value = True
         file_lock.return_value.__exit__.return_value = False

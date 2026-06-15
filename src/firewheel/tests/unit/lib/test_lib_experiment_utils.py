@@ -346,7 +346,8 @@ def test_delete_saved_experiment_not_directory(tmp_path: Path) -> None:
         ret = delete_saved_experiment(console, "exp1")
 
     assert ret == 1
-    assert "is not a directory" in console.export_text()
+    text = console.export_text().replace("\n", " ")
+    assert "is not a directory" in text
 
 
 def test_delete_saved_experiment_access_error() -> None:
