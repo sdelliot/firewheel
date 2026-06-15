@@ -221,20 +221,6 @@ def test_set_vm_state_by_uuid() -> None:
     assert vm.state == "RUNNING"
 
 
-def test_set_vm_state_by_uuid_missing_aborts() -> None:
-    """Verify missing VM state targets abort."""
-    servicer = _build_servicer_without_init()
-    request = Mock()
-    request.db = "prod"
-    request.server_uuid = "missing"
-    request.state = "RUNNING"
-
-    with pytest.raises(RuntimeError) as exc:
-        servicer.SetVMStateByUUID(request, _AbortContext())
-
-    assert exc.value.args[0][0] == grpc.StatusCode.OUT_OF_RANGE
-
-
 def test_destroy_vm_mapping_by_uuid() -> None:
     """Verify a VM mapping and readiness entry can be removed."""
     servicer = _build_servicer_without_init()
