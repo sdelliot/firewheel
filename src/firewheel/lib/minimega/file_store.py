@@ -5,7 +5,7 @@ import time
 import shutil
 import tarfile
 from io import BufferedReader
-from lzma import LZMADecompressor
+from lzma import LZMADecompressor, LZMAError
 from types import TracebackType
 from typing import Dict, List, Tuple, Union, Optional, Generator
 from logging import Logger
@@ -274,14 +274,14 @@ class FileStore:
         return filename
 
     def _decompress_error(
-        self, exp: OSError, tmp_local_path: str, host_file_path: str
+        self, exp: Exception, tmp_local_path: str, host_file_path: str
     ) -> None:
         """
         Output specific warnings/errors if an issue happened while trying to decompress a file.
         Additionally, try to remove the file which caused the issue.
 
         Args:
-            exp (OSError): The exception being raised.
+            exp (Exception): The exception being raised.
             tmp_local_path (str): The temporary path of the file name used for
                 decompression.
             host_file_path (str): The location to cache the file locally.
@@ -335,7 +335,7 @@ class FileStore:
                                         cache_file.write(
                                             decompressor.decompress(xz_file.read(chunk))
                                         )
-                        except OSError as exp:
+                        except (OSError, LZMAError) as exp:
                             self._decompress_error(exp, tmp_local_path, host_file_path)
                             return "", "decompress"
 
@@ -353,7 +353,7 @@ class FileStore:
                                     os.path.dirname(host_file_path),
                                     members=get_safe_tarfile_members(tar_file),
                                 )
-                        except OSError as exp:
+                        except (OSError, tarfile.TarError) as exp:
                             self._decompress_error(exp, tmp_local_path, host_file_path)
                             return "", "decompress"
                     else:

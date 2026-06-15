@@ -342,12 +342,15 @@ def test_delete_saved_experiment_not_directory(tmp_path: Path) -> None:
     with patch(
         "firewheel.lib.experiment_utils.get_saved_experiment_path",
         return_value=target,
-    ):
+    ), patch("firewheel.lib.experiment_utils.print_error") as mock_print_error:
         ret = delete_saved_experiment(console, "exp1")
 
     assert ret == 1
-    text = console.export_text().replace("\n", " ")
-    assert "is not a directory" in text
+    mock_print_error.assert_called_once()
+    called_console, message = mock_print_error.call_args.args
+    assert called_console is console
+    assert str(target) in message
+    assert "is not a directory" in message
 
 
 def test_delete_saved_experiment_access_error() -> None:

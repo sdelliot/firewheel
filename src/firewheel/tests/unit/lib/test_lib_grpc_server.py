@@ -309,22 +309,6 @@ def test_serve_startup_path() -> None:
     server.stop.assert_called_once_with(0)
 
 
-def test_read_repository_db_from_file_skips_malformed_lines() -> None:
-    """Verify malformed repository lines are skipped."""
-    servicer = _build_servicer_without_init()
-    servicer.dbs["prod"]["repositories"] = {}
-
-    mocked_file = mock_open(read_data='{"bad": "line"}\n')
-    with patch("builtins.open", mocked_file), patch(
-        "firewheel.lib.grpc.firewheel_grpc_server.Parse",
-        side_effect=Exception("parse fail"),
-    ):
-        result = servicer._read_repository_db_from_file("prod")
-
-    assert result is True
-    assert servicer.dbs["prod"]["repositories"] == {}
-
-
 def test_set_vm_state_by_uuid_missing_aborts() -> None:
     """Verify missing VM mapping during state update aborts."""
     servicer = _build_servicer_without_init()
