@@ -6,34 +6,34 @@ from __future__ import annotations
 import json
 import pickle
 import tarfile
-from datetime import datetime, timezone
 from pathlib import Path
+from datetime import datetime, timezone
 from unittest.mock import Mock, patch
 
 import pytest
 from rich.console import Console
 
 from firewheel.lib.experiment_utils import (
-    EXPERIMENT_TIME_FILENAME,
     FORMAT_VERSION,
-    IMAGESTORE_DIRNAME,
-    LAUNCH_CMDS_FILENAME,
     MANIFEST_FILENAME,
     SCHEDULES_DIRNAME,
-    VMRESOURCESTORE_DIRNAME,
+    IMAGESTORE_DIRNAME,
     VM_MAPPING_FILENAME,
+    LAUNCH_CMDS_FILENAME,
+    VMRESOURCESTORE_DIRNAME,
+    EXPERIMENT_TIME_FILENAME,
     BackupLayout,
-    build_manifest,
-    create_resume_schedule_entry,
-    delete_saved_experiment,
-    extract_archive_safely,
-    get_saved_experiment_path,
-    is_supported_archive,
-    list_saved_experiments,
     load_manifest,
-    print_saved_experiments,
-    validate_backup_directory,
+    build_manifest,
     write_manifest,
+    is_supported_archive,
+    extract_archive_safely,
+    list_saved_experiments,
+    delete_saved_experiment,
+    print_saved_experiments,
+    get_saved_experiment_path,
+    validate_backup_directory,
+    create_resume_schedule_entry,
 )
 
 
@@ -232,7 +232,9 @@ def test_list_saved_experiments(tmp_path: Path) -> None:
 def test_print_saved_experiments_none() -> None:
     """Verify printing handles an empty saved experiment list."""
     console = Console(record=True)
-    with patch("firewheel.lib.experiment_utils.list_saved_experiments", return_value=[]):
+    with patch(
+        "firewheel.lib.experiment_utils.list_saved_experiments", return_value=[]
+    ):
         ret = print_saved_experiments(console)
 
     assert ret == 0
@@ -302,6 +304,7 @@ def test_create_resume_schedule_entry() -> None:
 
     assert result[-1].data == [{"resume": True}]
 
+
 def test_list_saved_experiments_no_root() -> None:
     """Verify missing saved root returns an empty list."""
     with patch("firewheel.lib.experiment_utils.FileStore") as mock_store_cls:
@@ -339,10 +342,13 @@ def test_delete_saved_experiment_not_directory(tmp_path: Path) -> None:
     target = tmp_path / "exp1"
     target.write_text("not dir", encoding="utf-8")
 
-    with patch(
-        "firewheel.lib.experiment_utils.get_saved_experiment_path",
-        return_value=target,
-    ), patch("firewheel.lib.experiment_utils.print_error") as mock_print_error:
+    with (
+        patch(
+            "firewheel.lib.experiment_utils.get_saved_experiment_path",
+            return_value=target,
+        ),
+        patch("firewheel.lib.experiment_utils.print_error") as mock_print_error,
+    ):
         ret = delete_saved_experiment(console, "exp1")
 
     assert ret == 1

@@ -200,7 +200,9 @@ def test_start_discovery_returns_false_after_all_attempts(
 
     api = discoveryAPI()
 
-    with patch.object(api, "test_connection", side_effect=[False] * 13) as test_connection:
+    with patch.object(
+        api, "test_connection", side_effect=[False] * 13
+    ) as test_connection:
         assert api.start_discovery() is False
 
     assert test_connection.call_count == 13
@@ -247,7 +249,9 @@ def test_insert_network(mock_config_cls, mock_post) -> None:
     api = discoveryAPI()
 
     assert api.insert_network() == [{"NID": "n1"}]
-    mock_post.assert_called_once_with(f"{api.discovery_URI}/networks/", json=[{}], timeout=60)
+    mock_post.assert_called_once_with(
+        f"{api.discovery_URI}/networks/", json=[{}], timeout=60
+    )
 
 
 @patch("firewheel.lib.discovery.api.requests.get")
@@ -284,7 +288,9 @@ def test_delete_networks_with_key_and_value(mock_config_cls, mock_delete) -> Non
     api = discoveryAPI()
 
     assert api.delete_networks(key="NID", value="n1") == [{"NID": "n1"}]
-    mock_delete.assert_called_once_with(f"{api.discovery_URI}/networks/NID/n1", timeout=60)
+    mock_delete.assert_called_once_with(
+        f"{api.discovery_URI}/networks/NID/n1", timeout=60
+    )
 
 
 @patch("firewheel.lib.discovery.api.requests.delete")
@@ -302,7 +308,9 @@ def test_delete_networks_with_value_only(mock_config_cls, mock_delete) -> None:
 
 @patch("firewheel.lib.discovery.api.requests.delete")
 @patch("firewheel.lib.discovery.api.Config")
-def test_delete_networks_returns_empty_list_on_none(mock_config_cls, mock_delete) -> None:
+def test_delete_networks_returns_empty_list_on_none(
+    mock_config_cls, mock_delete
+) -> None:
     """Verify delete_networks normalizes None responses to an empty list."""
     mock_config_cls.return_value.get_config.return_value = _mock_config()
     mock_delete.return_value = _build_response(json_data=None)
@@ -346,7 +354,9 @@ def test_delete_endpoints_with_key_and_value(mock_config_cls, mock_delete) -> No
     api = discoveryAPI()
 
     assert api.delete_endpoints(key="NID", value="e1") == [{"NID": "e1"}]
-    mock_delete.assert_called_once_with(f"{api.discovery_URI}/endpoints/NID/e1", timeout=60)
+    mock_delete.assert_called_once_with(
+        f"{api.discovery_URI}/endpoints/NID/e1", timeout=60
+    )
 
 
 @patch("firewheel.lib.discovery.api.requests.delete")
@@ -359,12 +369,16 @@ def test_delete_endpoints_with_value_only(mock_config_cls, mock_delete) -> None:
     api = discoveryAPI()
 
     assert api.delete_endpoints(value="qemu") == [{"NID": "e1"}]
-    mock_delete.assert_called_once_with(f"{api.discovery_URI}/endpoints/qemu", timeout=60)
+    mock_delete.assert_called_once_with(
+        f"{api.discovery_URI}/endpoints/qemu", timeout=60
+    )
 
 
 @patch("firewheel.lib.discovery.api.requests.delete")
 @patch("firewheel.lib.discovery.api.Config")
-def test_delete_endpoints_returns_empty_list_on_none(mock_config_cls, mock_delete) -> None:
+def test_delete_endpoints_returns_empty_list_on_none(
+    mock_config_cls, mock_delete
+) -> None:
     """Verify delete_endpoints normalizes None responses to an empty list."""
     mock_config_cls.return_value.get_config.return_value = _mock_config()
     mock_delete.return_value = _build_response(json_data=None)
@@ -390,11 +404,12 @@ def test_delete_all_endpoints_only_qemu_needed(mock_config_cls) -> None:
     mock_config_cls.return_value.get_config.return_value = _mock_config()
     api = discoveryAPI()
 
-    with patch.object(
-        api, "get_endpoints", side_effect=[[{"NID": "e1"}], []]
-    ), patch.object(
-        api, "delete_endpoints", return_value=[{"NID": "e1"}]
-    ) as delete_endpoints:
+    with (
+        patch.object(api, "get_endpoints", side_effect=[[{"NID": "e1"}], []]),
+        patch.object(
+            api, "delete_endpoints", return_value=[{"NID": "e1"}]
+        ) as delete_endpoints,
+    ):
         assert api.delete_all_endpoints() == [{"NID": "e1"}]
 
     delete_endpoints.assert_called_once_with(value="qemu")
@@ -408,13 +423,14 @@ def test_delete_all_endpoints_deletes_remaining_by_nid(mock_config_cls) -> None:
 
     remaining = [{"NID": "e2"}, {"NID": "e3"}]
 
-    with patch.object(
-        api, "get_endpoints", side_effect=[[{"NID": "e1"}], remaining]
-    ), patch.object(
-        api,
-        "delete_endpoints",
-        side_effect=[[{"NID": "e1"}], [{"NID": "e2"}], [{"NID": "e3"}]],
-    ) as delete_endpoints:
+    with (
+        patch.object(api, "get_endpoints", side_effect=[[{"NID": "e1"}], remaining]),
+        patch.object(
+            api,
+            "delete_endpoints",
+            side_effect=[[{"NID": "e1"}], [{"NID": "e2"}], [{"NID": "e3"}]],
+        ) as delete_endpoints,
+    ):
         result = api.delete_all_endpoints()
 
     assert result == [{"NID": "e1"}, {"NID": "e2"}, {"NID": "e3"}]
@@ -439,13 +455,14 @@ def test_delete_all_networks(mock_config_cls) -> None:
     mock_config_cls.return_value.get_config.return_value = _mock_config()
     api = discoveryAPI()
 
-    with patch.object(
-        api, "get_networks", return_value=[{"NID": "n1"}, {"NID": "n2"}]
-    ), patch.object(
-        api,
-        "delete_networks",
-        side_effect=[[{"NID": "n1"}], [{"NID": "n2"}]],
-    ) as delete_networks:
+    with (
+        patch.object(api, "get_networks", return_value=[{"NID": "n1"}, {"NID": "n2"}]),
+        patch.object(
+            api,
+            "delete_networks",
+            side_effect=[[{"NID": "n1"}], [{"NID": "n2"}]],
+        ) as delete_networks,
+    ):
         result = api.delete_all_networks()
 
     assert result == [{"NID": "n1"}, {"NID": "n2"}]
@@ -459,10 +476,11 @@ def test_delete_all_success(mock_config_cls) -> None:
     mock_config_cls.return_value.get_config.return_value = _mock_config()
     api = discoveryAPI()
 
-    with patch.object(api, "delete_all_endpoints"), patch.object(
-        api, "get_endpoints", return_value=[]
-    ), patch.object(api, "delete_all_networks"), patch.object(
-        api, "get_networks", return_value=[]
+    with (
+        patch.object(api, "delete_all_endpoints"),
+        patch.object(api, "get_endpoints", return_value=[]),
+        patch.object(api, "delete_all_networks"),
+        patch.object(api, "get_networks", return_value=[]),
     ):
         assert api.delete_all() is True
 
@@ -473,8 +491,9 @@ def test_delete_all_raises_for_remaining_endpoints(mock_config_cls) -> None:
     mock_config_cls.return_value.get_config.return_value = _mock_config()
     api = discoveryAPI()
 
-    with patch.object(api, "delete_all_endpoints"), patch.object(
-        api, "get_endpoints", return_value=[{"NID": "e1"}]
+    with (
+        patch.object(api, "delete_all_endpoints"),
+        patch.object(api, "get_endpoints", return_value=[{"NID": "e1"}]),
     ):
         with pytest.raises(RuntimeError, match="discovery endpoints"):
             api.delete_all()
@@ -486,10 +505,11 @@ def test_delete_all_raises_for_remaining_networks(mock_config_cls) -> None:
     mock_config_cls.return_value.get_config.return_value = _mock_config()
     api = discoveryAPI()
 
-    with patch.object(api, "delete_all_endpoints"), patch.object(
-        api, "get_endpoints", return_value=[]
-    ), patch.object(api, "delete_all_networks"), patch.object(
-        api, "get_networks", return_value=[{"NID": "n1"}]
+    with (
+        patch.object(api, "delete_all_endpoints"),
+        patch.object(api, "get_endpoints", return_value=[]),
+        patch.object(api, "delete_all_networks"),
+        patch.object(api, "get_networks", return_value=[{"NID": "n1"}]),
     ):
         with pytest.raises(RuntimeError, match="Networks not successfully deleted"):
             api.delete_all()
@@ -541,7 +561,9 @@ def test_connect_endpoint(mock_config_cls, mock_post) -> None:
     api = discoveryAPI()
 
     assert api.connect_endpoint("node1", "net1") == {"NID": "e1", "network": "n1"}
-    mock_post.assert_called_once_with(f"{api.discovery_URI}/connect/net1/node1", timeout=60)
+    mock_post.assert_called_once_with(
+        f"{api.discovery_URI}/connect/net1/node1", timeout=60
+    )
 
 
 @patch("firewheel.lib.discovery.api.requests.get")
@@ -580,8 +602,9 @@ def test_delete_all_endpoints_raises_on_missing_nid(mock_config_cls) -> None:
     mock_config_cls.return_value.get_config.return_value = _mock_config()
     api = discoveryAPI()
 
-    with patch.object(api, "get_endpoints", side_effect=[[{"NID": "e1"}], [{"bad": 1}]]), patch.object(
-        api, "delete_endpoints", return_value=[{"NID": "e1"}]
+    with (
+        patch.object(api, "get_endpoints", side_effect=[[{"NID": "e1"}], [{"bad": 1}]]),
+        patch.object(api, "delete_endpoints", return_value=[{"NID": "e1"}]),
     ):
         with pytest.raises(KeyError):
             api.delete_all_endpoints()

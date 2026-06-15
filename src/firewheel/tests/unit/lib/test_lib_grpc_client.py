@@ -163,9 +163,7 @@ def test_initialize_experiment_start_time() -> None:
     client = _build_client_without_init()
     client.stub.InitializeExperimentStartTime.return_value = object()
 
-    with patch(
-        "firewheel.lib.grpc.firewheel_grpc_client.msg_to_dict", return_value={}
-    ):
+    with patch("firewheel.lib.grpc.firewheel_grpc_client.msg_to_dict", return_value={}):
         assert client.initialize_experiment_start_time() == {}
 
 
@@ -174,9 +172,7 @@ def test_destroy_all_vm_mappings() -> None:
     client = _build_client_without_init()
     client.stub.DestroyAllVMMappings.return_value = object()
 
-    with patch(
-        "firewheel.lib.grpc.firewheel_grpc_client.msg_to_dict", return_value={}
-    ):
+    with patch("firewheel.lib.grpc.firewheel_grpc_client.msg_to_dict", return_value={}):
         assert client.destroy_all_vm_mappings() == {}
 
 
@@ -229,7 +225,9 @@ def test_get_vm_mapping_by_uuid_success() -> None:
 def test_get_vm_mapping_by_uuid_missing_returns_none() -> None:
     """Verify missing UUID lookup returns None."""
     client = _build_client_without_init()
-    client.stub.GetVMMappingByUUID.side_effect = _RpcException(grpc.StatusCode.OUT_OF_RANGE)
+    client.stub.GetVMMappingByUUID.side_effect = _RpcException(
+        grpc.StatusCode.OUT_OF_RANGE
+    )
     assert client.get_vm_mapping_by_uuid("uuid") is None
 
 
@@ -238,9 +236,7 @@ def test_destroy_vm_mapping_by_uuid() -> None:
     client = _build_client_without_init()
     client.stub.DestroyVMMappingByUUID.return_value = object()
 
-    with patch(
-        "firewheel.lib.grpc.firewheel_grpc_client.msg_to_dict", return_value={}
-    ):
+    with patch("firewheel.lib.grpc.firewheel_grpc_client.msg_to_dict", return_value={}):
         assert client.destroy_vm_mapping_by_uuid("uuid") == {}
 
 
@@ -273,8 +269,13 @@ def test_set_vm_time_by_uuid_success() -> None:
 def test_set_vm_time_by_uuid_missing_returns_none() -> None:
     """Verify missing VM time update target returns None."""
     client = _build_client_without_init()
-    client.stub.SetVMTimeByUUID.side_effect = _RpcException(grpc.StatusCode.OUT_OF_RANGE)
-    assert client.set_vm_time_by_uuid({"server_uuid": "uuid", "current_time": "12"}) is None
+    client.stub.SetVMTimeByUUID.side_effect = _RpcException(
+        grpc.StatusCode.OUT_OF_RANGE
+    )
+    assert (
+        client.set_vm_time_by_uuid({"server_uuid": "uuid", "current_time": "12"})
+        is None
+    )
 
 
 def test_set_vm_state_by_uuid_success() -> None:
@@ -294,8 +295,12 @@ def test_set_vm_state_by_uuid_success() -> None:
 def test_set_vm_state_by_uuid_missing_returns_none() -> None:
     """Verify missing VM state update target returns None."""
     client = _build_client_without_init()
-    client.stub.SetVMStateByUUID.side_effect = _RpcException(grpc.StatusCode.OUT_OF_RANGE)
-    assert client.set_vm_state_by_uuid({"server_uuid": "uuid", "state": "READY"}) is None
+    client.stub.SetVMStateByUUID.side_effect = _RpcException(
+        grpc.StatusCode.OUT_OF_RANGE
+    )
+    assert (
+        client.set_vm_state_by_uuid({"server_uuid": "uuid", "state": "READY"}) is None
+    )
 
 
 def test_close() -> None:
@@ -303,6 +308,7 @@ def test_close() -> None:
     client = _build_client_without_init()
     client.close()
     client.chan.close.assert_called_once()
+
 
 def test_init_with_explicit_logger_and_no_required_connection(monkeypatch) -> None:
     """Verify constructor accepts an injected logger."""
@@ -323,9 +329,15 @@ def test_init_with_explicit_logger_and_no_required_connection(monkeypatch) -> No
     try:
         import unittest.mock as umock
 
-        with umock.patch("firewheel.lib.grpc.firewheel_grpc_client.grpc.insecure_channel", return_value=fake_channel), umock.patch(
-            "firewheel.lib.grpc.firewheel_grpc_client.firewheel_grpc_pb2_grpc.FirewheelStub",
-            return_value=fake_stub,
+        with (
+            umock.patch(
+                "firewheel.lib.grpc.firewheel_grpc_client.grpc.insecure_channel",
+                return_value=fake_channel,
+            ),
+            umock.patch(
+                "firewheel.lib.grpc.firewheel_grpc_client.firewheel_grpc_pb2_grpc.FirewheelStub",
+                return_value=fake_stub,
+            ),
         ):
             client = FirewheelGrpcClient(log=fake_log, require_connection=False)
     finally:
@@ -347,7 +359,9 @@ def test_get_info_logs_non_unavailable_rpc_error() -> None:
 def test_get_experiment_launch_time_logs_unexpected_rpc_error() -> None:
     """Verify unexpected launch time RPC errors are logged."""
     client = _build_client_without_init()
-    client.stub.GetExperimentLaunchTime.side_effect = _RpcException(grpc.StatusCode.INTERNAL)
+    client.stub.GetExperimentLaunchTime.side_effect = _RpcException(
+        grpc.StatusCode.INTERNAL
+    )
 
     assert client.get_experiment_launch_time() is None
     assert client.log.exception.called
@@ -356,7 +370,9 @@ def test_get_experiment_launch_time_logs_unexpected_rpc_error() -> None:
 def test_get_experiment_start_time_logs_unexpected_rpc_error() -> None:
     """Verify unexpected start time RPC errors are logged."""
     client = _build_client_without_init()
-    client.stub.GetExperimentStartTime.side_effect = _RpcException(grpc.StatusCode.INTERNAL)
+    client.stub.GetExperimentStartTime.side_effect = _RpcException(
+        grpc.StatusCode.INTERNAL
+    )
 
     assert client.get_experiment_start_time() is None
     assert client.log.exception.called

@@ -76,6 +76,7 @@ def test_utclog_uses_gmtime(tmp_path, monkeypatch) -> None:
     formatter = logger.handlers[0].formatter
     assert formatter.converter is not None
 
+
 def test_log_warns_on_missing_group(tmp_path, monkeypatch) -> None:
     """Verify missing configured group emits a warning path."""
     from firewheel.config import config
@@ -109,10 +110,11 @@ def test_log_warning_on_chown_failure(tmp_path, monkeypatch) -> None:
 
         st_gid = 12345
 
-    with patch("firewheel.lib.log.grp.getgrnam", return_value=FakeGroup()), patch(
-        "firewheel.lib.log.os.stat", return_value=FakeStat()
-    ), patch("firewheel.lib.log.os.getgid", return_value=1), patch(
-        "firewheel.lib.log.os.chown", side_effect=OSError("bad chown")
+    with (
+        patch("firewheel.lib.log.grp.getgrnam", return_value=FakeGroup()),
+        patch("firewheel.lib.log.os.stat", return_value=FakeStat()),
+        patch("firewheel.lib.log.os.getgid", return_value=1),
+        patch("firewheel.lib.log.os.chown", side_effect=OSError("bad chown")),
     ):
         logger = Log("test_log_chown_failure").log
 

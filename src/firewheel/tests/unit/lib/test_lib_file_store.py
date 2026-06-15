@@ -3,12 +3,9 @@
 
 from __future__ import annotations
 
-import json
 import os
-import tarfile
-import tempfile
-from datetime import datetime
 from pathlib import Path
+from datetime import datetime
 from unittest.mock import Mock, patch
 
 import pytest
@@ -154,8 +151,9 @@ def test_check_path(tmp_path: Path, monkeypatch) -> None:
 def test_get_path_success() -> None:
     """Verify get_path returns resolved local path on success."""
     store = _build_filestore(Path("/tmp"))
-    with patch.object(store, "get_file_path", return_value="/tmp/file"), patch.object(
-        store, "_minimega_get_data", return_value=("/tmp/file", "")
+    with (
+        patch.object(store, "get_file_path", return_value="/tmp/file"),
+        patch.object(store, "_minimega_get_data", return_value=("/tmp/file", "")),
     ):
         assert store.get_path("file") == "/tmp/file"
 
@@ -163,8 +161,9 @@ def test_get_path_success() -> None:
 def test_get_path_failed_raises() -> None:
     """Verify get_path raises FileNotFoundError on failed fetch."""
     store = _build_filestore(Path("/tmp"))
-    with patch.object(store, "get_file_path", return_value="/tmp/file"), patch.object(
-        store, "_minimega_get_data", return_value=("", "failed")
+    with (
+        patch.object(store, "get_file_path", return_value="/tmp/file"),
+        patch.object(store, "_minimega_get_data", return_value=("", "failed")),
     ):
         with pytest.raises(FileNotFoundError):
             store.get_path("file")
@@ -173,8 +172,9 @@ def test_get_path_failed_raises() -> None:
 def test_get_path_decompress_raises() -> None:
     """Verify get_path raises RuntimeError on decompression failure."""
     store = _build_filestore(Path("/tmp"))
-    with patch.object(store, "get_file_path", return_value="/tmp/file"), patch.object(
-        store, "_minimega_get_data", return_value=("", "decompress")
+    with (
+        patch.object(store, "get_file_path", return_value="/tmp/file"),
+        patch.object(store, "_minimega_get_data", return_value=("", "decompress")),
     ):
         with pytest.raises(RuntimeError):
             store.get_path("file")
@@ -379,7 +379,9 @@ def test_remove_file() -> None:
     store.remove_file("file.txt")
 
     store.mm_api.mm.file_delete.assert_called_once_with("saved/file.txt")
-    store.mm_api.mm.mesh_send.assert_called_once_with("all", "file delete saved/file.txt")
+    store.mm_api.mm.mesh_send.assert_called_once_with(
+        "all", "file delete saved/file.txt"
+    )
 
 
 def test_wait_for_lock_exits_when_lock_disappears(tmp_path: Path) -> None:
@@ -415,8 +417,11 @@ def test_wait_for_lock_warns_after_five_minutes(tmp_path: Path) -> None:
         count["value"] += 1
         return count["value"] < 1202
 
-    with patch("firewheel.lib.minimega.file_store.os.path.exists", side_effect=fake_exists), patch(
-        "firewheel.lib.minimega.file_store.time.sleep"
+    with (
+        patch(
+            "firewheel.lib.minimega.file_store.os.path.exists", side_effect=fake_exists
+        ),
+        patch("firewheel.lib.minimega.file_store.time.sleep"),
     ):
         store._wait_for_lock(str(target))
 
@@ -438,13 +443,11 @@ def test_minimega_get_data_download_timeout_waits_for_other(tmp_path: Path) -> N
     host_file_path = str(tmp_path / "saved" / "file.txt")
     Path(host_file_path).parent.mkdir(parents=True, exist_ok=True)
 
-    with patch.object(
-        store, "file_lock"
-    ) as file_lock, patch.object(
-        store, "_minimega_get_file", side_effect=TimeoutError("busy")
-    ), patch.object(
-        store, "_wait_for_lock"
-    ) as wait_for_lock:
+    with (
+        patch.object(store, "file_lock") as file_lock,
+        patch.object(store, "_minimega_get_file", side_effect=TimeoutError("busy")),
+        patch.object(store, "_wait_for_lock") as wait_for_lock,
+    ):
         file_lock.return_value.__enter__.return_value = True
         file_lock.return_value.__exit__.return_value = False
 
@@ -463,7 +466,9 @@ def test_minimega_get_data_existing_file_only_waits_for_lock(tmp_path: Path) -> 
     host_file_path.write_text("data", encoding="utf-8")
 
     with patch.object(store, "_wait_for_lock") as wait_for_lock:
-        local_path, error = store._minimega_get_data(str(host_file_path), "file.txt", False)
+        local_path, error = store._minimega_get_data(
+            str(host_file_path), "file.txt", False
+        )
 
     assert local_path == str(host_file_path)
     assert error == ""
@@ -480,13 +485,16 @@ def test_minimega_get_data_failed_download_removes_partial(tmp_path: Path) -> No
         Path(cache_location).write_text("partial", encoding="utf-8")
         return False
 
-    with patch.object(store, "file_lock") as file_lock, patch.object(
-        store, "_minimega_get_file", side_effect=fake_get_file
+    with (
+        patch.object(store, "file_lock") as file_lock,
+        patch.object(store, "_minimega_get_file", side_effect=fake_get_file),
     ):
         file_lock.return_value.__enter__.return_value = True
         file_lock.return_value.__exit__.return_value = False
 
-        local_path, error = store._minimega_get_data(str(host_file_path), "file.txt", False)
+        local_path, error = store._minimega_get_data(
+            str(host_file_path), "file.txt", False
+        )
 
     assert local_path == ""
     assert error == "failed"
@@ -503,13 +511,16 @@ def test_minimega_get_data_xz_decompress_error(tmp_path: Path) -> None:
         Path(cache_location).write_bytes(b"not really xz")
         return True
 
-    with patch.object(store, "file_lock") as file_lock, patch.object(
-        store, "_minimega_get_file", side_effect=fake_get_file
+    with (
+        patch.object(store, "file_lock") as file_lock,
+        patch.object(store, "_minimega_get_file", side_effect=fake_get_file),
     ):
         file_lock.return_value.__enter__.return_value = True
         file_lock.return_value.__exit__.return_value = False
 
-        local_path, error = store._minimega_get_data(str(host_file_path), "file.xz", True)
+        local_path, error = store._minimega_get_data(
+            str(host_file_path), "file.xz", True
+        )
 
     assert local_path == ""
     assert error == "decompress"
@@ -525,13 +536,16 @@ def test_minimega_get_data_tar_decompress_error(tmp_path: Path) -> None:
         Path(cache_location).write_bytes(b"not a tar archive")
         return True
 
-    with patch.object(store, "file_lock") as file_lock, patch.object(
-        store, "_minimega_get_file", side_effect=fake_get_file
+    with (
+        patch.object(store, "file_lock") as file_lock,
+        patch.object(store, "_minimega_get_file", side_effect=fake_get_file),
     ):
         file_lock.return_value.__enter__.return_value = True
         file_lock.return_value.__exit__.return_value = False
 
-        local_path, error = store._minimega_get_data(str(host_file_path), "archive.tar", True)
+        local_path, error = store._minimega_get_data(
+            str(host_file_path), "archive.tar", True
+        )
 
     assert local_path == ""
     assert error == "decompress"
@@ -560,8 +574,9 @@ def test_minimega_get_file_allows_already_in_flight(tmp_path: Path) -> None:
     class FakeError(Exception):
         """Simple stand-in minimega error."""
 
-    with patch("firewheel.lib.minimega.file_store.MinimegaError", FakeError), patch(
-        "firewheel.lib.minimega.file_store.time.sleep"
+    with (
+        patch("firewheel.lib.minimega.file_store.MinimegaError", FakeError),
+        patch("firewheel.lib.minimega.file_store.time.sleep"),
     ):
         store.mm_api.mm.file_get.side_effect = FakeError("already in flight")
         store.mm_api.mm.file_status.return_value = [{"Tabular": []}]
@@ -596,8 +611,9 @@ def test_minimega_get_file_raises_filenotfound_on_disk_info(tmp_path: Path) -> N
     class FakeError(Exception):
         """Simple stand-in minimega error."""
 
-    with patch("firewheel.lib.minimega.file_store.MinimegaError", FakeError), patch(
-        "firewheel.lib.minimega.file_store.time.sleep"
+    with (
+        patch("firewheel.lib.minimega.file_store.MinimegaError", FakeError),
+        patch("firewheel.lib.minimega.file_store.time.sleep"),
     ):
         store.mm_api.mm.file_status.return_value = [{"Tabular": []}]
         store.mm_api.mm.disk_info.side_effect = FakeError("file not found")
@@ -638,7 +654,9 @@ def test_check_mesh_file_consistency_inconsistent_mesh_size() -> None:
 def test_check_mesh_transfer_returns_false_when_not_consistent() -> None:
     """Verify mesh transfer returns False when final consistency fails."""
     store = _build_filestore(Path("/tmp"))
-    store.mm_api.mm.mesh_send.return_value = [{"Host": "host1", "Header": ["filename"], "Tabular": []}]
+    store.mm_api.mm.mesh_send.return_value = [
+        {"Host": "host1", "Header": ["filename"], "Tabular": []}
+    ]
     store.mm_api.mmr_map.return_value = {"host1": []}
     store._check_mesh_file_consistency = Mock(
         return_value={"consistent": False, "exists": True}
@@ -668,7 +686,10 @@ def test_add_file_raises_on_copy_failure(tmp_path: Path, monkeypatch) -> None:
     source.write_text("payload", encoding="utf-8")
     (tmp_path / "saved").mkdir(parents=True, exist_ok=True)
 
-    with patch("firewheel.lib.minimega.file_store.shutil.copy2", side_effect=OSError("copy fail")):
+    with patch(
+        "firewheel.lib.minimega.file_store.shutil.copy2",
+        side_effect=OSError("copy fail"),
+    ):
         with pytest.raises(OSError):
             store.add_file(str(source), force=False)
 
@@ -717,20 +738,25 @@ def test_strip_extension_removes_only_xz_suffix() -> None:
     store = _build_filestore(Path("/tmp"))
 
     assert store._strip_extension("buzz.xz") == "buzz"
-    
+
 
 def test_get_path_decompress_strips_suffix_after_success() -> None:
     """Verify get_path strips compression suffix on successful decompression."""
     store = _build_filestore(Path("/tmp"))
     store.decompress = True
 
-    with patch.object(store, "get_file_path", return_value="/tmp/saved/file"), patch.object(
-        store, "_minimega_get_data", return_value=("/tmp/saved/file.xz", "")
+    with (
+        patch.object(store, "get_file_path", return_value="/tmp/saved/file"),
+        patch.object(
+            store, "_minimega_get_data", return_value=("/tmp/saved/file.xz", "")
+        ),
     ):
         assert store.get_path("file.xz") == "/tmp/saved/file"
 
 
-def test_add_image_file_no_remove_if_suffix_not_changed(monkeypatch, tmp_path: Path) -> None:
+def test_add_image_file_no_remove_if_suffix_not_changed(
+    monkeypatch, tmp_path: Path
+) -> None:
     """Verify add_image_file does not delete an expected basename when unchanged."""
     from firewheel.config import config
 
@@ -749,9 +775,13 @@ def test_add_image_file_no_remove_if_suffix_not_changed(monkeypatch, tmp_path: P
 def test_check_mesh_transfer_breaks_on_empty_host_response() -> None:
     """Verify mesh transfer returns False when consistency never becomes valid."""
     store = _build_filestore(Path("/tmp"))
-    store.mm_api.mm.mesh_send.return_value = [{"Host": "host1", "Header": ["filename"], "Tabular": []}]
+    store.mm_api.mm.mesh_send.return_value = [
+        {"Host": "host1", "Header": ["filename"], "Tabular": []}
+    ]
     store.mm_api.mmr_map.return_value = {"host1": []}
-    store._check_mesh_file_consistency = Mock(return_value={"consistent": False, "exists": False})
+    store._check_mesh_file_consistency = Mock(
+        return_value={"consistent": False, "exists": False}
+    )
 
     assert store._check_mesh_transfer("saved/file") is False
 

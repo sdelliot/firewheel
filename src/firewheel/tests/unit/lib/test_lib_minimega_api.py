@@ -6,7 +6,7 @@ from __future__ import annotations
 import platform
 import subprocess
 from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock, patch
 
 import pytest
 
@@ -56,8 +56,9 @@ def test_check_version_success() -> None:
     proc = Mock()
     proc.is_alive.return_value = False
 
-    with patch("firewheel.lib.minimega.api.multiprocessing.Queue", return_value=queue), patch(
-        "firewheel.lib.minimega.api.multiprocessing.Process", return_value=proc
+    with (
+        patch("firewheel.lib.minimega.api.multiprocessing.Queue", return_value=queue),
+        patch("firewheel.lib.minimega.api.multiprocessing.Process", return_value=proc),
     ):
         assert api._check_version(timeout=1, skip_retry=False) is True
 
@@ -70,8 +71,9 @@ def test_check_version_timeout_raises_runtimeerror_when_skip_retry() -> None:
     proc = Mock()
     proc.is_alive.return_value = True
 
-    with patch("firewheel.lib.minimega.api.multiprocessing.Queue", return_value=queue), patch(
-        "firewheel.lib.minimega.api.multiprocessing.Process", return_value=proc
+    with (
+        patch("firewheel.lib.minimega.api.multiprocessing.Queue", return_value=queue),
+        patch("firewheel.lib.minimega.api.multiprocessing.Process", return_value=proc),
     ):
         with pytest.raises(RuntimeError):
             api._check_version(timeout=1, skip_retry=True)
@@ -291,15 +293,6 @@ def test_get_cpu_commit_ratio() -> None:
     with patch.object(api, "get_hosts", return_value={"cpus": 8, "cpucommit": 4}):
         assert api.get_cpu_commit_ratio() == 0.5
 
-def _build_api_without_init() -> minimegaAPI:
-    """Create a minimegaAPI instance without invoking __init__."""
-    api = object.__new__(minimegaAPI)
-    api.log = Mock()
-    api.mm = Mock()
-    api.mm_base = "/tmp/mm"
-    api.mm_socket = "/tmp/mm/minimega"
-    return api
-
 
 def test_init_raises_when_socket_missing(monkeypatch) -> None:
     """Verify constructor raises when minimega socket is absent."""
@@ -322,9 +315,12 @@ def test_init_raises_on_minimega_connection_failure(monkeypatch) -> None:
     monkeypatch.setitem(config["minimega"], "namespace", None)
     monkeypatch.setitem(config["cluster"], "control", ["headnode"])
 
-    with patch("firewheel.lib.minimega.api.os.path.exists", return_value=True), patch(
-        "firewheel.lib.minimega.api.minimega.minimega",
-        side_effect=Exception("connect fail"),
+    with (
+        patch("firewheel.lib.minimega.api.os.path.exists", return_value=True),
+        patch(
+            "firewheel.lib.minimega.api.minimega.minimega",
+            side_effect=Exception("connect fail"),
+        ),
     ):
         with pytest.raises(RuntimeError):
             minimegaAPI()
@@ -340,10 +336,12 @@ def test_init_raises_timeout_from_check_version(monkeypatch) -> None:
 
     mm_obj = Mock()
 
-    with patch("firewheel.lib.minimega.api.os.path.exists", return_value=True), patch(
-        "firewheel.lib.minimega.api.minimega.minimega", return_value=mm_obj
-    ), patch.object(
-        minimegaAPI, "_check_version", side_effect=TimeoutError("timeout")
+    with (
+        patch("firewheel.lib.minimega.api.os.path.exists", return_value=True),
+        patch("firewheel.lib.minimega.api.minimega.minimega", return_value=mm_obj),
+        patch.object(
+            minimegaAPI, "_check_version", side_effect=TimeoutError("timeout")
+        ),
     ):
         with pytest.raises(TimeoutError):
             minimegaAPI()
@@ -377,7 +375,9 @@ def test_get_hosts_single_hit() -> None:
     assert host["cpus"] == 8
 
 
-def test_run_minimega_script_raises_calledprocesserror(monkeypatch, tmp_path: Path) -> None:
+def test_run_minimega_script_raises_calledprocesserror(
+    monkeypatch, tmp_path: Path
+) -> None:
     """Verify subprocess failures are re-raised by run_minimega_script."""
     from firewheel.config import config
 

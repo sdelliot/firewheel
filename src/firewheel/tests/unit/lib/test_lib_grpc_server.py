@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from unittest.mock import Mock, mock_open, patch
+from unittest.mock import Mock, patch
 
 import grpc
 import pytest
@@ -282,18 +282,22 @@ def test_destroy_all_vm_mappings() -> None:
 def test_serve_startup_path() -> None:
     """Verify serve wires up and starts a gRPC server."""
     server = Mock()
-    with patch(
-        "firewheel.lib.grpc.firewheel_grpc_server.FirewheelServicer"
-    ) as servicer_cls, patch(
-        "firewheel.lib.grpc.firewheel_grpc_server.Config"
-    ) as config_cls, patch(
-        "firewheel.lib.grpc.firewheel_grpc_server.grpc.server",
-        return_value=server,
-    ), patch(
-        "firewheel.lib.grpc.firewheel_grpc_server.firewheel_grpc_pb2_grpc.add_FirewheelServicer_to_server"
-    ), patch(
-        "firewheel.lib.grpc.firewheel_grpc_server.time.sleep",
-        side_effect=KeyboardInterrupt,
+    with (
+        patch(
+            "firewheel.lib.grpc.firewheel_grpc_server.FirewheelServicer"
+        ) as servicer_cls,
+        patch("firewheel.lib.grpc.firewheel_grpc_server.Config") as config_cls,
+        patch(
+            "firewheel.lib.grpc.firewheel_grpc_server.grpc.server",
+            return_value=server,
+        ),
+        patch(
+            "firewheel.lib.grpc.firewheel_grpc_server.firewheel_grpc_pb2_grpc.add_FirewheelServicer_to_server"
+        ),
+        patch(
+            "firewheel.lib.grpc.firewheel_grpc_server.time.sleep",
+            side_effect=KeyboardInterrupt,
+        ),
     ):
         servicer = servicer_cls.return_value
         config_cls.return_value.get_config.return_value = {
@@ -329,15 +333,18 @@ def test_serve_returns_when_bind_fails() -> None:
     server = __import__("unittest").mock.Mock()
     server.add_insecure_port.side_effect = RuntimeError("bind fail")
 
-    with patch(
-        "firewheel.lib.grpc.firewheel_grpc_server.FirewheelServicer"
-    ) as servicer_cls, patch(
-        "firewheel.lib.grpc.firewheel_grpc_server.Config"
-    ) as config_cls, patch(
-        "firewheel.lib.grpc.firewheel_grpc_server.grpc.server",
-        return_value=server,
-    ), patch(
-        "firewheel.lib.grpc.firewheel_grpc_server.firewheel_grpc_pb2_grpc.add_FirewheelServicer_to_server"
+    with (
+        patch(
+            "firewheel.lib.grpc.firewheel_grpc_server.FirewheelServicer"
+        ) as servicer_cls,
+        patch("firewheel.lib.grpc.firewheel_grpc_server.Config") as config_cls,
+        patch(
+            "firewheel.lib.grpc.firewheel_grpc_server.grpc.server",
+            return_value=server,
+        ),
+        patch(
+            "firewheel.lib.grpc.firewheel_grpc_server.firewheel_grpc_pb2_grpc.add_FirewheelServicer_to_server"
+        ),
     ):
         config_cls.return_value.get_config.return_value = {
             "grpc": {"hostname": "127.0.0.1", "port": "50051", "threads": 2}

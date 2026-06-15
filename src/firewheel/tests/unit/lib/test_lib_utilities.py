@@ -13,24 +13,24 @@ import pytest
 from rich.console import Console
 
 from firewheel.lib.utilities import (
+    retry,
     badlink,
     badpath,
-    copyfile_if_needed,
-    copytree_if_needed,
-    directories_are_identical,
-    escape_embedded_json,
-    files_are_identical,
-    get_safe_tarfile_members,
     hash_file,
+    strtobool,
     print_error,
-    print_phase_header,
-    print_result_card,
     print_reused,
     print_success,
+    print_result_card,
+    copyfile_if_needed,
+    copytree_if_needed,
+    print_phase_header,
     render_rich_string,
-    retry,
-    strtobool,
+    files_are_identical,
+    escape_embedded_json,
     unescape_embedded_json,
+    get_safe_tarfile_members,
+    directories_are_identical,
 )
 
 
@@ -373,6 +373,7 @@ def test_retry_uses_object_logger_when_available() -> None:
 
     assert obj.log.debug.called
 
+
 def test_directories_are_identical_false_if_not_directories(tmp_path: Path) -> None:
     """Verify non-directory inputs return False."""
     source = tmp_path / "source.txt"
@@ -446,6 +447,7 @@ def test_retry_does_not_catch_unlisted_exception() -> None:
 
     with pytest.raises(RuntimeError):
         fail()
+
 
 def test_badpath_with_absolute_escape(tmp_path: Path) -> None:
     """Verify absolute paths outside the base are rejected."""
