@@ -542,3 +542,74 @@ def test_connect_endpoint(mock_config_cls, mock_post) -> None:
 
     assert api.connect_endpoint("node1", "net1") == {"NID": "e1", "network": "n1"}
     mock_post.assert_called_once_with(f"{api.discovery_URI}/connect/net1/node1", timeout=60)
+
+
+@patch("firewheel.lib.discovery.api.requests.get")
+@patch("firewheel.lib.discovery.api.Config")
+def test_get_config_propagates_json_error(mock_config_cls, mock_get) -> None:
+    """Verify malformed JSON from discovery propagates."""
+    mock_config_cls.return_value.get_config.return_value = _mock_config()
+    response = _build_response()
+    response.json.side_effect = ValueError("bad json")
+    mock_get.return_value = response
+
+    api = discoveryAPI()
+
+    with pytest.raises(ValueError):
+        api.get_config("foo")
+
+
+@patch("firewheel.lib.discovery.api.requests.post")
+@patch("firewheel.lib.discovery.api.Config")
+def test_set_config_propagates_http_error(mock_config_cls, mock_post) -> None:
+    """Verify HTTP errors from set_config are propagated."""
+    mock_config_cls.return_value.get_config.return_value = _mock_config()
+    response = _build_response()
+    response.raise_for_status.side_effect = requests.HTTPError("boom")
+    mock_post.return_value = response
+
+    api = discoveryAPI()
+
+    with pytest.raises(requests.HTTPError):
+        api.set_config("foo", {"bar": 1})
+
+
+@patch("firewheel.lib.discovery.api.Config")
+def test_delete_all_endpoints_raises_on_missing_nid(mock_config_cls) -> None:
+    """Verify delete_all_endpoints fails clearly on malformed endpoint data."""
+    mock_config_cls.return_value.get_config.return_value = _mock_config()
+    api = discoveryAPI()
+
+    with patch.object(api, "get_endpoints", side_effect=[[{"NID": "e1"}], [{"bad": 1}]]), patch.object(
+        api, "delete_endpoints", return_value=[{"NID": "e1"}]
+    ):
+        with pytest.raises(KeyError):
+            api.delete_all_endpoints()
+
+
+@patch("firewheel.lib.discovery.api.Config")
+def test_delete_all_networks_raises_on_missing_nid(mock_config_cls) -> None:
+    """Verify delete_all_networks fails clearly on malformed network data."""
+    mock_config_cls.return_value.get_config.return_value = _mock_config()
+    api = discoveryAPI()
+
+    with patch.object(api, "get_networks", return_value=[{"bad": 1}]):
+        with pytest.raises(KeyError):
+            api.delete_all_networks()
+
+
+@patch("firewheel.lib.discovery.api.requests.post")
+@patch("firewheel.lib.discovery.api.Config")
+def test_insert_endpoint_accepts_none_properties(mock_config_cls, mock_post) -> None:
+    """Verify insert_endpoint wraps None in the expected payload shape."""
+    mock_config_cls.return_value.get_config.return_value = _mock_config()
+    mock_post.return_value = _build_response(json_data=[{"NID": "e1"}])
+
+    api = discoveryAPI()
+
+    assert api.insert_endpoint(None) == [{"NID": "e1"}]
+    mock_post.assert_called_once_with(
+        f"{api.discovery_URI}/endpoints/",
+        json=[{"D": None}],
+        timeout=60,
+    )

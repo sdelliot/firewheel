@@ -446,3 +446,14 @@ def test_retry_does_not_catch_unlisted_exception() -> None:
 
     with pytest.raises(RuntimeError):
         fail()
+
+def test_badpath_with_absolute_escape(tmp_path: Path) -> None:
+    """Verify absolute paths outside the base are rejected."""
+    assert badpath("/etc/passwd", tmp_path) is True
+
+
+def test_badlink_with_nested_parent_escape(tmp_path: Path) -> None:
+    """Verify tar links escaping via parent traversal are rejected."""
+    info = tarfile.TarInfo(name="nested/link")
+    info.linkname = "../../../etc/passwd"
+    assert badlink(info, tmp_path) is True

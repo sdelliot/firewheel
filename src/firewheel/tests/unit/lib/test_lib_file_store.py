@@ -696,3 +696,71 @@ def test_remove_file_raises_oserror() -> None:
 
     with pytest.raises(OSError):
         store.remove_file("file.txt")
+
+
+def test_strip_extension_removes_only_tar_suffix() -> None:
+    """Verify .tar suffix stripping removes only the exact suffix."""
+    store = _build_filestore()
+
+    assert store._strip_extension("foobar.tar") == "foobar"
+
+
+def test_strip_extension_removes_only_tgz_suffix() -> None:
+    """Verify .tgz suffix stripping removes only the exact suffix."""
+    store = _build_filestore()
+
+    assert store._strip_extension("pizza.tgz") == "pizza"
+
+
+def test_strip_extension_removes_only_xz_suffix() -> None:
+    """Verify .xz suffix stripping removes only the exact suffix."""
+    store = _build_filestore()
+
+    assert store._strip_extension("buzz.xz") == "buzz"
+    
+
+def test_get_path_decompress_strips_suffix_after_success() -> None:
+    """Verify get_path strips compression suffix on successful decompression."""
+    store = _build_filestore(Path("/tmp"))
+    store.decompress = True
+
+    with patch.object(store, "get_file_path", return_value="/tmp/saved/file"), patch.object(
+        store, "_minimega_get_data", return_value=("/tmp/saved/file.xz", "")
+    ):
+        assert store.get_path("file.xz") == "/tmp/saved/file"
+
+
+def test_add_image_file_no_remove_if_suffix_not_changed(monkeypatch, tmp_path: Path) -> None:
+    """Verify add_image_file does not delete an expected basename when unchanged."""
+    from firewheel.config import config
+
+    monkeypatch.setitem(config["minimega"], "files_dir", str(tmp_path))
+    store = _build_filestore(tmp_path)
+    store.store = "saved"
+    store.add_file = Mock()
+    store.remove_file = Mock()
+    store.get_path = Mock(return_value=str(tmp_path / "saved" / "image.qcow2"))
+    store.broadcast_get_file = Mock(return_value=True)
+
+    assert store.add_image_file("/tmp/image.qcow2", force=True) is True
+    store.remove_file.assert_not_called()
+
+
+def test_check_mesh_transfer_breaks_on_empty_host_response() -> None:
+    """Verify mesh transfer returns False when consistency never becomes valid."""
+    store = _build_filestore(Path("/tmp"))
+    store.mm_api.mm.mesh_send.return_value = [{"Host": "host1", "Header": ["filename"], "Tabular": []}]
+    store.mm_api.mmr_map.return_value = {"host1": []}
+    store._check_mesh_file_consistency = Mock(return_value={"consistent": False, "exists": False})
+
+    assert store._check_mesh_transfer("saved/file") is False
+
+
+def test_broadcast_get_file_raises_non_inflight_exception() -> None:
+    """Verify broadcast_get_file re-raises unexpected mesh_send exceptions."""
+    store = _build_filestore(Path("/tmp"))
+    store.mm_api.get_mesh_size.return_value = 2
+    store.mm_api.mm.mesh_send.side_effect = Exception("hard failure")
+
+    with pytest.raises(Exception, match="hard failure"):
+        store.broadcast_get_file("saved/file")

@@ -411,3 +411,52 @@ def test_run_minimega_script_raises_oserror(monkeypatch, tmp_path: Path) -> None
     ):
         with pytest.raises(OSError):
             api.run_minimega_script(script)
+
+
+def test_mmr_map_first_value_only_empty_raises() -> None:
+    """Verify first_value_only with empty input raises IndexError."""
+    with pytest.raises(IndexError):
+        minimegaAPI.mmr_map([], first_value_only=True)
+
+
+def test_mmr_map_missing_host_key_raises() -> None:
+    """Verify malformed minimega responses without Host raise KeyError."""
+    raw = [{"Header": ["a"], "Tabular": [["1"]]}]
+    with pytest.raises(KeyError):
+        minimegaAPI.mmr_map(raw)
+
+
+def test_mmr_map_missing_header_key_raises() -> None:
+    """Verify malformed minimega responses without Header raise KeyError."""
+    raw = [{"Host": "host1", "Tabular": [["1"]]}]
+    with pytest.raises(KeyError):
+        minimegaAPI.mmr_map(raw)
+
+
+def test_get_mesh_size_bad_shape_raises() -> None:
+    """Verify malformed mesh_status output raises during parsing."""
+    api = _build_api_without_init()
+    api.mm.mesh_status.return_value = [{"Tabular": []}]
+
+    with pytest.raises(IndexError):
+        api.get_mesh_size()
+
+
+def test_mm_vms_bad_tags_json_raises() -> None:
+    """Verify malformed VM tag JSON propagates."""
+    api = _build_api_without_init()
+    api.mm.vm_info.return_value = [
+        {
+            "Header": ["uuid", "name", "state", "id", "vnc_port", "tags", "pid"],
+            "Tabular": [["uuid1", "vm1", "running", "1", "5900", "{bad json", "123"]],
+            "Host": "host1",
+        }
+    ]
+
+    with pytest.raises(Exception):
+        api.mm_vms()
+
+
+def test_parse_table_with_only_header_returns_empty() -> None:
+    """Verify parse_table returns an empty list when only a header is present."""
+    assert minimegaAPI._parse_table([["h1", "h2"]]) == []
