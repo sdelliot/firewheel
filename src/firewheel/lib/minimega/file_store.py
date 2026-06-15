@@ -265,7 +265,7 @@ class FileStore:
         if filename.endswith(".xz"):
             filename = filename.removesuffix(".xz")
         elif filename.endswith(".tar.gz"):
-            filename = filename.removesuffix(".tar.gz", "")
+            filename = filename.removesuffix(".tar.gz")
         elif filename.endswith(".tar"):
             filename = filename.removesuffix(".tar")
         elif filename.endswith(".tgz"):
