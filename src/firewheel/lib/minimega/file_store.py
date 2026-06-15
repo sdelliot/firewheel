@@ -9,7 +9,7 @@ from lzma import LZMADecompressor
 from types import TracebackType
 from typing import Dict, List, Tuple, Union, Optional, Generator
 from logging import Logger
-from datetime import datetime
+from datetime import datetime, timezone
 from contextlib import contextmanager
 
 from minimega import Error as MinimegaError  # type: ignore[import-untyped]
@@ -611,7 +611,7 @@ class FileStore:
         )
         try:
             upload_time = os.path.getmtime(host_file_path)
-            last_upload_date = datetime.utcfromtimestamp(upload_time)
+            last_upload_date = datetime.fromtimestamp(upload_time, timezone.utc)
             self.log.debug(
                 "basename %s  has upload time of %s", basename, last_upload_date
             )
