@@ -3,49 +3,45 @@
 
 from __future__ import annotations
 
+from typing import Iterator
 import logging
 from unittest.mock import patch
+
+import pytest
 
 from firewheel.lib.log import Log, UTCLog
 
 
-def test_log_creates_handler(tmp_path, monkeypatch) -> None:
-    """Verify a file handler is created for a new logger."""
+@pytest.fixture
+def mock_config(tmp_path, monkeypatch) -> Iterator[dict]:
+    """Configure logging-related settings for tests and yield the config."""
     from firewheel.config import config
 
     monkeypatch.setitem(config["logging"], "root_dir", str(tmp_path))
     monkeypatch.setitem(config["logging"], "firewheel_log", "firewheel.log")
     monkeypatch.setitem(config["logging"], "level", "INFO")
     monkeypatch.setitem(config["system"], "default_group", "")
+    yield config
 
+
+def test_log_creates_handler(mock_config) -> None:
+    """Verify a file handler is created for a new logger."""
     logger = Log("test_log_handler").log
     assert logger.handlers
     assert isinstance(logger.handlers[0], logging.FileHandler)
 
 
-def test_log_uses_null_handler_on_bad_root_dir(monkeypatch) -> None:
+def test_log_uses_null_handler_on_bad_root_dir(mock_config, monkeypatch) -> None:
     """Verify a null handler is used when log path construction fails."""
-    from firewheel.config import config
-
-    monkeypatch.setitem(config["logging"], "root_dir", 1234)
-    monkeypatch.setitem(config["logging"], "firewheel_log", "firewheel.log")
-    monkeypatch.setitem(config["logging"], "level", "INFO")
-    monkeypatch.setitem(config["system"], "default_group", "")
+    monkeypatch.setitem(mock_config["logging"], "root_dir", 1234)
 
     logger = Log("test_bad_root_dir").log
     assert logger.handlers
     assert isinstance(logger.handlers[0], logging.NullHandler)
 
 
-def test_log_falls_back_to_second_try_file(tmp_path, monkeypatch) -> None:
+def test_log_falls_back_to_second_try_file(mock_config) -> None:
     """Verify logger falls back to a username-suffixed file on IOError."""
-    from firewheel.config import config
-
-    monkeypatch.setitem(config["logging"], "root_dir", str(tmp_path))
-    monkeypatch.setitem(config["logging"], "firewheel_log", "firewheel.log")
-    monkeypatch.setitem(config["logging"], "level", "INFO")
-    monkeypatch.setitem(config["system"], "default_group", "")
-
     original_file_handler = logging.FileHandler
 
     call_count = {"count": 0}
@@ -63,42 +59,29 @@ def test_log_falls_back_to_second_try_file(tmp_path, monkeypatch) -> None:
     assert call_count["count"] == 2
 
 
-def test_utclog_uses_gmtime(tmp_path, monkeypatch) -> None:
+def test_utclog_uses_gmtime(mock_config, monkeypatch) -> None:
     """Verify UTCLog configures its formatter for UTC conversion."""
-    from firewheel.config import config
-
-    monkeypatch.setitem(config["logging"], "root_dir", str(tmp_path))
-    monkeypatch.setitem(config["logging"], "firewheel_log", "utc.log")
-    monkeypatch.setitem(config["logging"], "level", "INFO")
-    monkeypatch.setitem(config["system"], "default_group", "")
+    monkeypatch.setitem(mock_config["logging"], "firewheel_log", "utc.log")
 
     logger = UTCLog("test_utc_log").log
     formatter = logger.handlers[0].formatter
     assert formatter.converter is not None
 
 
-def test_log_warns_on_missing_group(tmp_path, monkeypatch) -> None:
+def test_log_warns_on_missing_group(mock_config, monkeypatch) -> None:
     """Verify missing configured group emits a warning path."""
-    from firewheel.config import config
-
-    monkeypatch.setitem(config["logging"], "root_dir", str(tmp_path))
-    monkeypatch.setitem(config["logging"], "firewheel_log", "group_missing.log")
-    monkeypatch.setitem(config["logging"], "level", "INFO")
-    monkeypatch.setitem(config["system"], "default_group", "definitely_missing_group")
+    monkeypatch.setitem(mock_config["logging"], "firewheel_log", "group_missing.log")
+    monkeypatch.setitem(mock_config["system"], "default_group", "definitely_missing_group")
 
     logger = Log("test_log_missing_group").log
     assert logger.handlers
     assert isinstance(logger.handlers[0], logging.FileHandler)
 
 
-def test_log_warning_on_chown_failure(tmp_path, monkeypatch) -> None:
+def test_log_warning_on_chown_failure(mock_config, monkeypatch) -> None:
     """Verify chown failures are tolerated and logger still initializes."""
-    from firewheel.config import config
-
-    monkeypatch.setitem(config["logging"], "root_dir", str(tmp_path))
-    monkeypatch.setitem(config["logging"], "firewheel_log", "chown_failure.log")
-    monkeypatch.setitem(config["logging"], "level", "INFO")
-    monkeypatch.setitem(config["system"], "default_group", "root")
+    monkeypatch.setitem(mock_config["logging"], "firewheel_log", "chown_failure.log")
+    monkeypatch.setitem(mock_config["system"], "default_group", "root")
 
     class FakeGroup:
         """Simple group record."""
@@ -122,14 +105,9 @@ def test_log_warning_on_chown_failure(tmp_path, monkeypatch) -> None:
     assert isinstance(logger.handlers[0], logging.FileHandler)
 
 
-def test_log_second_try_also_fails_uses_nullhandler(tmp_path, monkeypatch) -> None:
+def test_log_second_try_also_fails_uses_nullhandler(mock_config, monkeypatch) -> None:
     """Verify logger falls back to NullHandler if both file opens fail."""
-    from firewheel.config import config
-
-    monkeypatch.setitem(config["logging"], "root_dir", str(tmp_path))
-    monkeypatch.setitem(config["logging"], "firewheel_log", "double_fail.log")
-    monkeypatch.setitem(config["logging"], "level", "INFO")
-    monkeypatch.setitem(config["system"], "default_group", "")
+    monkeypatch.setitem(mock_config["logging"], "firewheel_log", "double_fail.log")
 
     with patch("firewheel.lib.log.logging.FileHandler", side_effect=IOError("fail")):
         logger = Log("test_log_double_fail").log

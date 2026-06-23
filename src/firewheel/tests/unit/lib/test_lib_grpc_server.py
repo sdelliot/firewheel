@@ -46,22 +46,25 @@ def _build_servicer_without_init() -> FirewheelServicer:
     return servicer
 
 
-def test_get_vm_mapping_found() -> None:
+@pytest.fixture
+def servicer() -> FirewheelServicer:
+    """Create a fresh ``FirewheelServicer`` test instance for each test."""
+    return _build_servicer_without_init()
+
+
+def test_get_vm_mapping_found(servicer) -> None:
     """Verify get_vm_mapping returns found entries."""
-    servicer = _build_servicer_without_init()
     vm = Mock()
     assert servicer.get_vm_mapping({"uuid": vm}, "uuid") is vm
 
 
-def test_get_vm_mapping_missing() -> None:
+def test_get_vm_mapping_missing(servicer) -> None:
     """Verify get_vm_mapping returns None on missing keys."""
-    servicer = _build_servicer_without_init()
     assert servicer.get_vm_mapping({}, "uuid") is None
 
 
-def test_init_db() -> None:
+def test_init_db(servicer) -> None:
     """Verify _init_db creates expected database structure."""
-    servicer = _build_servicer_without_init()
     servicer.dbs = {}
     servicer._init_db("prod")
 
@@ -70,18 +73,16 @@ def test_init_db() -> None:
     assert servicer.dbs["prod"]["not_ready_vmms"] == set()
 
 
-def test_get_info() -> None:
+def test_get_info(servicer) -> None:
     """Verify server info reports version and experiment status."""
-    servicer = _build_servicer_without_init()
     response = servicer.GetInfo(Mock(), Mock())
     assert response.version == "1.2.3"
     assert response.uptime >= 0
     assert response.experiment_running is False
 
 
-def test_set_and_get_experiment_launch_time() -> None:
+def test_set_and_get_experiment_launch_time(servicer) -> None:
     """Verify launch time can be stored and retrieved."""
-    servicer = _build_servicer_without_init()
     request = Mock()
     request.db = "prod"
 
@@ -89,9 +90,8 @@ def test_set_and_get_experiment_launch_time() -> None:
     assert servicer.GetExperimentLaunchTime(request, Mock()) is request
 
 
-def test_get_experiment_launch_time_missing_aborts() -> None:
+def test_get_experiment_launch_time_missing_aborts(servicer) -> None:
     """Verify missing launch time aborts with OUT_OF_RANGE."""
-    servicer = _build_servicer_without_init()
     request = Mock()
     request.db = "prod"
 
@@ -101,9 +101,8 @@ def test_get_experiment_launch_time_missing_aborts() -> None:
     assert exc.value.args[0][0] == grpc.StatusCode.OUT_OF_RANGE
 
 
-def test_set_and_get_experiment_start_time() -> None:
+def test_set_and_get_experiment_start_time(servicer) -> None:
     """Verify start time can be stored and retrieved."""
-    servicer = _build_servicer_without_init()
     request = Mock()
     request.db = "prod"
 
@@ -111,9 +110,8 @@ def test_set_and_get_experiment_start_time() -> None:
     assert servicer.GetExperimentStartTime(request, Mock()) is request
 
 
-def test_get_experiment_start_time_missing_aborts() -> None:
+def test_get_experiment_start_time_missing_aborts(servicer) -> None:
     """Verify missing start time aborts with OUT_OF_RANGE."""
-    servicer = _build_servicer_without_init()
     request = Mock()
     request.db = "prod"
 
@@ -123,9 +121,8 @@ def test_get_experiment_start_time_missing_aborts() -> None:
     assert exc.value.args[0][0] == grpc.StatusCode.OUT_OF_RANGE
 
 
-def test_initialize_experiment_start_time() -> None:
+def test_initialize_experiment_start_time(servicer) -> None:
     """Verify initialization clears launch/start time state."""
-    servicer = _build_servicer_without_init()
     servicer.dbs["prod"]["experiment_launch_time"] = Mock()
     servicer.dbs["prod"]["experiment_start_times"] = [Mock()]
 
@@ -138,9 +135,8 @@ def test_initialize_experiment_start_time() -> None:
     assert servicer.dbs["prod"]["experiment_start_times"] == []
 
 
-def test_count_vm_mappings_not_ready() -> None:
+def test_count_vm_mappings_not_ready(servicer) -> None:
     """Verify not-ready VM count is returned."""
-    servicer = _build_servicer_without_init()
     servicer.dbs["prod"]["not_ready_vmms"] = {"a", "b"}
     request = Mock()
     request.db = "prod"
@@ -149,9 +145,8 @@ def test_count_vm_mappings_not_ready() -> None:
     assert response.count == 2
 
 
-def test_get_vm_mapping_by_uuid_found() -> None:
+def test_get_vm_mapping_by_uuid_found(servicer) -> None:
     """Verify UUID lookup returns the stored mapping."""
-    servicer = _build_servicer_without_init()
     vm = Mock()
     servicer.dbs["prod"]["vm_mappings"]["uuid"] = vm
     request = Mock()
@@ -161,9 +156,8 @@ def test_get_vm_mapping_by_uuid_found() -> None:
     assert servicer.GetVMMappingByUUID(request, Mock()) is vm
 
 
-def test_get_vm_mapping_by_uuid_missing_aborts() -> None:
+def test_get_vm_mapping_by_uuid_missing_aborts(servicer) -> None:
     """Verify missing UUID lookup aborts with OUT_OF_RANGE."""
-    servicer = _build_servicer_without_init()
     request = Mock()
     request.db = "prod"
     request.server_uuid = "missing"
@@ -174,9 +168,8 @@ def test_get_vm_mapping_by_uuid_missing_aborts() -> None:
     assert exc.value.args[0][0] == grpc.StatusCode.OUT_OF_RANGE
 
 
-def test_set_vm_time_by_uuid() -> None:
+def test_set_vm_time_by_uuid(servicer) -> None:
     """Verify VM current time can be updated."""
-    servicer = _build_servicer_without_init()
     vm = Mock()
     servicer.dbs["prod"]["vm_mappings"]["uuid"] = vm
 
@@ -190,10 +183,8 @@ def test_set_vm_time_by_uuid() -> None:
     assert vm.current_time == "123"
 
 
-def test_update_not_ready_vmms_add_and_remove() -> None:
+def test_update_not_ready_vmms_add_and_remove(servicer) -> None:
     """Verify VM readiness tracking set updates correctly."""
-    servicer = _build_servicer_without_init()
-
     vmm = Mock()
     vmm.state = "BOOTING"
     vmm.server_uuid = "uuid"
@@ -205,9 +196,8 @@ def test_update_not_ready_vmms_add_and_remove() -> None:
     assert "uuid" not in servicer.dbs["prod"]["not_ready_vmms"]
 
 
-def test_set_vm_state_by_uuid() -> None:
+def test_set_vm_state_by_uuid(servicer) -> None:
     """Verify VM state updates modify stored mappings."""
-    servicer = _build_servicer_without_init()
     vm = Mock()
     servicer.dbs["prod"]["vm_mappings"]["uuid"] = vm
 
@@ -221,9 +211,8 @@ def test_set_vm_state_by_uuid() -> None:
     assert vm.state == "RUNNING"
 
 
-def test_destroy_vm_mapping_by_uuid() -> None:
+def test_destroy_vm_mapping_by_uuid(servicer) -> None:
     """Verify a VM mapping and readiness entry can be removed."""
-    servicer = _build_servicer_without_init()
     servicer.dbs["prod"]["vm_mappings"]["uuid"] = Mock()
     servicer.dbs["prod"]["not_ready_vmms"].add("uuid")
 
@@ -237,9 +226,8 @@ def test_destroy_vm_mapping_by_uuid() -> None:
     assert "uuid" not in servicer.dbs["prod"]["not_ready_vmms"]
 
 
-def test_set_vm_mapping() -> None:
+def test_set_vm_mapping(servicer) -> None:
     """Verify SetVMMapping stores the provided request object."""
-    servicer = _build_servicer_without_init()
     request = Mock()
     request.db = "prod"
     request.server_uuid = "uuid"
@@ -250,9 +238,8 @@ def test_set_vm_mapping() -> None:
     assert servicer.dbs["prod"]["vm_mappings"]["uuid"] is request
 
 
-def test_destroy_all_vm_mappings() -> None:
+def test_destroy_all_vm_mappings(servicer) -> None:
     """Verify all VM mappings and readiness tracking are cleared."""
-    servicer = _build_servicer_without_init()
     servicer.dbs["prod"]["vm_mappings"] = {"uuid": Mock()}
     servicer.dbs["prod"]["not_ready_vmms"] = {"uuid"}
 
@@ -299,10 +286,8 @@ def test_serve_startup_path() -> None:
     server.stop.assert_called_once_with(0)
 
 
-def test_set_vm_state_by_uuid_missing_aborts() -> None:
+def test_set_vm_state_by_uuid_missing_aborts(servicer) -> None:
     """Verify missing VM mapping during state update aborts."""
-    servicer = _build_servicer_without_init()
-
     request = __import__("unittest").mock.Mock()
     request.db = "prod"
     request.server_uuid = "missing"

@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+from typing import Iterator
 from unittest.mock import Mock, patch
 
 import pytest
@@ -25,6 +26,14 @@ def _mock_config() -> dict:
             "level": "INFO",
         },
     }
+
+
+@pytest.fixture
+def mock_config() -> Iterator[None]:
+    """Patch the discovery API configuration loading with deterministic test values."""
+    with patch("firewheel.lib.discovery.api.Config") as mock_config_cls:
+        mock_config_cls.return_value.get_config.return_value = _mock_config()
+        yield
 
 
 def _build_response(
@@ -50,11 +59,8 @@ def _build_response(
     return response
 
 
-@patch("firewheel.lib.discovery.api.Config")
-def test_init_uses_config_defaults(mock_config_cls) -> None:
+def test_init_uses_config_defaults(mock_config) -> None:
     """Verify discoveryAPI initialization uses configuration defaults."""
-    mock_config_cls.return_value.get_config.return_value = _mock_config()
-
     api = discoveryAPI()
 
     assert api.bind_addr == "discovery-host:9001"
@@ -62,11 +68,8 @@ def test_init_uses_config_defaults(mock_config_cls) -> None:
     assert api.log_file is None
 
 
-@patch("firewheel.lib.discovery.api.Config")
-def test_init_uses_explicit_hostname_port(mock_config_cls) -> None:
+def test_init_uses_explicit_hostname_port(mock_config) -> None:
     """Verify discoveryAPI honors explicit hostname and port overrides."""
-    mock_config_cls.return_value.get_config.return_value = _mock_config()
-
     api = discoveryAPI(hostname="custom-host", port=1234)
 
     assert api.bind_addr == "custom-host:1234"
@@ -74,10 +77,8 @@ def test_init_uses_explicit_hostname_port(mock_config_cls) -> None:
 
 
 @patch("firewheel.lib.discovery.api.requests.get")
-@patch("firewheel.lib.discovery.api.Config")
-def test_test_connection_success(mock_config_cls, mock_get) -> None:
+def test_test_connection_success(mock_get, mock_config) -> None:
     """Verify test_connection returns True for HTTP 200."""
-    mock_config_cls.return_value.get_config.return_value = _mock_config()
     mock_get.return_value = _build_response(status_code=requests.codes.ok)
 
     api = discoveryAPI()
@@ -87,10 +88,8 @@ def test_test_connection_success(mock_config_cls, mock_get) -> None:
 
 
 @patch("firewheel.lib.discovery.api.requests.get")
-@patch("firewheel.lib.discovery.api.Config")
-def test_test_connection_bad_status_returns_false(mock_config_cls, mock_get) -> None:
+def test_test_connection_bad_status_returns_false(mock_get, mock_config) -> None:
     """Verify test_connection returns False for unexpected status codes."""
-    mock_config_cls.return_value.get_config.return_value = _mock_config()
     mock_get.return_value = _build_response(status_code=500)
 
     api = discoveryAPI()
@@ -99,10 +98,8 @@ def test_test_connection_bad_status_returns_false(mock_config_cls, mock_get) -> 
 
 
 @patch("firewheel.lib.discovery.api.requests.get")
-@patch("firewheel.lib.discovery.api.Config")
-def test_test_connection_connection_error(mock_config_cls, mock_get) -> None:
+def test_test_connection_connection_error(mock_get, mock_config) -> None:
     """Verify test_connection returns False on connection failures."""
-    mock_config_cls.return_value.get_config.return_value = _mock_config()
     mock_get.side_effect = requests.exceptions.ConnectionError()
 
     api = discoveryAPI()
@@ -111,10 +108,8 @@ def test_test_connection_connection_error(mock_config_cls, mock_get) -> None:
 
 
 @patch("firewheel.lib.discovery.api.requests.get")
-@patch("firewheel.lib.discovery.api.Config")
-def test_test_connection_invalid_url(mock_config_cls, mock_get) -> None:
+def test_test_connection_invalid_url(mock_get, mock_config) -> None:
     """Verify test_connection returns False for invalid URLs."""
-    mock_config_cls.return_value.get_config.return_value = _mock_config()
     mock_get.side_effect = requests.exceptions.InvalidURL()
 
     api = discoveryAPI()
@@ -122,10 +117,8 @@ def test_test_connection_invalid_url(mock_config_cls, mock_get) -> None:
     assert api.test_connection() is False
 
 
-@patch("firewheel.lib.discovery.api.Config")
-def test_start_discovery_returns_true_if_already_running(mock_config_cls) -> None:
+def test_start_discovery_returns_true_if_already_running(mock_config) -> None:
     """Verify start_discovery returns immediately when service is already running."""
-    mock_config_cls.return_value.get_config.return_value = _mock_config()
     api = discoveryAPI()
 
     with patch.object(api, "test_connection", return_value=True) as test_connection:
@@ -135,12 +128,10 @@ def test_start_discovery_returns_true_if_already_running(mock_config_cls) -> Non
 
 
 @patch("firewheel.lib.discovery.api.minimegaAPI")
-@patch("firewheel.lib.discovery.api.Config")
 def test_start_discovery_runtime_error_returns_false(
-    mock_config_cls, mock_minimega_api_cls
+    mock_minimega_api_cls, mock_config
 ) -> None:
     """Verify start_discovery returns False on minimega runtime errors."""
-    mock_config_cls.return_value.get_config.return_value = _mock_config()
     mock_minimega_api_cls.side_effect = RuntimeError("boom")
 
     api = discoveryAPI()
@@ -150,12 +141,10 @@ def test_start_discovery_runtime_error_returns_false(
 
 
 @patch("firewheel.lib.discovery.api.minimegaAPI")
-@patch("firewheel.lib.discovery.api.Config")
 def test_start_discovery_timeout_error_returns_false(
-    mock_config_cls, mock_minimega_api_cls
+    mock_minimega_api_cls, mock_config
 ) -> None:
     """Verify start_discovery returns False on minimega timeout errors."""
-    mock_config_cls.return_value.get_config.return_value = _mock_config()
     mock_minimega_api_cls.side_effect = TimeoutError("boom")
 
     api = discoveryAPI()
@@ -166,12 +155,10 @@ def test_start_discovery_timeout_error_returns_false(
 
 @patch("firewheel.lib.discovery.api.time.sleep")
 @patch("firewheel.lib.discovery.api.minimegaAPI")
-@patch("firewheel.lib.discovery.api.Config")
 def test_start_discovery_success_after_polling(
-    mock_config_cls, mock_minimega_api_cls, mock_sleep
+    mock_minimega_api_cls, mock_sleep, mock_config
 ) -> None:
     """Verify start_discovery launches discovery and detects startup."""
-    mock_config_cls.return_value.get_config.return_value = _mock_config()
     mock_mm = Mock()
     mock_minimega_api_cls.return_value = mock_mm
 
@@ -190,12 +177,10 @@ def test_start_discovery_success_after_polling(
 
 @patch("firewheel.lib.discovery.api.time.sleep")
 @patch("firewheel.lib.discovery.api.minimegaAPI")
-@patch("firewheel.lib.discovery.api.Config")
 def test_start_discovery_returns_false_after_all_attempts(
-    mock_config_cls, mock_minimega_api_cls, mock_sleep
+    mock_minimega_api_cls, mock_sleep, mock_config
 ) -> None:
     """Verify start_discovery returns False if service never responds."""
-    mock_config_cls.return_value.get_config.return_value = _mock_config()
     mock_minimega_api_cls.return_value = Mock()
 
     api = discoveryAPI()
@@ -210,10 +195,8 @@ def test_start_discovery_returns_false_after_all_attempts(
 
 
 @patch("firewheel.lib.discovery.api.requests.get")
-@patch("firewheel.lib.discovery.api.Config")
-def test_get_config(mock_config_cls, mock_get) -> None:
+def test_get_config(mock_get, mock_config) -> None:
     """Verify get_config returns JSON data from discovery."""
-    mock_config_cls.return_value.get_config.return_value = _mock_config()
     mock_get.return_value = _build_response(json_data={"a": 1})
 
     api = discoveryAPI()
@@ -224,10 +207,8 @@ def test_get_config(mock_config_cls, mock_get) -> None:
 
 
 @patch("firewheel.lib.discovery.api.requests.post")
-@patch("firewheel.lib.discovery.api.Config")
-def test_set_config(mock_config_cls, mock_post) -> None:
+def test_set_config(mock_post, mock_config) -> None:
     """Verify set_config posts data and returns response.ok."""
-    mock_config_cls.return_value.get_config.return_value = _mock_config()
     mock_post.return_value = _build_response(ok=True)
 
     api = discoveryAPI()
@@ -240,10 +221,8 @@ def test_set_config(mock_config_cls, mock_post) -> None:
 
 
 @patch("firewheel.lib.discovery.api.requests.post")
-@patch("firewheel.lib.discovery.api.Config")
-def test_insert_network(mock_config_cls, mock_post) -> None:
+def test_insert_network(mock_post, mock_config) -> None:
     """Verify insert_network posts the expected payload."""
-    mock_config_cls.return_value.get_config.return_value = _mock_config()
     mock_post.return_value = _build_response(json_data=[{"NID": "n1"}])
 
     api = discoveryAPI()
@@ -255,10 +234,8 @@ def test_insert_network(mock_config_cls, mock_post) -> None:
 
 
 @patch("firewheel.lib.discovery.api.requests.get")
-@patch("firewheel.lib.discovery.api.Config")
-def test_get_networks_returns_list(mock_config_cls, mock_get) -> None:
+def test_get_networks_returns_list(mock_get, mock_config) -> None:
     """Verify get_networks returns network data."""
-    mock_config_cls.return_value.get_config.return_value = _mock_config()
     mock_get.return_value = _build_response(json_data=[{"NID": "n1"}])
 
     api = discoveryAPI()
@@ -267,10 +244,8 @@ def test_get_networks_returns_list(mock_config_cls, mock_get) -> None:
 
 
 @patch("firewheel.lib.discovery.api.requests.get")
-@patch("firewheel.lib.discovery.api.Config")
-def test_get_networks_returns_empty_list_on_none(mock_config_cls, mock_get) -> None:
+def test_get_networks_returns_empty_list_on_none(mock_get, mock_config) -> None:
     """Verify get_networks normalizes None responses to an empty list."""
-    mock_config_cls.return_value.get_config.return_value = _mock_config()
     mock_get.return_value = _build_response(json_data=None)
 
     api = discoveryAPI()
@@ -279,10 +254,8 @@ def test_get_networks_returns_empty_list_on_none(mock_config_cls, mock_get) -> N
 
 
 @patch("firewheel.lib.discovery.api.requests.delete")
-@patch("firewheel.lib.discovery.api.Config")
-def test_delete_networks_with_key_and_value(mock_config_cls, mock_delete) -> None:
+def test_delete_networks_with_key_and_value(mock_delete, mock_config) -> None:
     """Verify delete_networks uses the key/value endpoint when both are provided."""
-    mock_config_cls.return_value.get_config.return_value = _mock_config()
     mock_delete.return_value = _build_response(json_data=[{"NID": "n1"}])
 
     api = discoveryAPI()
@@ -294,10 +267,8 @@ def test_delete_networks_with_key_and_value(mock_config_cls, mock_delete) -> Non
 
 
 @patch("firewheel.lib.discovery.api.requests.delete")
-@patch("firewheel.lib.discovery.api.Config")
-def test_delete_networks_with_value_only(mock_config_cls, mock_delete) -> None:
+def test_delete_networks_with_value_only(mock_delete, mock_config) -> None:
     """Verify delete_networks uses the value-only endpoint when key is omitted."""
-    mock_config_cls.return_value.get_config.return_value = _mock_config()
     mock_delete.return_value = _build_response(json_data=[{"NID": "n1"}])
 
     api = discoveryAPI()
@@ -307,12 +278,10 @@ def test_delete_networks_with_value_only(mock_config_cls, mock_delete) -> None:
 
 
 @patch("firewheel.lib.discovery.api.requests.delete")
-@patch("firewheel.lib.discovery.api.Config")
 def test_delete_networks_returns_empty_list_on_none(
-    mock_config_cls, mock_delete
+    mock_delete, mock_config
 ) -> None:
     """Verify delete_networks normalizes None responses to an empty list."""
-    mock_config_cls.return_value.get_config.return_value = _mock_config()
     mock_delete.return_value = _build_response(json_data=None)
 
     api = discoveryAPI()
@@ -321,10 +290,8 @@ def test_delete_networks_returns_empty_list_on_none(
 
 
 @patch("firewheel.lib.discovery.api.requests.get")
-@patch("firewheel.lib.discovery.api.Config")
-def test_get_endpoints_returns_list(mock_config_cls, mock_get) -> None:
+def test_get_endpoints_returns_list(mock_get, mock_config) -> None:
     """Verify get_endpoints returns endpoint data."""
-    mock_config_cls.return_value.get_config.return_value = _mock_config()
     mock_get.return_value = _build_response(json_data=[{"NID": "e1"}])
 
     api = discoveryAPI()
@@ -333,10 +300,8 @@ def test_get_endpoints_returns_list(mock_config_cls, mock_get) -> None:
 
 
 @patch("firewheel.lib.discovery.api.requests.get")
-@patch("firewheel.lib.discovery.api.Config")
-def test_get_endpoints_returns_empty_list_on_none(mock_config_cls, mock_get) -> None:
+def test_get_endpoints_returns_empty_list_on_none(mock_get, mock_config) -> None:
     """Verify get_endpoints normalizes None responses to an empty list."""
-    mock_config_cls.return_value.get_config.return_value = _mock_config()
     mock_get.return_value = _build_response(json_data=None)
 
     api = discoveryAPI()
@@ -345,10 +310,8 @@ def test_get_endpoints_returns_empty_list_on_none(mock_config_cls, mock_get) -> 
 
 
 @patch("firewheel.lib.discovery.api.requests.delete")
-@patch("firewheel.lib.discovery.api.Config")
-def test_delete_endpoints_with_key_and_value(mock_config_cls, mock_delete) -> None:
+def test_delete_endpoints_with_key_and_value(mock_delete, mock_config) -> None:
     """Verify delete_endpoints uses the key/value endpoint when both are provided."""
-    mock_config_cls.return_value.get_config.return_value = _mock_config()
     mock_delete.return_value = _build_response(json_data=[{"NID": "e1"}])
 
     api = discoveryAPI()
@@ -360,10 +323,8 @@ def test_delete_endpoints_with_key_and_value(mock_config_cls, mock_delete) -> No
 
 
 @patch("firewheel.lib.discovery.api.requests.delete")
-@patch("firewheel.lib.discovery.api.Config")
-def test_delete_endpoints_with_value_only(mock_config_cls, mock_delete) -> None:
+def test_delete_endpoints_with_value_only(mock_delete, mock_config) -> None:
     """Verify delete_endpoints uses the value-only endpoint when key is omitted."""
-    mock_config_cls.return_value.get_config.return_value = _mock_config()
     mock_delete.return_value = _build_response(json_data=[{"NID": "e1"}])
 
     api = discoveryAPI()
@@ -375,12 +336,10 @@ def test_delete_endpoints_with_value_only(mock_config_cls, mock_delete) -> None:
 
 
 @patch("firewheel.lib.discovery.api.requests.delete")
-@patch("firewheel.lib.discovery.api.Config")
 def test_delete_endpoints_returns_empty_list_on_none(
-    mock_config_cls, mock_delete
+    mock_delete, mock_config
 ) -> None:
     """Verify delete_endpoints normalizes None responses to an empty list."""
-    mock_config_cls.return_value.get_config.return_value = _mock_config()
     mock_delete.return_value = _build_response(json_data=None)
 
     api = discoveryAPI()
@@ -388,20 +347,16 @@ def test_delete_endpoints_returns_empty_list_on_none(
     assert api.delete_endpoints(value="qemu") == []
 
 
-@patch("firewheel.lib.discovery.api.Config")
-def test_delete_all_endpoints_empty(mock_config_cls) -> None:
+def test_delete_all_endpoints_empty(mock_config) -> None:
     """Verify delete_all_endpoints returns empty when no endpoints exist."""
-    mock_config_cls.return_value.get_config.return_value = _mock_config()
     api = discoveryAPI()
 
     with patch.object(api, "get_endpoints", return_value=[]):
         assert api.delete_all_endpoints() == []
 
 
-@patch("firewheel.lib.discovery.api.Config")
-def test_delete_all_endpoints_only_qemu_needed(mock_config_cls) -> None:
+def test_delete_all_endpoints_only_qemu_needed(mock_config) -> None:
     """Verify delete_all_endpoints stops after qemu deletion if no endpoints remain."""
-    mock_config_cls.return_value.get_config.return_value = _mock_config()
     api = discoveryAPI()
 
     with (
@@ -415,10 +370,8 @@ def test_delete_all_endpoints_only_qemu_needed(mock_config_cls) -> None:
     delete_endpoints.assert_called_once_with(value="qemu")
 
 
-@patch("firewheel.lib.discovery.api.Config")
-def test_delete_all_endpoints_deletes_remaining_by_nid(mock_config_cls) -> None:
+def test_delete_all_endpoints_deletes_remaining_by_nid(mock_config) -> None:
     """Verify delete_all_endpoints deletes remaining endpoints by NID."""
-    mock_config_cls.return_value.get_config.return_value = _mock_config()
     api = discoveryAPI()
 
     remaining = [{"NID": "e2"}, {"NID": "e3"}]
@@ -439,20 +392,16 @@ def test_delete_all_endpoints_deletes_remaining_by_nid(mock_config_cls) -> None:
     assert delete_endpoints.call_args_list[2].kwargs == {"key": "NID", "value": "e3"}
 
 
-@patch("firewheel.lib.discovery.api.Config")
-def test_delete_all_networks_empty(mock_config_cls) -> None:
+def test_delete_all_networks_empty(mock_config) -> None:
     """Verify delete_all_networks returns empty when no networks exist."""
-    mock_config_cls.return_value.get_config.return_value = _mock_config()
     api = discoveryAPI()
 
     with patch.object(api, "get_networks", return_value=[]):
         assert api.delete_all_networks() == []
 
 
-@patch("firewheel.lib.discovery.api.Config")
-def test_delete_all_networks(mock_config_cls) -> None:
+def test_delete_all_networks(mock_config) -> None:
     """Verify delete_all_networks deletes each network by NID."""
-    mock_config_cls.return_value.get_config.return_value = _mock_config()
     api = discoveryAPI()
 
     with (
@@ -470,10 +419,8 @@ def test_delete_all_networks(mock_config_cls) -> None:
     assert delete_networks.call_args_list[1].kwargs == {"key": "NID", "value": "n2"}
 
 
-@patch("firewheel.lib.discovery.api.Config")
-def test_delete_all_success(mock_config_cls) -> None:
+def test_delete_all_success(mock_config) -> None:
     """Verify delete_all returns True when endpoints and networks are cleared."""
-    mock_config_cls.return_value.get_config.return_value = _mock_config()
     api = discoveryAPI()
 
     with (
@@ -485,10 +432,8 @@ def test_delete_all_success(mock_config_cls) -> None:
         assert api.delete_all() is True
 
 
-@patch("firewheel.lib.discovery.api.Config")
-def test_delete_all_raises_for_remaining_endpoints(mock_config_cls) -> None:
+def test_delete_all_raises_for_remaining_endpoints(mock_config) -> None:
     """Verify delete_all raises if endpoints remain after deletion."""
-    mock_config_cls.return_value.get_config.return_value = _mock_config()
     api = discoveryAPI()
 
     with (
@@ -499,10 +444,8 @@ def test_delete_all_raises_for_remaining_endpoints(mock_config_cls) -> None:
             api.delete_all()
 
 
-@patch("firewheel.lib.discovery.api.Config")
-def test_delete_all_raises_for_remaining_networks(mock_config_cls) -> None:
+def test_delete_all_raises_for_remaining_networks(mock_config) -> None:
     """Verify delete_all raises if networks remain after deletion."""
-    mock_config_cls.return_value.get_config.return_value = _mock_config()
     api = discoveryAPI()
 
     with (
@@ -516,10 +459,8 @@ def test_delete_all_raises_for_remaining_networks(mock_config_cls) -> None:
 
 
 @patch("firewheel.lib.discovery.api.requests.post")
-@patch("firewheel.lib.discovery.api.Config")
-def test_insert_endpoint(mock_config_cls, mock_post) -> None:
+def test_insert_endpoint(mock_post, mock_config) -> None:
     """Verify insert_endpoint posts wrapped node properties."""
-    mock_config_cls.return_value.get_config.return_value = _mock_config()
     mock_post.return_value = _build_response(json_data=[{"NID": "e1"}])
 
     api = discoveryAPI()
@@ -534,10 +475,8 @@ def test_insert_endpoint(mock_config_cls, mock_post) -> None:
 
 
 @patch("firewheel.lib.discovery.api.requests.put")
-@patch("firewheel.lib.discovery.api.Config")
-def test_update_endpoint(mock_config_cls, mock_put) -> None:
+def test_update_endpoint(mock_put, mock_config) -> None:
     """Verify update_endpoint sends the given node properties."""
-    mock_config_cls.return_value.get_config.return_value = _mock_config()
     mock_put.return_value = _build_response(json_data=[{"NID": "e1"}])
 
     api = discoveryAPI()
@@ -552,10 +491,8 @@ def test_update_endpoint(mock_config_cls, mock_put) -> None:
 
 
 @patch("firewheel.lib.discovery.api.requests.post")
-@patch("firewheel.lib.discovery.api.Config")
-def test_connect_endpoint(mock_config_cls, mock_post) -> None:
+def test_connect_endpoint(mock_post, mock_config) -> None:
     """Verify connect_endpoint posts to the correct connect URI."""
-    mock_config_cls.return_value.get_config.return_value = _mock_config()
     mock_post.return_value = _build_response(json_data={"NID": "e1", "network": "n1"})
 
     api = discoveryAPI()
@@ -567,10 +504,8 @@ def test_connect_endpoint(mock_config_cls, mock_post) -> None:
 
 
 @patch("firewheel.lib.discovery.api.requests.get")
-@patch("firewheel.lib.discovery.api.Config")
-def test_get_config_propagates_json_error(mock_config_cls, mock_get) -> None:
+def test_get_config_propagates_json_error(mock_get, mock_config) -> None:
     """Verify malformed JSON from discovery propagates."""
-    mock_config_cls.return_value.get_config.return_value = _mock_config()
     response = _build_response()
     response.json.side_effect = ValueError("bad json")
     mock_get.return_value = response
@@ -582,10 +517,8 @@ def test_get_config_propagates_json_error(mock_config_cls, mock_get) -> None:
 
 
 @patch("firewheel.lib.discovery.api.requests.post")
-@patch("firewheel.lib.discovery.api.Config")
-def test_set_config_propagates_http_error(mock_config_cls, mock_post) -> None:
+def test_set_config_propagates_http_error(mock_post, mock_config) -> None:
     """Verify HTTP errors from set_config are propagated."""
-    mock_config_cls.return_value.get_config.return_value = _mock_config()
     response = _build_response()
     response.raise_for_status.side_effect = requests.HTTPError("boom")
     mock_post.return_value = response
@@ -596,10 +529,8 @@ def test_set_config_propagates_http_error(mock_config_cls, mock_post) -> None:
         api.set_config("foo", {"bar": 1})
 
 
-@patch("firewheel.lib.discovery.api.Config")
-def test_delete_all_endpoints_raises_on_missing_nid(mock_config_cls) -> None:
+def test_delete_all_endpoints_raises_on_missing_nid(mock_config) -> None:
     """Verify delete_all_endpoints fails clearly on malformed endpoint data."""
-    mock_config_cls.return_value.get_config.return_value = _mock_config()
     api = discoveryAPI()
 
     with (
@@ -610,10 +541,8 @@ def test_delete_all_endpoints_raises_on_missing_nid(mock_config_cls) -> None:
             api.delete_all_endpoints()
 
 
-@patch("firewheel.lib.discovery.api.Config")
-def test_delete_all_networks_raises_on_missing_nid(mock_config_cls) -> None:
+def test_delete_all_networks_raises_on_missing_nid(mock_config) -> None:
     """Verify delete_all_networks fails clearly on malformed network data."""
-    mock_config_cls.return_value.get_config.return_value = _mock_config()
     api = discoveryAPI()
 
     with patch.object(api, "get_networks", return_value=[{"bad": 1}]):
@@ -622,10 +551,8 @@ def test_delete_all_networks_raises_on_missing_nid(mock_config_cls) -> None:
 
 
 @patch("firewheel.lib.discovery.api.requests.post")
-@patch("firewheel.lib.discovery.api.Config")
-def test_insert_endpoint_accepts_none_properties(mock_config_cls, mock_post) -> None:
+def test_insert_endpoint_accepts_none_properties(mock_post, mock_config) -> None:
     """Verify insert_endpoint wraps None in the expected payload shape."""
-    mock_config_cls.return_value.get_config.return_value = _mock_config()
     mock_post.return_value = _build_response(json_data=[{"NID": "e1"}])
 
     api = discoveryAPI()
