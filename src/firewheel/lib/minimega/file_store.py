@@ -5,11 +5,11 @@ import time
 import shutil
 import tarfile
 from io import BufferedReader
-from lzma import LZMADecompressor
+from lzma import LZMAError, LZMADecompressor
 from types import TracebackType
 from typing import Dict, List, Tuple, Union, Optional, Generator
 from logging import Logger
-from datetime import datetime
+from datetime import datetime, timezone
 from contextlib import contextmanager
 
 from minimega import Error as MinimegaError  # type: ignore[import-untyped]
@@ -263,25 +263,25 @@ class FileStore:
         """
 
         if filename.endswith(".xz"):
-            filename = filename.rstrip(".xz")
+            filename = filename.removesuffix(".xz")
         elif filename.endswith(".tar.gz"):
-            filename = filename.replace(".tar.gz", "")
+            filename = filename.removesuffix(".tar.gz")
         elif filename.endswith(".tar"):
-            filename = filename.rstrip(".tar")
+            filename = filename.removesuffix(".tar")
         elif filename.endswith(".tgz"):
-            filename = filename.rstrip(".tgz")
+            filename = filename.removesuffix(".tgz")
 
         return filename
 
     def _decompress_error(
-        self, exp: OSError, tmp_local_path: str, host_file_path: str
+        self, exp: Exception, tmp_local_path: str, host_file_path: str
     ) -> None:
         """
         Output specific warnings/errors if an issue happened while trying to decompress a file.
         Additionally, try to remove the file which caused the issue.
 
         Args:
-            exp (OSError): The exception being raised.
+            exp (Exception): The exception being raised.
             tmp_local_path (str): The temporary path of the file name used for
                 decompression.
             host_file_path (str): The location to cache the file locally.
@@ -335,7 +335,7 @@ class FileStore:
                                         cache_file.write(
                                             decompressor.decompress(xz_file.read(chunk))
                                         )
-                        except OSError as exp:
+                        except (OSError, LZMAError) as exp:
                             self._decompress_error(exp, tmp_local_path, host_file_path)
                             return "", "decompress"
 
@@ -353,7 +353,7 @@ class FileStore:
                                     os.path.dirname(host_file_path),
                                     members=get_safe_tarfile_members(tar_file),
                                 )
-                        except OSError as exp:
+                        except (OSError, tarfile.TarError) as exp:
                             self._decompress_error(exp, tmp_local_path, host_file_path)
                             return "", "decompress"
                     else:
@@ -611,7 +611,7 @@ class FileStore:
         )
         try:
             upload_time = os.path.getmtime(host_file_path)
-            last_upload_date = datetime.utcfromtimestamp(upload_time)
+            last_upload_date = datetime.fromtimestamp(upload_time, timezone.utc)
             self.log.debug(
                 "basename %s  has upload time of %s", basename, last_upload_date
             )
