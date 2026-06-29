@@ -204,6 +204,8 @@ source = ["firewheel"]
 omit = [
     "*/tests/functional/*",
     "*/tests/conftest.py",
+    "*/firewheel/lib/grpc/firewheel_grpc_pb2.py",
+    "*/firewheel/lib/grpc/firewheel_grpc_pb2_grpc.py",
 ]
 
 [tool.coverage.paths]
