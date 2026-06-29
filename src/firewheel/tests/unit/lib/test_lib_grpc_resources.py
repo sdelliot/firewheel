@@ -9,7 +9,7 @@ from firewheel.lib.grpc.firewheel_grpc_resources import msg_to_dict
 
 
 def test_msg_to_dict_replaces_none_string() -> None:
-    """Verify literal 'None' values are converted to Python None."""
+    """Verify literal 'None' values are converted to Python :py:data:`None.`"""
     with patch(
         "firewheel.lib.grpc.firewheel_grpc_resources.MessageToDict",
         return_value={"a": "None", "b": "value"},
