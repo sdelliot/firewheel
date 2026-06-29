@@ -39,6 +39,26 @@ class FirewheelServicer(firewheel_grpc_pb2_grpc.FirewheelServicer):
             return None
         return vm_mapping
 
+    def _get_server_specific_vm_mapping(self, db, server_uuid, context):
+        """
+        Retrieve a specific VM mapping from the requested DB or abort the RPC.
+
+        Args:
+            db (str): Database name.
+            server_uuid (str): VM UUID to retrieve.
+            context (grpc._server._Context): The gRPC context.
+
+        Returns:
+            firewheel_grpc_pb2.VMMapping: The requested VM mapping.
+        """
+        vm_mapping = self.get_vm_mapping(self.dbs[db]["vm_mappings"], server_uuid)
+        if vm_mapping is None:
+            context.abort(
+                code=grpc.StatusCode.OUT_OF_RANGE,
+                details=f"No vm_mapping found for {server_uuid}",
+            )
+        return vm_mapping
+
     def __init__(self):
         """
         Initialize the Servicer.
@@ -139,13 +159,13 @@ class FirewheelServicer(firewheel_grpc_pb2_grpc.FirewheelServicer):
         """
         db = request.db
         with self._db_lock:
-            if self.dbs[db]["experiment_launch_time"] is not None:
-                return self.dbs[db]["experiment_launch_time"]
+            experiment_launch_time = self.dbs[db]["experiment_launch_time"]
+            if experiment_launch_time is not None:
+                return experiment_launch_time
 
-        error_details = "IndexError. No launch time available yet."
+        error_details = "No launch time available yet."
         error_code = grpc.StatusCode.OUT_OF_RANGE
         context.abort(code=error_code, details=error_details)
-        return None
 
     def SetExperimentStartTime(self, request, context):  # noqa: N802,ARG002
         """
@@ -162,7 +182,7 @@ class FirewheelServicer(firewheel_grpc_pb2_grpc.FirewheelServicer):
         """
         db = request.db
         with self._db_lock:
-            if self.dbs[db]["experiment_start_time"]:
+            if self.dbs[db]["experiment_start_time"] is not None:
                 return self.dbs[db]["experiment_start_time"]
 
             self.dbs[db]["experiment_start_time"] = request
@@ -181,14 +201,13 @@ class FirewheelServicer(firewheel_grpc_pb2_grpc.FirewheelServicer):
         """
         db = request.db
         with self._db_lock:
-            with contextlib.suppress(IndexError):
-                return self.dbs[db]["experiment_start_time"]
+            experiment_start_time = self.dbs[db]["experiment_start_time"]
+            if experiment_start_time is not None:
+                return experiment_start_time
 
-        error_details = "IndexError. No start time available yet."
+        error_details = "No start time available yet."
         error_code = grpc.StatusCode.OUT_OF_RANGE
         context.abort(code=error_code, details=error_details)
-
-        return None
 
     def InitializeExperimentStartTime(self, request, context):  # noqa: N802,ARG002
         """
@@ -203,10 +222,8 @@ class FirewheelServicer(firewheel_grpc_pb2_grpc.FirewheelServicer):
         """
         db = request.db
         with self._db_lock:
-            with contextlib.suppress(KeyError):
-                self.dbs[db]["experiment_launch_time"] = None
-            with contextlib.suppress(KeyError):
-                self.dbs[db]["experiment_start_time"] = None
+            self.dbs[db]["experiment_launch_time"] = None
+            self.dbs[db]["experiment_start_time"] = None
         return firewheel_grpc_pb2.InitializeExperimentStartTimeResponse()
 
     def CountVMMappingsNotReady(self, request, context):  # noqa: N802,ARG002
@@ -241,16 +258,10 @@ class FirewheelServicer(firewheel_grpc_pb2_grpc.FirewheelServicer):
         """
         db = request.db
         with self._db_lock:
-            vm_mapping = self.get_vm_mapping(
-                self.dbs[db]["vm_mappings"], request.server_uuid
+            vm_mapping = self._get_server_specific_vm_mapping(
+                db, request.server_uuid, context
             )
-            if vm_mapping:
-                return copy.deepcopy(vm_mapping)
-
-        error_details = f"IndexError. No vm_mapping found for {request.server_uuid}"
-        error_code = grpc.StatusCode.OUT_OF_RANGE
-        context.abort(code=error_code, details=error_details)
-        return None
+            return copy.deepcopy(vm_mapping)
 
     def SetVMTimeByUUID(self, request, context):  # noqa: N802,ARG002
         """
@@ -265,19 +276,11 @@ class FirewheelServicer(firewheel_grpc_pb2_grpc.FirewheelServicer):
         """
         db = request.db
         with self._db_lock:
-            try:
-                self.dbs[db]["vm_mappings"][
-                    request.server_uuid
-                ].current_time = request.current_time
-                return copy.deepcopy(self.dbs[db]["vm_mappings"][request.server_uuid])
-            except KeyError:
-                error_details = (
-                    f"IndexError. No vm_mapping found for {request.server_uuid}"
-                )
-                error_code = grpc.StatusCode.OUT_OF_RANGE
-                context.abort(code=error_code, details=error_details)
-
-        return None
+            vm_mapping = self._get_server_specific_vm_mapping(
+                db, request.server_uuid, context
+            )
+            vm_mapping.current_time = request.current_time
+            return copy.deepcopy(vm_mapping)
 
     def _update_not_ready_vmms(self, vmm, db):
         """
@@ -304,21 +307,14 @@ class FirewheelServicer(firewheel_grpc_pb2_grpc.FirewheelServicer):
         Returns:
             firewheel_grpc_pb2.VMMapping: The updated vm_mapping.
         """
+        db = request.db
         with self._db_lock:
-            try:
-                db = request.db
-                self._update_not_ready_vmms(request, db)
-                vmm = self.dbs[db]["vm_mappings"][request.server_uuid]
-                vmm.state = request.state
-                return copy.deepcopy(vmm)
-            except KeyError:
-                error_details = (
-                    f"IndexError. No vm_mapping found for {request.server_uuid}"
-                )
-                error_code = grpc.StatusCode.OUT_OF_RANGE
-                context.abort(code=error_code, details=error_details)
-
-        return None
+            self._update_not_ready_vmms(request, db)
+            vm_mapping = self._get_server_specific_vm_mapping(
+                db, request.server_uuid, context
+            )
+            vm_mapping.state = request.state
+            return copy.deepcopy(vm_mapping)
 
     def DestroyVMMappingByUUID(self, request, context):  # noqa: N802,ARG002
         """
@@ -398,10 +394,8 @@ class FirewheelServicer(firewheel_grpc_pb2_grpc.FirewheelServicer):
         """
         db = request.db
         with self._db_lock:
-            with contextlib.suppress(KeyError):
-                self.dbs[db]["vm_mappings"] = {}
-            with contextlib.suppress(KeyError):
-                self.dbs[db]["not_ready_vmms"] = set()
+            self.dbs[db]["vm_mappings"] = {}
+            self.dbs[db]["not_ready_vmms"] = set()
         return firewheel_grpc_pb2.DestroyAllVMMappingsResponse()
 
 
