@@ -7,7 +7,7 @@ import hashlib
 import tarfile
 import traceback
 from time import sleep
-from typing import Any
+from typing import Any, Tuple, Optional
 from pathlib import Path
 from functools import wraps as _wraps
 
@@ -319,7 +319,7 @@ def get_safe_tarfile_members(
     return result
 
 
-def strtobool(val):
+def strtobool(val: str) -> int:
     """Convert a string representation of truth to true (1) or false (0).
     True values are 'y', 'yes', 't', 'true', 'on', and '1'; false values
     are 'n', 'no', 'f', 'false', 'off', and '0'.  Raises ValueError if
@@ -369,7 +369,7 @@ def hash_file(fname: str) -> str:
     return hash_func.hexdigest()
 
 
-def retry(num_tries, exceptions=None, base_delay=10, exp_factor=2):
+def retry(num_tries: int, exceptions: Optional[Tuple] = None, base_delay: int = 10, exp_factor: int = 2):
     """
     This function provides a decorator which enables automatic retrying of
     functions which make connections to the FileStore and fail due to timeout errors.
