@@ -1,14 +1,16 @@
 import random
 import hashlib
+import tarfile
 import traceback
 from time import sleep
+from typing import List, Tuple, Optional
 from pathlib import Path
 from functools import wraps as _wraps
 
 from rich.console import Console
 
 
-def render_rich_string(text):
+def render_rich_string(text: str) -> str:
     """
     Convert a string with :py:mod:`rich` markup to standard string with ANSI sequences.
     This is useful for printing without the :py:class:`rich.console.Console`.
@@ -28,7 +30,7 @@ def render_rich_string(text):
     return capture.get()
 
 
-def badpath(path, base):
+def badpath(path: str, base: Path) -> bool:
     """
     Checks to see if the provided file path is underneath the given base path.
 
@@ -45,7 +47,7 @@ def badpath(path, base):
     return not str(joint).startswith(str(base))
 
 
-def badlink(info, base):
+def badlink(info: tarfile.TarInfo, base: Path) -> bool:
     """
     Checks to see if the provided link is underneath the given base path.
 
@@ -62,7 +64,7 @@ def badlink(info, base):
     return badpath(info.linkname, link_path)
 
 
-def get_safe_tarfile_members(tarfile):
+def get_safe_tarfile_members(tarfile: tarfile.TarFile) -> List:
     """
     Identify and return the members of a :py:class:`tarfile.TarFile` that are considered safe.
     See the documentation for :py:meth:`tarfile.TarFile.extractall` for more information.
@@ -70,7 +72,7 @@ def get_safe_tarfile_members(tarfile):
     https://stackoverflow.com/a/10077309.
 
     Args:
-        tarfile (tarfile.TarFile): The tar file to extract.
+        tarfile: The tar file to extract.
 
     Returns:
         list: A list of "safe" members to extract.
@@ -95,7 +97,7 @@ def get_safe_tarfile_members(tarfile):
     return result
 
 
-def strtobool(val):
+def strtobool(val: str) -> int:
     """Convert a string representation of truth to true (1) or false (0).
     True values are 'y', 'yes', 't', 'true', 'on', and '1'; false values
     are 'n', 'no', 'f', 'false', 'off', and '0'.  Raises ValueError if
@@ -145,7 +147,7 @@ def hash_file(fname: str) -> str:
     return hash_func.hexdigest()
 
 
-def retry(num_tries, exceptions=None, base_delay=10, exp_factor=2):
+def retry(num_tries: int, exceptions: Optional[Tuple] = None, base_delay: int = 10, exp_factor: int = 2):
     """
     This function provides a decorator which enables automatic retrying of
     functions which make connections to the FileStore and fail due to timeout errors.
