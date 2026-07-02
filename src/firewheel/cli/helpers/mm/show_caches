@@ -106,8 +106,8 @@ def collect_cache_data():
 
     host = vm_resources_host or images_host or mm_api.get_head_node()
 
-    vm_resources_entries = normalize_cache_rows(vm_resources_rows)
-    images_entries = normalize_cache_rows(images_rows)
+    vm_resources_entries = sorted(normalize_cache_rows(vm_resources_rows), key=lambda r: r["name"])
+    images_entries = sorted(normalize_cache_rows(images_rows), key=lambda r: r["name"])
 
     return {
         "host": host,
