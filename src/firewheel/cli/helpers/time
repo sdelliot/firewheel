@@ -148,7 +148,6 @@ def main():
         "--json",
         action="store_true",
         default=False,
-        deprecated=True,
         help=argparse.SUPPRESS,
     )
 

@@ -399,7 +399,6 @@ def main():
         "--json",
         action="store_true",
         default=False,
-        deprecated=True,
         help="Backward-compatible alias for retrieving the JSON log artifact.",
     )
     parser.add_argument(

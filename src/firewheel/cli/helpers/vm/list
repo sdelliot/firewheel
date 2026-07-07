@@ -516,7 +516,6 @@ def main():
     parser.add_argument(
         "--csv",
         action="store_true",
-        deprecated=True,
         help="Print the result into CSV-formatted rows instead of a pretty table.",
     )
     parser.add_argument(
