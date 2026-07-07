@@ -67,7 +67,6 @@ Named Arguments
     ``attributes``                 The dictionary of both provides and depends. Filters provided return true if found in either provides or depends.
     ``model_component_depends``    The model components depended on by the MC.
     ``model_component_precedes``   The model components preceded by the MC.
-    ``model_component_objects``    The model component objects provided by the MC.
     ``vm_resources``               The VM Resources provided by the MC. This will not auto-expand any wildcards (e.g. ``vm_resources/**``).
     ============================   ==================================================================================================================================
 
@@ -170,6 +169,8 @@ def parse_field_filters(args_fields):
 
 def check_field_filter(field_filter, elem):
     """Check if an element matches the specified field filter.
+
+    It checks both top-level keys and nested attributes within the element.
 
     Args:
         field_filter (dict): Field filter criteria.

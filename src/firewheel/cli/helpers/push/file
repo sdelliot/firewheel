@@ -59,6 +59,8 @@ Example
 
 ``firewheel push file /tmp/test.txt host.root.net /tmp/myfile.txt``
 
+``firewheel push file /tmp/test.txt host.windows.net '/Users/User/Downloads/myfile.txt'``
+
 ``firewheel push file --format json /tmp/test.txt host.root.net /tmp/myfile.txt``
 
 DONE
@@ -128,6 +130,11 @@ def build_error_result(filename, vm_name, destination, message, error_type):
 def schedule_file_transfer(name, file_name, destination, windows):
     """
     Schedule a VM resource file transfer.
+
+    This function retrieves the schedule for a specified virtual machine (VM)
+    from the schedule database, adds a new schedule entry for transferring a
+    resource file to the VM, and updates the schedule in the database. It
+    supports both Unix-like and Windows file transfer commands.
 
     Args:
         name (str): VM name.
