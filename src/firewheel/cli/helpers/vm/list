@@ -9,6 +9,9 @@ of all filters. If multiple filters are used then anything that matches **all**
 of filters will be displayed. Filters will attempt substring matching so ensure that
 you provide enough of a substring to the filter to narrow down the displayed results.
 
+This Helper supports human-readable table output, CSV output, and machine-readable
+JSON output.
+
 Arguments
 +++++++++
 
@@ -21,9 +24,16 @@ Named Arguments
 
     Show help message and exit.
 
+.. option:: --format {table,json,csv}
+
+    :default: ``table``
+
+    Select the output format. ``table`` prints a human-readable table.
+    ``csv`` prints CSV-formatted output. ``json`` returns a structured JSON response.
+
 .. option:: --csv
 
-    Output in CSV format.
+    Backward-compatible alias for ``--format csv``.
 
 Positional Arguments
 ^^^^^^^^^^^^^^^^^^^^
@@ -41,8 +51,8 @@ Positional Arguments
     ``name``       The name of the VM
     ``state``      State of VM QEMU process and vm_resource run status
     ``image``      Full name of the base image of the VM
-    ``hostname``   The hostname as it was assigned in the experiment
-    ``vnc``        The shortened port number used to connect to the VM through VNC. Note, the real port number is 5900 + that shown
+    ``hostname``   The hostname of the FIREWHEEL host currently running the VM
+    ``vnc``        The VNC port used to connect to the VM
     ``time``       If VM is configuring, this displays the time of the vm_resource currently running within a VM. If VM has not started configuring, this displays N/A. If VM is configured, this displays 0, unless an experiment start time has been determined, in which case all VMs return :)
     ``ip``         The VMs :ref:`control_network_mc` IP address, if the experiment included the :ref:`control_network_mc` MC
     =============  ==================================================================================================================================
@@ -59,6 +69,8 @@ Example
 ``firewheel vm list name=root --csv``
 
 ``firewheel vm list image=vyos state``
+
+``firewheel vm list --format json image=vyos state``
 
 DONE
 RUN LocalPython ON control

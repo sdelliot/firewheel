@@ -2,12 +2,34 @@ AUTHOR
 FIREWHEEL Team
 DONE
 DESCRIPTION
-Show all installed repositories.
+Show all installed Model Component repositories.
+
+This Helper supports both human-readable text output and machine-readable
+JSON output.
+
+Arguments
++++++++++
+
+Named Arguments
+^^^^^^^^^^^^^^^
+
+.. option:: -h, --help
+
+    Show help message and exit.
+
+.. option:: --format {text,json}
+
+    :default: ``text``
+
+    Select the output format. ``text`` prints repository paths in a simple list.
+    ``json`` returns a structured JSON response.
 
 Example
 +++++++
 
 ``firewheel repository list``
+
+``firewheel repository list --format json``
 
 DONE
 RUN Python ON control

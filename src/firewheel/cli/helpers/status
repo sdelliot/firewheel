@@ -2,13 +2,35 @@ AUTHOR
 FIREWHEEL Team
 DONE
 DESCRIPTION
-This informs a user if the testbed is available for use or occupied by
-an existing experiment.
+Report whether the FIREWHEEL testbed is ready for use or appears to be occupied
+by an existing experiment or existing minimega VMs.
+
+This Helper supports both human-readable text output and machine-readable
+JSON output.
+
+Arguments
++++++++++
+
+Named Arguments
+^^^^^^^^^^^^^^^
+
+.. option:: -h, --help
+
+    Show help message and exit.
+
+.. option:: --format {text,json}
+
+    :default: ``text``
+
+    Select the output format. ``text`` prints a human-readable status message.
+    ``json`` returns a structured JSON response.
 
 Example
 +++++++
 
 ``firewheel status``
+
+``firewheel status --format json``
 
 DONE
 RUN Python ON control

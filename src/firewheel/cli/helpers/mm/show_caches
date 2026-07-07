@@ -2,15 +2,37 @@ AUTHOR
 FIREWHEEL Team
 DONE
 DESCRIPTION
-
-List the image and vm_resource cache directories which are found in the
+List the image and vm_resource cache directories found in the
 :class:`FileStore <firewheel.lib.minimega.file_store.FileStore>`. This enables
-users to identify if a file was correctly cached.
+users to identify whether a file was correctly cached.
+
+This Helper supports both human-readable table output and machine-readable
+JSON output.
+
+Arguments
++++++++++
+
+Named Arguments
+^^^^^^^^^^^^^^^
+
+.. option:: -h, --help
+
+    Show help message and exit.
+
+.. option:: --format {text,json}
+
+    :default: ``text``
+
+    Select the output format. ``text`` displays human-readable cache tables with
+    file sizes rendered in a human-friendly format. ``json`` returns a structured
+    JSON response with raw byte counts.
 
 Examples
 ++++++++
 
 ``firewheel mm show_caches``
+
+``firewheel mm show_caches --format json``
 
 DONE
 RUN LocalPython ON control

@@ -5,7 +5,7 @@ DESCRIPTION
 
 Create a FIREWHEEL experiment using a set of model components.
 
-**Usage:**  ``firewheel experiment [-h] [--profile] [--dry-run] [-f] <model_component>[:<name1>=<value1>[:<name2>=<value2>]...] [<model_component2>[:<name1>=<value1>[:<name2>=<value2>]...]]``
+**Usage:**  ``firewheel experiment [-h] [--format {table,json}] [--profile] [--dry-run] [-f] [-r] [-ni] <model_component>[:<name1>=<value1>[:<name2>=<value2>]...] [<model_component2>[:<name1>=<value1>[:<name2>=<value2>]...]]``
 
 All of the experiment Helper's command line arguments, along with any named
 MC parameter value settings, must be included on a single line.
@@ -28,6 +28,15 @@ Component) or realizing the topology into an emulation. The current method to
 launch an experiment is to use the ``minimega.launch`` model component which uses
 `minimega <https://www.sandia.gov/minimega>`_ to instantiate the emulation. **NOTE: This is not required**.
 FIREWHEEL is extensible and enables users to create other experiment instantiation methods.
+
+This Helper supports both human-readable table output and machine-readable
+JSON output.
+
+.. note::
+
+    When using ``--format json``, this Helper requires non-interactive execution.
+    Re-run with :option:`--no-install` to prevent interactive Model Component
+    INSTALL prompting.
 
 Arguments
 +++++++++
@@ -54,13 +63,19 @@ Positional Arguments
         $ # Muliple MC named arguments
         $ firewheel experiment tests.router_tree:3 tests.large_resource:size=1024:location_dir=/tmp:preload=True minimega.launch
 
-
 Named Arguments
 ^^^^^^^^^^^^^^^
 
 .. option:: -h, --help
 
     Print this experiment Helper description then exit. (optional)
+
+.. option:: --format {table,json}
+
+    :default: ``table``
+
+    Select the output format. ``table`` prints a human-readable execution summary.
+    ``json`` returns a structured JSON response.
 
 .. option:: -f, --force
 
@@ -82,7 +97,6 @@ Named Arguments
 
     Continue regardless of if Model Components within the experiment have been "installed" (i.e., the ``INSTALL`` file executed). Defaults to None. (optional)
 
-
 Examples
 ++++++++
 ``firewheel experiment acme.run minimega.launch``
@@ -92,6 +106,8 @@ Examples
 ``firewheel experiment tests.vm_gen:size=3 minimega.launch``
 
 ``firewheel experiment -r tests.vm_gen:size=3 tests.connect_all tests.ping_all minimega.launch``
+
+``firewheel experiment --format json --no-install tests.router_tree:3 minimega.launch``
 
 DONE
 RUN LocalPython ON control

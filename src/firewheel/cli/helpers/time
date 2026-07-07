@@ -10,6 +10,9 @@ use the command ``date --utc``.
 If the experiment has started, the number of seconds since the experiment
 started is also printed.
 
+This Helper supports both human-readable text output and machine-readable
+JSON output.
+
 Arguments
 +++++++++
 All arguments are optional.
@@ -21,16 +24,23 @@ Named Arguments
 
     Show help message and exit.
 
+.. option:: --format {text,json}
+
+    :default: ``text``
+
+    Select the output format. ``text`` prints a human-readable summary.
+    ``json`` returns a structured JSON response.
+
 .. option:: --json
 
-    Dump output as JSON-formatted dictionary in the form of ``{start_time: <datetime>, seconds_since_start: <int>}``
+    Backward-compatible alias for ``--format json``.
 
 Example
 +++++++
 
 ``firewheel time``
 
-``firewheel time --json``
+``firewheel time --format json``
 
 DONE
 RUN LocalPython ON control

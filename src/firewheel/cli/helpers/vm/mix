@@ -2,19 +2,41 @@ AUTHOR
 FIREWHEEL Team
 DONE
 DESCRIPTION
+Generates a view of the VM image mix for the current experiment. The output
+includes the VM image, the VM power state, the VM resource state, and the
+count of VMs in each grouped combination.
 
-Generates a table showing the VM Images for a running experiment. The table also
-includes the power state of the VMs and the vm_resource state. Images that are the same
-and have the same power/vm_resource state are grouped. The count of the various VMs are
-provided. Additionally, the total number of scheduled VMs is shown at the bottom
-of the table.
+VMs with the same image, power state, and VM resource state are grouped
+together. The total number of scheduled VMs is also reported.
+
+This Helper supports both human-readable table output and machine-readable
+JSON output.
+
+Arguments
++++++++++
+
+Named Arguments
+^^^^^^^^^^^^^^^
+
+.. option:: -h, --help
+
+    Show help message and exit.
+
+.. option:: --format {table,json}
+
+    :default: ``table``
+
+    Select the output format. ``table`` displays a live-updating human-readable
+    table. ``json`` returns a one-time structured JSON snapshot.
 
 Example
 +++++++
 
 ``firewheel vm mix``
 
-The output will look similar to the below table.::
+``firewheel vm mix --format json``
+
+The table output will look similar to the below.::
 
     +------------------------------------------------+-------------+----------------------+-------+
     |                    VM Image                    | Power State |  VM Resource State   | Count |

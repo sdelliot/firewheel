@@ -2,9 +2,8 @@ AUTHOR
 FIREWHEEL Team
 DONE
 DESCRIPTION
-
 Push a file to a VM using the VM resource handler. This does not require that
-the VM is running a SSH server. Also, unlike :ref:`helper_scp`, there is no need
+the VM is running an SSH server. Also, unlike :ref:`helper_scp`, there is no need
 to use the :ref:`control_network_mc` model component since the VM resource handler has access to
 the VM through a serial port.
 
@@ -18,8 +17,10 @@ All files get placed at the location specified on the command line.
 
     Any shell expansions (e.g. ``~``) used in the ``destination`` path are resolved **BEFORE** the file is pushed to the VM.
 
+This Helper supports both human-readable text output and machine-readable
+JSON output.
 
-**Usage:**  ``firewheel push file [-h] <filename> <vm hostname> <destination>``
+**Usage:**  ``firewheel push file [-h] [--format {text,json}] <filename> <vm hostname> <destination>``
 
 Arguments
 +++++++++
@@ -29,14 +30,21 @@ Named Arguments
 
 .. option:: -h, --help
 
-    Show this help message and exit
+    Show this help message and exit.
+
+.. option:: --format {text,json}
+
+    :default: ``text``
+
+    Select the output format. ``text`` prints a human-readable scheduling summary.
+    ``json`` returns a structured JSON response.
 
 Positional Arguments
 ^^^^^^^^^^^^^^^^^^^^
 
 .. option:: <filename>
 
-    The name of the file to push to the VM
+    The name of the file to push to the VM.
 
 .. option:: <vm hostname>
 
@@ -51,7 +59,7 @@ Example
 
 ``firewheel push file /tmp/test.txt host.root.net /tmp/myfile.txt``
 
-``firewheel push file /tmp/test.txt whost.root.net '/Users/User/Downloads/myfile.txt'``
+``firewheel push file --format json /tmp/test.txt host.root.net /tmp/myfile.txt``
 
 DONE
 RUN LocalPython ON control
