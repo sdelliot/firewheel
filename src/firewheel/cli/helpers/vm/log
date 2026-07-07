@@ -1,6 +1,7 @@
 AUTHOR
 FIREWHEEL Team
 DONE
+DESCRIPTION
 
 Retrieve a log for the given VM. This enables users to easily access log files for VMs
 without intimate knowledge of where the VM resource logs are stored. Additionally, it enables
