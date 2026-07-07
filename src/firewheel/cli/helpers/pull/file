@@ -9,6 +9,11 @@ the VM through a serial port.
 
 All files get placed at the location specified on the command line.
 
+.. note::
+
+    When pulling from a Windows VM, if the requested path does not include an
+    explicit drive letter, FIREWHEEL assumes the path is on the ``C:`` drive.
+
 This Helper supports both human-readable text output and machine-readable
 JSON output.
 
@@ -261,6 +266,9 @@ def ensure_local_destination(destination):
 
 def build_transfer_path(vm_name, filename, windows_vm):
     """Build the expected local transfer path on the FIREWHEEL host.
+
+    For Windows VMs, if the requested path does not include an explicit drive,
+    this function assumes the file is on the ``C:`` drive.
 
     Args:
         vm_name (str): VM hostname.
