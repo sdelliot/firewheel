@@ -1,11 +1,239 @@
+from __future__ import annotations
+
 import random
+import shutil
+import filecmp
 import hashlib
+import tarfile
 import traceback
 from time import sleep
+from typing import Any, Tuple, Optional
 from pathlib import Path
 from functools import wraps as _wraps
 
 from rich.console import Console
+
+
+def unescape_embedded_json(escaped_json: str) -> str:
+    """Convert embedded escaped JSON text into normal JSON text."""
+    return escaped_json.replace(r"\\", "\\").replace(r"\"", '"')
+
+
+def escape_embedded_json(json_text: str, is_mesh_command: bool) -> str:
+    """Escape JSON text for reinsertion into a launch command line."""
+    if is_mesh_command:
+        return json_text.replace('"', r"\\\"")
+    return json_text.replace('"', r"\"")
+
+
+def files_are_identical(source: Path, destination: Path) -> bool:
+    """Return whether two files are byte-for-byte identical.
+
+    Args:
+        source (Path): Source file path.
+        destination (Path): Destination file path.
+
+    Returns:
+        bool: True if both files exist and have identical contents, otherwise False.
+    """
+    if not source.is_file() or not destination.is_file():
+        return False
+    return filecmp.cmp(source, destination, shallow=False)
+
+
+def directories_are_identical(
+    source: Path, destination: Path, ignore: set[str] | None = None
+) -> bool:
+    """Recursively compare two directories for identical contents.
+
+    This function checks whether `source` and `destination` are both existing
+    directories with the same files and subdirectories. File contents are
+    compared using a deep comparison (`shallow=False`). Any names included in
+    `ignore` are excluded from comparisons at every directory level.
+
+    Args:
+        source (Path): Path to the source directory.
+        destination (Path): Path to the destination directory.
+        ignore (set[str] | None): Optional set of file or directory names to exclude from the
+            comparison. Ignored names are skipped wherever they appear in the
+            directory tree.
+
+    Returns:
+        bool: `True` if both paths are directories and their non-ignored contents are
+        identical; otherwise, `False`.
+
+    Notes:
+        - Returns `False` if either path is not a directory.
+        - Returns `False` if either directory contains non-ignored entries not
+          present in the other.
+        - Returns `False` if any common file differs in content or cannot be
+          compared.
+        - Returns `False` if `filecmp.dircmp` reports any funny files.
+
+    """
+    if ignore is None:
+        ignore = set()
+
+    if not source.is_dir() or not destination.is_dir():
+        return False
+
+    comparison = filecmp.dircmp(source, destination)
+
+    left_only = [x for x in comparison.left_only if x not in ignore]
+    right_only = [x for x in comparison.right_only if x not in ignore]
+    common_files = [x for x in comparison.common_files if x not in ignore]
+
+    if left_only or right_only or comparison.funny_files:
+        return False
+
+    _, mismatch, errors = filecmp.cmpfiles(
+        source, destination, common_files, shallow=False
+    )
+    if mismatch or errors:
+        return False
+
+    for common_dir in comparison.common_dirs:
+        if common_dir in ignore:
+            continue
+        if not directories_are_identical(
+            source / common_dir, destination / common_dir, ignore
+        ):
+            return False
+
+    return True
+
+
+def copytree_if_needed(source: Path, destination: Path, force: bool) -> bool:
+    """Copy a directory tree only when needed.
+
+    If the destination exists and is identical to the source, no action is taken.
+
+    Args:
+        source (Path): Source directory.
+        destination (Path): Destination directory.
+        force (bool): Whether differing existing content may be overwritten.
+
+    Returns:
+        bool: True if content was copied or overwritten, False if skipped because the
+        destination already matched the source.
+
+    Raises:
+        FileExistsError: If destination exists with different contents and
+            ``force`` is False.
+        OSError: If copying or deleting fails.
+    """
+    if not destination.exists():
+        shutil.copytree(source, destination)
+        return True
+
+    if directories_are_identical(source, destination):
+        return False
+
+    if not force:
+        raise FileExistsError(
+            f"Destination already exists with different contents: {destination}"
+        )
+
+    if destination.is_dir():
+        shutil.rmtree(destination)
+    else:
+        destination.unlink()
+
+    shutil.copytree(source, destination)
+    return True
+
+
+def copyfile_if_needed(source: Path, destination: Path, force: bool) -> bool:
+    """Copy a file only when needed.
+
+    If the destination exists and is identical to the source, no action is taken.
+
+    Args:
+        source (Path): Source file.
+        destination (Path): Destination file.
+        force (bool): Whether differing existing content may be overwritten.
+
+    Returns:
+        bool: True if content was copied or overwritten, False if skipped because the
+        destination already matched the source.
+
+    Raises:
+        FileExistsError: If destination exists with different contents and
+            ``force`` is False.
+        OSError: If copying or deleting fails.
+    """
+    if not destination.exists():
+        shutil.copy2(source, destination)
+        return True
+
+    if files_are_identical(source, destination):
+        return False
+
+    if not force:
+        raise FileExistsError(
+            f"Destination already exists with different contents: {destination}"
+        )
+
+    if destination.is_dir():
+        shutil.rmtree(destination)
+    else:
+        destination.unlink()
+
+    shutil.copy2(source, destination)
+    return True
+
+
+def print_phase_header(console, title: str) -> None:
+    """Print a restore phase header.
+
+    Args:
+        console (Console): The console to print to.
+        title (str): Phase title to display.
+    """
+    console.rule(f"[bold blue]{title}[/bold blue]")
+
+
+def print_success(console, message: str) -> None:
+    """Print a success message.
+
+    Args:
+        console (Console): The console to print to.
+        message (str): Message to display.
+    """
+    console.print(f"[green]✓ {message}[/green]")
+
+
+def print_reused(console, message: str) -> None:
+    """Print a reused/skipped message.
+
+    Args:
+        console (Console): The console to print to.
+        message (str): Message to display.
+    """
+    console.print(f"[yellow]↺ {message}[/yellow]")
+
+
+def print_error(console, message: str) -> None:
+    """Print an error message.
+
+    Args:
+        console (Console): The console to print to.
+        message (str): Message to display.
+    """
+    console.print(f"[red]✗ {message}[/red]")
+
+
+def print_result_card(console, title: str, lines: list[tuple[str, str]]) -> None:
+    """Print a concise result card.
+
+    Args:
+        console (Console): The console to print to.
+        title (str): Card title.
+        lines (list[tuple[str, str]]): Sequence of key/value pairs to display.
+    """
+    console.print(f"[bold]{title}[/bold]")
+    for key, value in lines:
+        console.print(f"  [cyan]{key:<26}[/cyan] {value}")
 
 
 def render_rich_string(text):
@@ -28,74 +256,70 @@ def render_rich_string(text):
     return capture.get()
 
 
-def badpath(path, base):
-    """
-    Checks to see if the provided file path is underneath the given base path.
+def badpath(path: str, base: Path) -> bool:
+    """Check whether a path escapes the provided base directory.
 
     Args:
-        path (str): The proposed extraction path of the tar file member to check.
-        base (pathlib.Path): The path of the current working directory.
+        path (str): Proposed extraction path.
+        base (Path): Intended extraction base directory.
 
     Returns:
-        bool: :py:data:`True` if the path is not under the proposed base path
-        otherwise :py:data:`False`.
+        bool: True if the resolved path escapes the base directory, otherwise False.
     """
-    joint = base / path
-    joint = joint.absolute().resolve()
-    return not str(joint).startswith(str(base))
+    joint = (base / path).resolve()
+    return not str(joint).startswith(str(base.resolve()))
 
 
-def badlink(info, base):
-    """
-    Checks to see if the provided link is underneath the given base path.
+def badlink(info: tarfile.TarInfo, base: Path) -> bool:
+    """Check whether a tar link target escapes the provided base directory.
 
     Args:
-        info (tarfile.TarInfo): The file member that is going to be extracted.
-        base (pathlib.Path): The path of the current working directory.
+        info (tarfile.TarInfo): Tar file member to inspect.
+        base (Path): Intended extraction base directory.
 
     Returns:
-        bool: :py:data:`True` if the path is not under the proposed base path
-        otherwise :py:data:`False`.
+        bool: True if the resolved link target escapes the base directory, otherwise
+        False.
     """
-    link_path = base / Path(info.name).parent
-    link_path = link_path.absolute().resolve()
+    link_path = (base / Path(info.name).parent).resolve()
     return badpath(info.linkname, link_path)
 
 
-def get_safe_tarfile_members(tarfile):
-    """
-    Identify and return the members of a :py:class:`tarfile.TarFile` that are considered safe.
-    See the documentation for :py:meth:`tarfile.TarFile.extractall` for more information.
-    This function, as well as :py:func:`badlink` and :py:func:`badpath` were based on
-    https://stackoverflow.com/a/10077309.
+def get_safe_tarfile_members(
+    tarfile_obj: tarfile.TarFile,
+    base: Path = Path("."),
+) -> list[tarfile.TarInfo]:
+    """Return tar members considered safe to extract under a base directory.
 
     Args:
-        tarfile (tarfile.TarFile): The tar file to extract.
+        tarfile_obj (tarfile.TarFile): Open tar archive.
+        base (Path): Intended extraction base directory.
 
     Returns:
-        list: A list of "safe" members to extract.
+        list[tarfile.TarInfo]: List of safe tar members.
     """
-    base = Path(".").resolve().absolute()
-
-    result = []
+    resolved_base = base.resolve()
+    result: list[tarfile.TarInfo] = []
     console = Console()
-    for member in tarfile.getmembers():
-        if badpath(member.name, base):
-            console.print(f"[b red] {member.name} is blocked: illegal path")
-        elif member.issym() and badlink(member, base):
+
+    for member in tarfile_obj.getmembers():
+        if badpath(member.name, resolved_base):
+            console.print(f"[b red]{member.name} is blocked: illegal path[/b red]")
+        elif member.issym() and badlink(member, resolved_base):
             console.print(
-                f"[b red] {member.name} is blocked: Symlink to [cyan]{member.linkname}"
+                f"[b red]{member.name} is blocked: symlink to [cyan]{member.linkname}[/cyan][/b red]"
             )
-        elif member.islnk() and badlink(member, base):
+        elif member.islnk() and badlink(member, resolved_base):
             console.print(
-                f"[b red] {member.name} is blocked: hard link to [cyan]{member.linkname}"
+                f"[b red]{member.name} is blocked: hard link to [cyan]{member.linkname}[/cyan][/b red]"
             )
         else:
             result.append(member)
+
     return result
 
 
-def strtobool(val):
+def strtobool(val: str) -> int:
     """Convert a string representation of truth to true (1) or false (0).
     True values are 'y', 'yes', 't', 'true', 'on', and '1'; false values
     are 'n', 'no', 'f', 'false', 'off', and '0'.  Raises ValueError if
@@ -145,7 +369,7 @@ def hash_file(fname: str) -> str:
     return hash_func.hexdigest()
 
 
-def retry(num_tries, exceptions=None, base_delay=10, exp_factor=2):
+def retry(num_tries: int, exceptions: Optional[Tuple] = None, base_delay: int = 10, exp_factor: int = 2):
     """
     This function provides a decorator which enables automatic retrying of
     functions which make connections to the FileStore and fail due to timeout errors.
@@ -182,7 +406,7 @@ def retry(num_tries, exceptions=None, base_delay=10, exp_factor=2):
         """
 
         @_wraps(func)
-        def f_retry(*args, **kwargs):  # noqa: DOC109
+        def f_retry(*args: Any, **kwargs: Any):
             """
             The retry loop which attempts the function ``num_tries`` times
             and will catch exceptions passed into exceptions, then sleep
@@ -190,8 +414,8 @@ def retry(num_tries, exceptions=None, base_delay=10, exp_factor=2):
             base_delay*exp_factor**(attempt) seconds before retrying.
 
             Args:
-                *args: Any arguments to the function.
-                **kwargs: Any keyword arguments to the function.
+                *args (Any): Any arguments to the function.
+                **kwargs (Any): Any keyword arguments to the function.
 
             Returns:
                 The passed in function.

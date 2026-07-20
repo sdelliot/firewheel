@@ -62,20 +62,13 @@ def set_vm_time(vm_uuid, new_time, mapping=None, log=None):
 
     db_time = str(int(new_time))
 
-    current_record = mapping.get(server_uuid=vm_uuid)
+    current_record = mapping.set_vm_time_by_uuid(vm_uuid, db_time)
     if current_record is None:
         raise RuntimeError(
             "Unexpected lack of database entry while updating "
             "time--I do not have enough parameters!"
         )
 
-    mapping.put(
-        current_record["server_uuid"],
-        current_record["server_name"],
-        current_record["state"],
-        db_time,
-        current_record["control_ip"],
-    )
     if close:
         mapping.close()
 
@@ -98,8 +91,8 @@ def get_vm_count_not_ready(mapping=None, log=None):
         log (logging.Logger): An optional logger that can to output results.
 
     Returns:
-        str: Count of the number of VMs not in the "configured" or
-             "N/A" vm_resources state.
+        str: Count of the number of VMs not in the "VMState.CONFIGURED" or
+             "VMState.NA" vm_resources state.
     """
     close = False
     if mapping is None:

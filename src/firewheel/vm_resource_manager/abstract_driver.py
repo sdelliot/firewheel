@@ -2,7 +2,7 @@ import time
 import threading
 from abc import ABC, abstractmethod
 from pathlib import Path, PureWindowsPath
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 class AbstractDriver(ABC):
@@ -641,7 +641,7 @@ class AbstractDriver(ABC):
         """
 
         if timestamp:
-            dtime = datetime.utcfromtimestamp(timestamp)
+            dtime = datetime.fromtimestamp(timestamp, timezone.utc)
             tstamp = f"'{dtime:%m/%d/%Y %H:%M:%S UTC}'"
 
         if "Windows" in self.get_os():
