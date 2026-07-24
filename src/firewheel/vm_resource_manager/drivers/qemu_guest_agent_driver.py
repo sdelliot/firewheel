@@ -26,6 +26,9 @@ class QemuGuestAgentDriver(AbstractDriver):
             log (logging.Logger): A logger which can be used by this class.
         """
         self.qga = None
+        if not config.get("path"):
+            raise FileNotFoundError("Was not given path to QGA serial device")
+
         super().__init__(config, log)
 
     def connect(self):
@@ -150,7 +153,7 @@ class QemuGuestAgentDriver(AbstractDriver):
         Get the time inside the VM.
 
         Returns:
-            int: Time in nanoseconds since the epoch.
+            float: Time in seconds since the epoch.
         """
 
         # No need to wrap this call since qmp's command function
@@ -843,5 +846,5 @@ class QemuGuestAgentDriver(AbstractDriver):
         """
         Close the connection to the socket used for guest agent.
         """
-
-        self.qga.close()
+        if self.qga:
+            self.qga.close()

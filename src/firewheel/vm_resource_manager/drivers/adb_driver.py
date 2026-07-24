@@ -1,426 +1,505 @@
+"""
+ADB driver for FIREWHEEL VM Resource Manager.
+
+This driver communicates with Android Virtual Devices / Android guests via ADB.
+It implements the AbstractDriver interface used by VMResourceHandler while avoiding
+QGA/Linux-specific assumptions such as /bin/bash, /var/launch, and writable /system.
+"""
+
 import json
 import time
+import shlex
 import base64
+import posixpath
+import re
+import uuid
+from pathlib import Path
 
 import adbutils
 
 from firewheel.vm_resource_manager.abstract_driver import AbstractDriver
 
-EXIT_MAGIC = "ExitCode="
-
 
 class ADBDriver(AbstractDriver):
     """
-    Driver class for the Android Debug Bridge (ADB). This class can communicate
-    with an emulated Android device via ADB.
+    Driver class for Android Debug Bridge (ADB).
+
+    This driver is intended to be selected for minimega/FIREWHEEL VMs whose engine
+    is ``AVD``. It uses Android-native paths and /system/bin/sh.
     """
+
+    ANDROID_SHELL = "/system/bin/sh"
+    FIREWHEEL_ROOT = "/data/local/tmp/firewheel"
+    LAUNCH_ROOT = f"{FIREWHEEL_ROOT}/launch"
+    PROC_ROOT = f"{FIREWHEEL_ROOT}/proc"
+
+    _ENV_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+
     def __init__(self, config, log):
-        """Initialize the ADB driver.
+        """
+        Initialize the ADB driver.
 
         Args:
-            config (dict): Configuration containing adb_port and other information.
-            log (logging.Logger): Logger instance for emitting debug/info messages.
+            config (dict): Handler config. Expected keys:
+                - ``adb_port``: Emulator console port, e.g. 5554.
+                - ``adb_serial``: ADB serial, e.g. ``emulator-5554``.
+                - ``require_root``: Optional bool. Defaults to True.
+            log (logging.Logger): Logger instance.
         """
-        log.info("Config = %s", config)
+        log.info("ADBDriver config = %s", config)
+
         self.console_port = config["adb_port"]
-        self.adb_name = f"emulator-{self.console_port}"
+        self.adb_name = config.get("adb_serial", f"emulator-{self.console_port}")
+        self.require_root = config.get("require_root", True)
+
         self.adb_client = adbutils.AdbClient()
         self.adb_device = self.adb_client.device(self.adb_name)
         self._is_rooted = False
+
         super().__init__(config, log)
 
+    # -------------------------------------------------------------------------
+    # Basic ADB helpers
+    # -------------------------------------------------------------------------
+
+    def _refresh_device(self):
+        """Refresh the adbutils device handle."""
+        self.adb_device = self.adb_client.device(self.adb_name)
+
+    def _shell(self, command):
+        """
+        Run an Android shell command and return stdout.
+
+        Args:
+            command (str): Command string.
+
+        Returns:
+            str: stdout text.
+        """
+        with self.lock:
+            return self.adb_device.shell(command)
+
+    def _shell2(self, command):
+        """
+        Run an Android shell command and return an adbutils shell2 result.
+
+        Args:
+            command (str): Command string.
+
+        Returns:
+            object: Result object with ``returncode`` and ``output``.
+        """
+        with self.lock:
+            return self.adb_device.shell2(command)
+
+    @staticmethod
+    def _contains_glob(path):
+        """Return True if ``path`` contains simple shell glob metacharacters."""
+        return any(char in str(path) for char in ("*", "?", "["))
+
+    def _quote_path(self, path, allow_glob=False):
+        """
+        Quote a path for shell use.
+
+        Args:
+            path (str): Path to quote.
+            allow_glob (bool): If True, preserve glob patterns unquoted.
+
+        Returns:
+            str: Shell-safe path string.
+        """
+        path = str(path)
+        if allow_glob and self._contains_glob(path):
+            return path
+        return shlex.quote(path)
+
+    def _ensure_firewheel_dirs(self):
+        """Create FIREWHEEL runtime directories on the Android guest."""
+        result = self._shell2(
+            f"mkdir -p {shlex.quote(self.LAUNCH_ROOT)} {shlex.quote(self.PROC_ROOT)}"
+        )
+        if result.returncode != 0:
+            raise RuntimeError(
+                f"Unable to create FIREWHEEL Android directories: {result.output}"
+            )
+
+    # -------------------------------------------------------------------------
+    # Connection / lifecycle
+    # -------------------------------------------------------------------------
+
     def _wait_for_device_online(self):
-        """Wait until the device responds to ping.
-
-        Continuously calls :py:meth:`ping` until it returns ``True`` indicating the
-        Android device is online. Sleeps briefly between attempts.
-        """
-        sleep_time = 1
+        """Wait until the ADB device is online and shell commands work."""
         while not self.ping():
-            self.log.debug("Waiting for device to come online")
-            time.sleep(sleep_time)
-
-    def _remount_system(self):
-        """Remount the /system partition as writable.
-
-        Ensures the device is online, then checks if the /system partition is already
-        writable. If not, attempts to remount it, reboot the device, and repeat the
-        process to guarantee the partition is writable.
-        """
-        self._wait_for_device_online()
-
-        returncode = self.adb_device.shell2("test -w /system").returncode
-        if returncode == 0:
-            # it was already writable
-            return
-
-        def _remount():
-            num_attempts = 10
-            for _ in range(num_attempts):
-                try:
-                    self.adb_device.adb_output("remount")
-                    break
-                except Exception as exc:
-                    self.log.exception(exc)
-            else:
-                raise RuntimeError("Error remounting /system as writable")
-
-        _remount()
-        self.reboot()
-        self._wait_for_device_online()
-        self._root()
-        self._wait_for_device_online()
-        _remount()
-        self._wait_for_device_online()
+            self.log.debug("Waiting for Android device %s to come online", self.adb_name)
+            time.sleep(1)
 
     def _root(self):
-        """Obtain root access on the Android device.
-
-        Acquires a thread-safe lock before invoking ``adb root`` on the device.
-        Sets the internal ``_is_rooted`` flag to ``True`` on success.
         """
+        Obtain root access.
+
+        Raises:
+            RuntimeError: If root is required but could not be obtained.
+        """
+        self.log.debug("Requesting adb root for %s", self.adb_name)
+
         with self.lock:
             self.adb_device.root()
+
+        # adb root commonly restarts adbd.
+        time.sleep(1)
+        self._refresh_device()
+        self._wait_for_device_online()
+
+        result = self._shell2("id -u")
+        uid = result.output.strip()
+
+        if result.returncode != 0 or uid != "0":
+            raise RuntimeError(
+                f"ADB root requested for {self.adb_name}, but device UID is "
+                f"{uid!r}; output={result.output!r}"
+            )
+
         self._is_rooted = True
-
-    def _symlink_bash(self):
-        """Create a symbolic link ``/bin/bash`` → ``/bin/sh`` on the device.
-
-        The link is created under a thread-safe lock so that concurrent callers
-        do not race the underlying ``adb shell`` command.
-        """
-        with self.lock:
-            self.adb_device.shell("ln -s /bin/sh /bin/bash")
+        self.log.debug("ADB root confirmed for %s", self.adb_name)
 
     def connect(self):
-        """Establish a connection to the Android device.
-
-        Ensures the device is online, obtains root access if necessary, remounts the
-        system partition, and creates a ``bash`` symlink. The method acquires a lock
-        for thread-safety and returns ``1`` on success.
         """
-        with self.lock:
+        Establish or re-establish connection to the Android device.
+
+        Returns:
+            int: ``1`` on success.
+        """
+        self._refresh_device()
+        self._wait_for_device_online()
+
+        if self.require_root and not self._is_rooted:
+            self._root()
             self._wait_for_device_online()
 
-            self.log.debug("Getting root access on device")
-            if not self._is_rooted:
-                self._root()
+        self._ensure_firewheel_dirs()
 
-                self._wait_for_device_online()
-
-                # Also, we need to remount /system as writable
-                self._remount_system()
-
-                # And, for now, let's symlink bash to sh
-                # It may get overwritten by the model component if the user
-                # wants to use bash features
-                self._symlink_bash()
-
-        return 1
+        return self.sync()
 
     def close(self):
-        """Close the driver connection.
+        """
+        Close the driver connection.
 
-        This method fulfills the abstract ``close`` contract but currently does
-        not perform any cleanup because the underlying resources are managed
-        elsewhere.
+        adbutils does not require explicit cleanup for this usage.
         """
         return
 
     def ping(self, timeout=10):
         """
-        Ping the Android device via ADB to ensure it is reachable.
+        Check whether the Android device is reachable.
 
         Args:
-            timeout (int): Number of seconds to wait for the ADB command.
+            timeout (int): Present for API compatibility.
 
         Returns:
-            bool: True if the device responds, False otherwise.
+            bool: True if the device is online and shell responds.
         """
-        _timeout = timeout  # unused variable
+        _timeout = timeout
 
         try:
-            # "adb get-state" returns "device" when the emulator/device is online
             with self.lock:
-                result = self.adb_device.get_state()
-            online = result.strip() == "device"
+                state = self.adb_device.get_state()
 
-            if not online:
+            if state.strip() != "device":
                 return False
 
-            # as an extra check, try to run a very simple shell command
             with self.lock:
-                self.adb_device.shell("true")
+                result = self.adb_device.shell2("true")
 
-            return True
+            return result.returncode == 0
+
         except adbutils.errors.AdbError:
-            # Any ADB exception indicates the device is not reachable
+            return False
+        except Exception:
             return False
 
-    def sync(self):
-        """Synchronize the driver state.
-
-        Currently a placeholder that returns ``1``. In future this could ensure the
-        driver is in a consistent state after connection changes.
+    def sync(self, timeout=5):
         """
+        Synchronize the driver state.
+
+        Args:
+            timeout (int): Present for API compatibility.
+
+        Returns:
+            int: ``1``.
+        """
+        _timeout = timeout
         return 1
 
     @staticmethod
     def get_engine():
         """
-        Get the virtualization engine that this driver supports.
+        Return the minimega/FIREWHEEL engine this driver supports.
 
         Returns:
-            str: The name of the virtualization engine that this driver supports.
-            Currently this is only 'AVD'.
+            str: ``"AVD"``.
         """
-
         return "AVD"
 
-    def get_time(self):
-        """
-        Get the current time from the Android device via ADB.
-        Returns the time in seconds (float) since the epoch.
-        """
-        # Use the shell command to get epoch seconds on the device.
-        # Android's date supports +%s which returns seconds since epoch.
-        with self.lock:
-            output = self.adb_device.shell("date +%s")
-        # The output may contain newline characters; strip them.
-        secs_str = output.strip()
-        secs = int(secs_str)
-        # Return as float seconds for consistency with other drivers.
-        return float(secs)
-
-    def set_time(self):
-        """Set the VM time to the host's current time.
-
-        Computes the current host time in nanoseconds and sends a ``date -s``
-        command to the device. This helps keep the VM clock synchronized.
-        """
-        cur_time_nano = int(time.time() * 1e9)
-        with self.lock:
-            self.adb_device.shell(f"date -s {cur_time_nano}")
-
     def reboot(self):
-        """Reboot the Android device.
-
-        Clears the internal ``_is_rooted`` flag and invokes ``adb reboot`` via the
-        ADB client. The operation is performed inside a thread-safe lock.
         """
+        Reboot the Android guest.
+        """
+        super().reboot()
+
         with self.lock:
             self._is_rooted = False
             self.adb_device.reboot()
 
-    def file_flush(self):
-        """Flush a file to disk inside the guest VM.
+    # -------------------------------------------------------------------------
+    # Time / OS / platform information
+    # -------------------------------------------------------------------------
 
-        This is a placeholder implementation that raises ``NotImplementedError``.
-        Subclasses should provide the actual logic to ensure data is flushed to
-        persistent storage on the VM.
+    def get_time(self):
         """
-        raise NotImplementedError
+        Get current Android guest time.
+
+        Returns:
+            float: Seconds since epoch.
+        """
+        output = self._shell("date +%s").strip()
+        return float(int(output.splitlines()[-1]))
+
+    def set_time(self):
+        """
+        Set Android guest time to the host's current UTC time.
+
+        This usually requires root. Android date syntax varies, so try several
+        common forms.
+        """
+        epoch_seconds = int(time.time())
+        android_stamp = time.strftime("%m%d%H%M%Y.%S", time.gmtime(epoch_seconds))
+
+        commands = [
+            f"date -u {shlex.quote(android_stamp)}",
+            f"toybox date -u {shlex.quote(android_stamp)}",
+            f"date -u @{epoch_seconds}",
+            f"toybox date -u @{epoch_seconds}",
+        ]
+
+        last_result = None
+
+        for command in commands:
+            last_result = self._shell2(command)
+            if last_result.returncode == 0:
+                self.log.debug("Set Android time using command: %s", command)
+                return
+
+        self.log.warning(
+            "Unable to set Android time on %s. Last command output: %s",
+            self.adb_name,
+            last_result.output if last_result else "",
+        )
+
+    def get_os(self):
+        """
+        Get Android OS details.
+
+        Returns:
+            str: Human-readable OS string containing ``Android``.
+        """
+        if self.target_os:
+            return self.target_os
+
+        cmd = (
+            'echo "$(getprop ro.product.brand) Android '
+            '$(getprop ro.build.version.release) '
+            '($(getprop ro.product.model))"'
+        )
+
+        for _attempt in range(10):
+            try:
+                output = self._shell(cmd).strip()
+                if output:
+                    self.target_os = output
+                    return self.target_os
+            except Exception as exc:
+                self.log.exception(exc)
+                time.sleep(1)
+
+        self.target_os = "Android"
+        return self.target_os
 
     def network_get_interfaces(self):
-        """Retrieve network interface information from the Android device.
-
-        Executes ``ip -j address`` via ADB and parses the JSON output to return a
-        Python data structure describing each network interface.
         """
-        with self.lock:
-            return json.loads(self.adb_device.shell("ip -j address"))
+        Retrieve network interface information.
+
+        Returns:
+            object: Parsed JSON from ``ip -j address``.
+
+        Raises:
+            json.JSONDecodeError: If the image's ``ip`` command lacks JSON support.
+        """
+        output = self._shell("ip -j address")
+        return json.loads(output)
 
     def set_user_password(self, username, password):
         """
-        Sets a user's password. This is not yet implemented for Android and is
-        not needed at this time.
+        Set a user's password.
+
+        Android does not use this mechanism for normal FIREWHEEL experiment control.
+        """
+        _username = username
+        _password = password
+        raise NotImplementedError("set_user_password is not implemented for Android")
+
+    # -------------------------------------------------------------------------
+    # Filesystem helpers required by VMResourceHandler
+    # -------------------------------------------------------------------------
+
+    def file_flush(self, handle=None):
+        """
+        Flush filesystem buffers on Android.
 
         Args:
-            username (str): The user account that will have its password changed.
-            password (str): A new password for the user account.
+            handle: Unused; present for AbstractDriver compatibility.
 
-        Raises:
-            NotImplementedError: This functionality is not yet needed
+        Returns:
+            bool: True on success.
         """
-        raise NotImplementedError
+        _handle = handle
+        result = self._shell2("sync")
+        return result.returncode == 0
 
-    def _get_pid_from_stream(self, stream):
-        """Read the PID from an ADB output stream.
-
-        The ADB ``shell`` command used in :py:meth:`execute` returns a stream where
-        the first line contains the PID followed by a newline. This method reads
-        bytes from the stream until a newline character is encountered, restores
-        the original blocking mode of the underlying socket, converts the
-        collected characters to an integer PID, and returns it. If conversion fails
-        ``None`` is returned.
+    def create_directories(self, directory):
         """
-        # We want this phase to be a blocking read
-        old_blocking_status = stream.conn.getblocking()
-        stream.conn.setblocking(True)
+        Create directories on the Android guest.
 
-        pid_str = ""
-        while True:
-            char = stream.read(1).decode("utf-8")
-            if char == "\n":
-                break
-            pid_str += char
-        stream.conn.setblocking(old_blocking_status)
+        Args:
+            directory (str): Absolute directory path.
 
-        try:
-            pid = int(pid_str)
-            return pid
-        except ValueError:
+        Returns:
+            bool: True on success.
+        """
+        self.log.info("Creating directory: %s", directory)
+        result = self._shell2(f"mkdir -p {self._quote_path(directory)}")
+
+        if result.returncode != 0:
+            self.log.error("mkdir failed for %s: %s", directory, result.output)
+            return False
+
+        return True
+
+    def delete_file(self, path):
+        """
+        Delete a file or directory inside the Android guest.
+
+        Args:
+            path (str): Absolute path. Globs are allowed.
+
+        Returns:
+            bool: True on success.
+        """
+        quoted = self._quote_path(path, allow_glob=True)
+        result = self._shell2(f"rm -rf {quoted}")
+
+        if result.returncode != 0:
+            self.log.error("rm failed for %s: %s", path, result.output)
+            return False
+
+        return True
+
+    def file_exists(self, path):
+        """
+        Check whether a path exists inside the Android guest.
+
+        Args:
+            path (str): Absolute path, optionally containing shell globs.
+
+        Returns:
+            bool | None: True if at least one match exists, False if not, None on error.
+        """
+        pattern = self._quote_path(path, allow_glob=True)
+        command = (
+            f"for i in {pattern}; do "
+            '[ -e "$i" ] && echo True && exit 0; '
+            "done; echo False"
+        )
+
+        result = self._shell2(command)
+
+        if result.returncode != 0:
+            self.log.error("file_exists failed for %s: %s", path, result.output)
             return None
 
-    def execute(self, path, arg=None, env=None, input_data=None, capture_output=True):
-        """Run a program inside the Android VM.
+        return "True" in result.output
 
-        Constructs a command line, optionally prefixes it with input data, and
-        executes the command via ``adb shell`` in the background. The method
-        returns the PID of the spawned process and stores the output stream for
-        later retrieval via :py:meth:`exec_status`.
+    def get_files(self, path, timestamp=None):
         """
-        _capture_output = capture_output  # unused variable
-
-        full_cmd = ""
-
-        if input_data is not None:
-            full_cmd += f"printf '{input_data}' | "
-
-        if env is not None:
-            for env_var in env:
-                full_cmd += env_var
-                full_cmd += " "
-
-        if isinstance(arg, (list, tuple)):
-            arg = adbutils._utils.list2cmdline(arg)
-        if arg is None:
-            arg = ""
-
-        full_cmd += path
-        full_cmd += " "
-        full_cmd += arg
-
-        # make it run in the background and echo the PID so we can save it
-        full_cmd += f' & pid=$!; echo $pid; wait $pid; echo "{EXIT_MAGIC}$?"'
-
-        with self.lock:
-            output_stream = self.adb_device.shell(full_cmd, stream=True)
-
-        # Get and return the PID
-        pid = self._get_pid_from_stream(output_stream)
-
-        self.output_cache[pid] = {"stream": output_stream}
-
-        return pid
-
-    def async_exec(
-        self, path, arg=None, env=None, input_data=None, capture_output=True
-    ):
-        """Convenience wrapper for asynchronous execution.
-
-        Delegates to :py:meth:`execute` to run the command asynchronously and
-        returns the same PID value.
-        """
-        return self.execute(path, arg, env, input_data, capture_output)
-
-    def _is_pid_alive(self, pid):
-        """Check whether a given PID is still running inside the VM.
-
-        Executes ``kill -0 <pid>`` via ADB; a zero return code indicates the
-        process exists, otherwise it is considered terminated.
-        """
-        returncode = self.adb_device.shell2(f"kill -0 {pid}").returncode
-        if returncode == 0:
-            return True
-        return False
-
-    def exec_status(self, pid):
-        """Retrieve execution status and output for a PID.
-
-        Reads any pending stdout from the stored output stream, determines whether
-        the process has exited using :py:meth:`_is_pid_alive`, and, if the process
-        is finished, extracts the exit code from the ``ExitCode=`` marker that the
-        ``execute`` method appends to the command output. The method updates the
-        ``self.output_cache[pid]`` dictionary with keys ``exited`` (bool),
-        ``exitcode`` (int, when known), and ``stdout`` (captured output). The
-        populated dictionary is returned.
-        """
-        stream = self.output_cache[pid]["stream"]
-
-        exited = not self._is_pid_alive(pid)
-
-        # We want this read to be non-blocking
-        old_blocking_status = stream.conn.getblocking()
-        stream.conn.setblocking(False)
-        stdout = ""
-        try:
-            while True:
-                byte = stream.read(1)
-                if byte == b"":
-                    break
-                char = byte.decode("utf-8")
-                stdout += char
-        except BlockingIOError:
-            # no more data to read
-            pass
-
-        stream.conn.setblocking(old_blocking_status)
-
-        self.log.debug("process stdout: ****%s****", stdout)
-        self.log.debug(self.output_cache[pid])
-
-        # check if process has finished
-        self.output_cache[pid]["exited"] = exited
-
-        self.output_cache[pid].setdefault("stdout", "")
-        stdout = self.output_cache[pid]["stdout"] + stdout
-        if "exitcode" in self.output_cache[pid]:
-            pass
-
-        elif exited:
-            # look for the "ExitCode=..." string in the output for exit code reporting
-            idx = stdout.rfind(EXIT_MAGIC)
-            exit_code_str = stdout[idx + len(EXIT_MAGIC) :]
-            exit_code = int(exit_code_str)
-            self.output_cache[pid]["exitcode"] = exit_code
-            self.output_cache[pid]["stdout"] = stdout[:idx]
-
-        else:
-            self.output_cache[pid]["stdout"] = stdout
-
-        self.log.info("exec_status of %s: %s", pid, self.output_cache[pid])
-        return self.output_cache[pid]
-
-    def store_captured_output(self, pid, output):
-        """
-        Store output from a VM program.
-
-        Hold on to output that has been returned from a program
-        that was run inside the VM via the ``exec`` method.
+        Get file names under a path on the Android guest.
 
         Args:
-            pid (int): The PID for the process that produced the output.
-            output (str): The processed returned output to be cached.
+            path (str): Absolute file/directory path. Globs are allowed.
+            timestamp (float | None): If provided, only return files with modification
+                times newer than this value. The timestamp is seconds since epoch.
 
-        Raises:
-            NotImplementedError: This does not seem to be needed yet and should
-                be implemented if/when it is needed
+        Returns:
+            list | None: List of file paths, or None on error.
         """
+        pattern = self._quote_path(path, allow_glob=True)
+        result = self._shell2(f"find {pattern} -type f")
 
-        raise NotImplementedError
+        if result.returncode != 0:
+            self.log.error("Unable to list files at %s: %s", path, result.output)
+            return None
+
+        files = [
+            line.strip()
+            for line in result.output.splitlines()
+            if line.strip() and not line.strip().endswith("swp")
+        ]
+
+        if timestamp is None:
+            return files
+
+        filtered_files = []
+
+        for filename in files:
+            mtime = self._get_file_mtime(filename)
+
+            # If mtime cannot be determined, include the file rather than risk
+            # missing data that should be transferred.
+            if mtime is None or mtime > timestamp:
+                filtered_files.append(filename)
+
+        return filtered_files
+
+    def make_file_executable(self, path):
+        """
+        Mark a file executable inside the Android guest.
+
+        Args:
+            path (str): File path.
+
+        Returns:
+            bool: True on success.
+        """
+        result = self._shell2(f"chmod +x {self._quote_path(path)}")
+
+        if result.returncode != 0:
+            self.log.error("chmod failed for %s: %s", path, result.output)
+            return False
+
+        return True
 
     def _write(self, filename, data, mode="w"):
         """
-        Write the provided data at the provided filename within the guest VM.
+        Write content to a file inside the Android guest.
 
         Args:
-            filename (str): name of the file to open for writing.
-            data (str): String of content to write to the file.
-            mode (str): Mode for writing to the file. ``'w'`` or ``'a'``.
+            filename (str): Remote file path.
+            data (str | bytes): Content to write.
+            mode (str): ``"w"`` or ``"a"``.
+
+        Returns:
+            bool: True on success.
 
         Raises:
-            ValueError: if a file mode other than "w" or "a" are provided
+            ValueError: If mode is unsupported.
         """
         if mode == "w":
             redirect = ">"
@@ -429,71 +508,463 @@ class ADBDriver(AbstractDriver):
         else:
             raise ValueError("Unsupported file mode")
 
-        maybe_b64 = ""
-        if isinstance(data, bytes):
-            data = base64.b64encode(data).decode("utf-8")
-            maybe_b64 = " | base64 -d "
+        if isinstance(data, str):
+            raw = data.encode("utf-8")
+        else:
+            raw = bytes(data)
 
-        with self.lock:
-            self.adb_device.shell2(
-                f"echo -n '{data}' {maybe_b64} {redirect} {filename}"
-            )
+        parent = posixpath.dirname(str(filename))
+        if parent and not self.create_directories(parent):
+            return False
+
+        encoded = base64.b64encode(raw).decode("ascii")
+        command = (
+            f"printf %s {shlex.quote(encoded)} | "
+            f"base64 -d {redirect} {self._quote_path(filename)}"
+        )
+
+        result = self._shell2(command)
+
+        if result.returncode != 0:
+            self.log.error("write failed for %s: %s", filename, result.output)
+            return False
 
         return True
 
     def read_file(self, filename, local_destination, mode="rb"):
         """
-        Read a file from a VM and put it onto the physical host.
+        Pull a file from Android to the physical host.
 
         Args:
-            filename (str): The file to read from inside the VM. This should be
-                the full path.
-            local_destination (pathlib.PurePosixPath): The path on the physical host
-                where the file should be read to.
-            mode (str): The mode of reading the file. Defaults to ``'rb'``.
-        """
-        _mode = mode  # unused variable
+            filename (str): Remote Android path.
+            local_destination (pathlib.Path): Local destination path.
+            mode (str): Present for API compatibility.
 
-        with self.lock:
-            self.adb_device.sync.pull_file(filename, local_destination)
+        Returns:
+            bool: True on success.
+        """
+        _mode = mode
+
+        try:
+            local_destination = Path(local_destination)
+            local_destination.parent.mkdir(parents=True, exist_ok=True)
+
+            with self.lock:
+                self.adb_device.sync.pull_file(str(filename), str(local_destination))
+
+            return local_destination.exists()
+
+        except Exception as exc:
+            self.log.exception(exc)
+            return False
 
     def write_from_file(self, filename, local_filename, mode="w"):
         """
-        Given a local filename, use ``adb push`` to push that file into the
-        guest VM at the location specified by ``filename``.
+        Push a local file into the Android guest.
 
         Args:
-            filename (str): The name of the file to open for writing.
-            local_filename (str): Filename of the file containing data to
-                send to the VM.
-            mode (str): Mode for writing to the file. ``'w'`` or ``'a'``.
+            filename (str): Remote Android destination path.
+            local_filename (str): Local source filename.
+            mode (str): Present for API compatibility. ADB push overwrites.
 
+        Returns:
+            bool: True on success.
         """
-        _mode = mode  # unused variable
-        self.adb_device.sync.push(local_filename, filename)
-        return True
+        _mode = mode
 
-    def get_os(self):
-        """
-        Get the Operating System details for the VM. Return the "pretty" name
-        """
-        if self.target_os:
-            return self.target_os
+        try:
+            parent = posixpath.dirname(str(filename))
+            if parent and not self.create_directories(parent):
+                return False
 
-        cmd = 'echo "'
-        cmd += "$(getprop ro.product.brand) "
-        cmd += "Android "
-        cmd += "$(getprop ro.build.version.release) "
-        cmd += "($(getprop ro.product.model))"
-        cmd += '"'
-
-        num_attempts = 10
-        for _attempt in range(num_attempts):
             with self.lock:
-                try:
-                    self.target_os = self.adb_device.shell(cmd)
-                    break
-                except Exception as exc:
-                    self.log.exception(exc)
-                    time.sleep(1)
-        return self.target_os
+                self.adb_device.sync.push(str(local_filename), str(filename))
+
+            return True
+
+        except Exception as exc:
+            self.log.exception(exc)
+            return False
+
+    # -------------------------------------------------------------------------
+    # ScheduleEntry path generation
+    # -------------------------------------------------------------------------
+
+    def create_paths(self, schedule_entry):
+        """
+        Create Android-specific paths and call script content for a ScheduleEntry.
+
+        This intentionally avoids the inherited Linux defaults:
+        - no /var/launch
+        - no /bin/bash
+        - no /bin/sh
+        """
+        if not schedule_entry.executable:
+            return
+
+        try:
+            schedule_entry.working_dir  # noqa: B018
+            return
+        except AttributeError:
+            pass
+
+        executable = Path(schedule_entry.executable)
+
+        schedule_entry.working_dir = self.deconflict_agent_path(
+            Path(self.LAUNCH_ROOT) / str(schedule_entry.start_time) / executable.name
+        )
+
+        if executable.is_absolute():
+            schedule_entry.exec_path = executable
+        else:
+            local = False
+
+            if schedule_entry.data:
+                for entry in schedule_entry.data:
+                    if (
+                        "filename" in entry
+                        and entry["filename"] == schedule_entry.executable
+                    ):
+                        local = True
+                        break
+
+            if local:
+                schedule_entry.exec_path = schedule_entry.working_dir / executable
+            else:
+                # Executable is expected to be available on Android PATH.
+                schedule_entry.exec_path = executable
+
+        schedule_entry.reboot_file = schedule_entry.working_dir / "reboot"
+        schedule_entry.call_args_filename = (
+            schedule_entry.working_dir / "call_arguments.sh"
+        )
+
+        call_arguments = (
+            f"#!{self.ANDROID_SHELL}\n"
+            'CURRENT_DIR="$(dirname "$0")"\n'
+            f"cd {schedule_entry.working_dir}\n"
+            f"{schedule_entry.exec_path!s}"
+        )
+
+        if schedule_entry.arguments:
+            call_arguments += f" {schedule_entry.arguments}"
+
+        call_arguments += "\n"
+
+        schedule_entry.call_arguments = call_arguments
+
+    # -------------------------------------------------------------------------
+    # Process execution/status API
+    # -------------------------------------------------------------------------
+
+    def _format_env(self, env):
+        """
+        Format environment variable assignments.
+
+        Args:
+            env (list[str] | None): List of KEY=VALUE strings.
+
+        Returns:
+            str: Shell-safe assignment prefix.
+        """
+        if not env:
+            return ""
+
+        assignments = []
+
+        for item in env:
+            if not isinstance(item, str) or "=" not in item:
+                self.log.error("env entries must be strings of the form KEY=VALUE")
+                return ""
+
+            key, value = item.split("=", 1)
+
+            if not self._ENV_NAME_RE.match(key):
+                self.log.error("Invalid environment variable name: %s", key)
+                return ""
+
+            assignments.append(f"{key}={shlex.quote(value)}")
+
+        return " ".join(assignments) + " "
+
+    def _format_args(self, arg):
+        """
+        Format command arguments.
+
+        List/tuple arguments are shell-quoted element-by-element. String arguments
+        are preserved for compatibility with existing FIREWHEEL usage.
+        """
+        if arg is None:
+            return ""
+
+        if isinstance(arg, (list, tuple)):
+            return " ".join(shlex.quote(str(item)) for item in arg)
+
+        if isinstance(arg, str):
+            return arg
+
+        self.log.error("arg must be a string, list, tuple, or None")
+        return ""
+
+    def _build_command(self, path, arg=None, env=None, input_data=None):
+        """
+        Build the Android shell command.
+
+        Args:
+            path (str): Executable path/name.
+            arg (str | list | tuple | None): Arguments.
+            env (list[str] | None): Environment assignments.
+            input_data (str | bytes | None): Data for stdin.
+
+        Returns:
+            str: Shell command.
+        """
+        env_prefix = self._format_env(env)
+        args = self._format_args(arg)
+
+        command = f"{env_prefix}{shlex.quote(str(path))}"
+
+        if args:
+            command += f" {args}"
+
+        if input_data is not None:
+            if isinstance(input_data, str):
+                raw_input = input_data.encode("utf-8")
+            else:
+                raw_input = bytes(input_data)
+
+            encoded_input = base64.b64encode(raw_input).decode("ascii")
+            command = (
+                f"printf %s {shlex.quote(encoded_input)} | base64 -d | {command}"
+            )
+
+        return command
+
+    def execute(self, path, arg=None, env=None, input_data=None, capture_output=True):
+        """
+        Run a program asynchronously inside the Android guest.
+
+        Instead of keeping a long-lived ADB stream open, the remote process writes
+        stdout, stderr, and return code into files under ``PROC_ROOT``. ``exec_status``
+        polls those files.
+
+        Args:
+            path (str): Executable path/name.
+            arg (str | list | tuple | None): Arguments.
+            env (list[str] | None): Environment assignments.
+            input_data (str | bytes | None): stdin content.
+            capture_output (bool): Whether to capture stdout/stderr.
+
+        Returns:
+            int | None: PID on success, None on failure.
+        """
+        token = uuid.uuid4().hex
+        out_file = f"{self.PROC_ROOT}/{token}.stdout"
+        err_file = f"{self.PROC_ROOT}/{token}.stderr"
+        rc_file = f"{self.PROC_ROOT}/{token}.rc"
+
+        command = self._build_command(path, arg=arg, env=env, input_data=input_data)
+
+        if capture_output:
+            stdout_target = self._quote_path(out_file)
+            stderr_target = self._quote_path(err_file)
+        else:
+            stdout_target = "/dev/null"
+            stderr_target = "/dev/null"
+
+        launch_command = (
+            f"mkdir -p {shlex.quote(self.PROC_ROOT)}; "
+            f"rm -f {self._quote_path(out_file)} "
+            f"{self._quote_path(err_file)} "
+            f"{self._quote_path(rc_file)}; "
+            f"( {command} > {stdout_target} 2> {stderr_target}; "
+            f"echo $? > {self._quote_path(rc_file)} ) "
+            f"& echo $!"
+        )
+
+        self.log.debug("ADB execute command: %s", launch_command)
+
+        try:
+            output = self._shell(launch_command)
+        except Exception as exc:
+            self.log.error("Unable to launch Android command: %s", command)
+            self.log.exception(exc)
+            return None
+
+        first_line = output.strip().splitlines()[0] if output.strip() else ""
+
+        try:
+            pid = int(first_line)
+        except ValueError:
+            self.log.error("Unable to parse PID from ADB output: %r", output)
+            return None
+
+        self.output_cache[pid] = {
+            "stdout_file": out_file,
+            "stderr_file": err_file,
+            "rc_file": rc_file,
+            "stdout_offset": 0,
+            "stderr_offset": 0,
+            "stdout": "",
+            "stderr": "",
+            "exited": False,
+        }
+
+        self.log.debug("Started Android process PID=%s command=%s", pid, command)
+        return pid
+
+    def async_exec(
+        self, path, arg=None, env=None, input_data=None, capture_output=True
+    ):
+        """
+        Run a program asynchronously.
+
+        Returns:
+            int | None: PID on success.
+        """
+        return self.execute(
+            path,
+            arg=arg,
+            env=env,
+            input_data=input_data,
+            capture_output=capture_output,
+        )
+
+    def _is_pid_alive(self, pid):
+        """
+        Check whether a PID is alive inside Android.
+
+        Args:
+            pid (int): Process ID.
+
+        Returns:
+            bool: True if alive.
+        """
+        result = self._shell2(f"kill -0 {int(pid)}")
+        return result.returncode == 0
+
+    def _read_remote_text_file(self, filename):
+        """
+        Read a remote text file.
+
+        Args:
+            filename (str): Remote path.
+
+        Returns:
+            str: File contents, or empty string if not available.
+        """
+        result = self._shell2(f"cat {self._quote_path(filename)} 2>/dev/null")
+
+        if result.returncode != 0:
+            return ""
+
+        return result.output
+
+    def exec_status(self, pid):
+        """
+        Retrieve execution status and captured output for a PID.
+
+        Args:
+            pid (int): Process ID returned by execute/async_exec.
+
+        Returns:
+            dict: Status dictionary compatible with AbstractDriver helpers.
+        """
+        if pid not in self.output_cache:
+            raise OSError(f"Unknown Android process PID: {pid}")
+
+        cache = self.output_cache[pid]
+
+        stdout_full = self._read_remote_text_file(cache["stdout_file"])
+        stdout_offset = cache.get("stdout_offset", 0)
+
+        if len(stdout_full) > stdout_offset:
+            cache["stdout"] = cache.get("stdout", "") + stdout_full[stdout_offset:]
+            cache["stdout_offset"] = len(stdout_full)
+
+        stderr_full = self._read_remote_text_file(cache["stderr_file"])
+        stderr_offset = cache.get("stderr_offset", 0)
+
+        if len(stderr_full) > stderr_offset:
+            cache["stderr"] = cache.get("stderr", "") + stderr_full[stderr_offset:]
+            cache["stderr_offset"] = len(stderr_full)
+
+        rc_text = self._read_remote_text_file(cache["rc_file"]).strip()
+
+        if rc_text:
+            try:
+                cache["exitcode"] = int(rc_text.splitlines()[-1])
+                cache["exited"] = True
+            except ValueError:
+                self.log.warning(
+                    "Unable to parse Android exit code for PID %s from %r",
+                    pid,
+                    rc_text,
+                )
+                alive = self._is_pid_alive(pid)
+                cache["exited"] = not alive
+
+                if not alive:
+                    cache.setdefault("stderr", "")
+                    cache["stderr"] += (
+                        f"\nUnable to parse Android return-code file "
+                        f"{cache['rc_file']}: {rc_text!r}\n"
+                    )
+                    cache["exitcode"] = 1
+        else:
+            alive = self._is_pid_alive(pid)
+            cache["exited"] = not alive
+
+            if not alive:
+                cache.setdefault("stderr", "")
+                cache["stderr"] += (
+                    f"\nADB process wrapper for PID {pid} exited without writing "
+                    f"return-code file {cache['rc_file']}.\n"
+                )
+                cache["exitcode"] = 1
+
+        self.log.debug("exec_status of %s: %s", pid, cache)
+        return cache
+
+    def store_captured_output(self, pid, output):
+        """
+        Store captured output/status.
+
+        This is normally unused by the ADB implementation but is implemented for
+        interface completeness.
+        """
+        self.output_cache.setdefault(pid, {}).update(output)
+
+    def _get_file_mtime(self, filename):
+        """
+        Get a file's modification time on Android.
+
+        Args:
+            filename (str): Remote Android file path.
+
+        Returns:
+            float | None: Modification time in seconds since epoch, or None if unavailable.
+        """
+        quoted = self._quote_path(filename)
+
+        commands = [
+            f"stat -c %Y {quoted}",
+            f"toybox stat -c %Y {quoted}",
+        ]
+
+        for command in commands:
+            result = self._shell2(command)
+            if result.returncode != 0:
+                continue
+
+            output = result.output.strip().splitlines()
+            if not output:
+                continue
+
+            try:
+                return float(output[-1])
+            except ValueError:
+                continue
+
+        self.log.warning("Unable to determine modification time for Android file: %s", filename)
+        return None
