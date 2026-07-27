@@ -25,7 +25,7 @@ class ADBDriver(AbstractDriver):
     Driver class for Android Debug Bridge (ADB).
 
     This driver is intended to be selected for minimega/FIREWHEEL VMs whose engine
-    is ``AVD``. It uses Android-native paths and /system/bin/sh.
+    is ``ADB``. It uses Android-native paths and /system/bin/sh.
     """
 
     ANDROID_SHELL = "/system/bin/sh"
@@ -41,16 +41,25 @@ class ADBDriver(AbstractDriver):
 
         Args:
             config (dict): Handler config. Expected keys:
-                - ``adb_port``: Emulator console port, e.g. 5554.
                 - ``adb_serial``: ADB serial, e.g. ``emulator-5554``.
+                - ``android_console_port``: Optional emulator console port, e.g. 5554.
+                - ``android_adb_port``: Optional ADB daemon port, e.g. 5555.
                 - ``require_root``: Optional bool. Defaults to True.
             log (logging.Logger): Logger instance.
         """
         log.info("ADBDriver config = %s", config)
 
-        self.console_port = config["adb_port"]
-        self.adb_name = config.get("adb_serial", f"emulator-{self.console_port}")
+        self.adb_name = config.get("adb_serial")
+        self.android_console_port = config.get("android_console_port")
+        self.android_adb_port = config.get("android_adb_port")
         self.require_root = config.get("require_root", True)
+
+        if not self.adb_name:
+            if self.android_console_port is None:
+                raise ValueError(
+                    "ADBDriver requires either adb_serial or android_console_port."
+                )
+            self.adb_name = f"emulator-{self.android_console_port}"
 
         self.adb_client = adbutils.AdbClient()
         self.adb_device = self.adb_client.device(self.adb_name)
@@ -233,12 +242,12 @@ class ADBDriver(AbstractDriver):
     @staticmethod
     def get_engine():
         """
-        Return the minimega/FIREWHEEL engine this driver supports.
+        Return the VM Resource Handler communication driver name.
 
         Returns:
-            str: ``"AVD"``.
+            str: ``"ADB"``.
         """
-        return "AVD"
+        return "ADB"
 
     def reboot(self):
         """
