@@ -773,6 +773,7 @@ class ADBDriver(AbstractDriver):
         out_file = f"{self.PROC_ROOT}/{token}.stdout"
         err_file = f"{self.PROC_ROOT}/{token}.stderr"
         rc_file = f"{self.PROC_ROOT}/{token}.rc"
+        started_file = f"{self.PROC_ROOT}/{token}.started"
 
         command = self._build_command(path, arg=arg, env=env, input_data=input_data)
 
@@ -783,21 +784,41 @@ class ADBDriver(AbstractDriver):
             stdout_target = "/dev/null"
             stderr_target = "/dev/null"
 
+        quoted_started_file = self._quote_path(started_file)
+        quoted_rc_file = self._quote_path(rc_file)
+
+        # The inner command is what actually runs inside a detached Android shell.
+        # It writes a "started" marker first, then runs the requested command, then
+        # records the return code. The started marker lets exec_status distinguish
+        # "wrapper never started" from "wrapper started but failed before rc write".
         inner_command = (
-            f"{command} > {stdout_target} 2> {stderr_target}; "
+            f"echo started > {quoted_started_file}; "
+            f"{command} >> {stdout_target} 2>> {stderr_target}; "
             "rc=$?; "
-            f"echo $rc > {self._quote_path(rc_file)}; "
+            f"echo $rc > {quoted_rc_file}; "
             "exit $rc"
         )
 
         runner = f"{self.ANDROID_SHELL} -c {shlex.quote(inner_command)}"
 
+        # Capture wrapper-level diagnostics too. If nohup is unavailable or fails,
+        # stderr should land in err_file rather than being discarded.
+        #
+        # Use nohup when available so the background process survives the parent
+        # adb shell session. Fall back to a normal background shell if nohup is not
+        # present on the Android image.
         launch_command = (
             f"mkdir -p {shlex.quote(self.PROC_ROOT)}; "
             f"rm -f {self._quote_path(out_file)} "
             f"{self._quote_path(err_file)} "
-            f"{self._quote_path(rc_file)}; "
-            f"nohup {runner} >/dev/null 2>&1 < /dev/null & echo $!"
+            f"{self._quote_path(rc_file)} "
+            f"{self._quote_path(started_file)}; "
+            "if command -v nohup >/dev/null 2>&1; then "
+            f"nohup {runner} >> {stdout_target} 2>> {stderr_target} < /dev/null & "
+            "else "
+            f"{runner} >> {stdout_target} 2>> {stderr_target} < /dev/null & "
+            "fi; "
+            "echo $!"
         )
 
         self.log.debug("ADB execute command: %s", launch_command)
@@ -821,11 +842,14 @@ class ADBDriver(AbstractDriver):
             "stdout_file": out_file,
             "stderr_file": err_file,
             "rc_file": rc_file,
+            "started_file": started_file,
             "stdout_offset": 0,
             "stderr_offset": 0,
             "stdout": "",
             "stderr": "",
             "exited": False,
+            "start_monotonic": time.monotonic(),
+            "rc_missing_reported": False,
         }
 
         self.log.debug("Started Android process PID=%s command=%s", pid, command)
@@ -892,6 +916,9 @@ class ADBDriver(AbstractDriver):
             raise OSError(f"Unknown Android process PID: {pid}")
 
         cache = self.output_cache[pid]
+
+        # If the process has already been finalized, do not keep appending error
+        # messages or re-reading state.
         if cache.get("exited") and "exitcode" in cache:
             return cache
 
@@ -931,41 +958,58 @@ class ADBDriver(AbstractDriver):
                         f"{cache['rc_file']}: {rc_text!r}\n"
                     )
                     cache["exitcode"] = 1
-        else:
-            alive = self._is_pid_alive(pid)
 
-            if alive:
-                cache["exited"] = False
-                self.log.debug("PID %s is still running and has not written rc file yet.", pid)
-                return cache
+            self.log.debug("exec_status of %s: %s", pid, cache)
+            return cache
 
-            # The process appears to have exited, but Android/ADB file visibility can lag
-            # briefly for very short-lived commands. Do not mark this as failed immediately.
-            age = time.time() - cache.get("start_time", time.time())
-            rc_grace_sec = 2.0
+        alive = self._is_pid_alive(pid)
 
-            if age < rc_grace_sec:
-                cache["exited"] = False
-                self.log.debug(
-                    "PID %s is no longer alive, but return-code file %s is not visible yet. "
-                    "Waiting for grace period %.1fs; age=%.3fs.",
-                    pid,
-                    cache["rc_file"],
-                    rc_grace_sec,
-                    age,
-                )
-                return cache
+        if alive:
+            cache["exited"] = False
+            self.log.debug("PID %s is still running and has not written rc file yet.", pid)
+            return cache
 
-            cache["exited"] = True
-            cache["exitcode"] = 1
+        # The process appears to have exited, but Android/ADB file visibility can
+        # lag briefly for very short-lived commands. Do not mark this as failed
+        # immediately.
+        age = time.monotonic() - cache.get("start_monotonic", time.monotonic())
+        rc_grace_sec = 2.0
 
-            if not cache.get("rc_missing_reported"):
-                cache.setdefault("stderr", "")
+        if age < rc_grace_sec:
+            cache["exited"] = False
+            self.log.debug(
+                "PID %s is no longer alive, but return-code file %s is not visible yet. "
+                "Waiting for grace period %.1fs; age=%.3fs.",
+                pid,
+                cache["rc_file"],
+                rc_grace_sec,
+                age,
+            )
+            return cache
+
+        started_text = ""
+        started_file = cache.get("started_file")
+        if started_file:
+            started_text = self._read_remote_text_file(started_file)
+
+        cache["exited"] = True
+        cache["exitcode"] = 1
+
+        if not cache.get("rc_missing_reported"):
+            cache.setdefault("stderr", "")
+
+            if not started_text.strip():
                 cache["stderr"] += (
-                    f"\nADB process wrapper for PID {pid} exited without writing "
-                    f"return-code file {cache['rc_file']}.\n"
+                    f"\nADB process wrapper for PID {pid} did not create started file "
+                    f"{started_file}. The wrapper may have failed before executing "
+                    "the command.\n"
                 )
-                cache["rc_missing_reported"] = True
+
+            cache["stderr"] += (
+                f"\nADB process wrapper for PID {pid} exited without writing "
+                f"return-code file {cache['rc_file']} after {age:.3f}s.\n"
+            )
+            cache["rc_missing_reported"] = True
 
         self.log.debug("exec_status of %s: %s", pid, cache)
         return cache
