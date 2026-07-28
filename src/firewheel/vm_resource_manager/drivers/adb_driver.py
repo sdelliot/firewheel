@@ -783,14 +783,21 @@ class ADBDriver(AbstractDriver):
             stdout_target = "/dev/null"
             stderr_target = "/dev/null"
 
+        inner_command = (
+            f"{command} > {stdout_target} 2> {stderr_target}; "
+            "rc=$?; "
+            f"echo $rc > {self._quote_path(rc_file)}; "
+            "exit $rc"
+        )
+
+        runner = f"{self.ANDROID_SHELL} -c {shlex.quote(inner_command)}"
+
         launch_command = (
             f"mkdir -p {shlex.quote(self.PROC_ROOT)}; "
             f"rm -f {self._quote_path(out_file)} "
             f"{self._quote_path(err_file)} "
             f"{self._quote_path(rc_file)}; "
-            f"( {command} > {stdout_target} 2> {stderr_target}; "
-            f"echo $? > {self._quote_path(rc_file)} ) "
-            f"& echo $!"
+            f"nohup {runner} >/dev/null 2>&1 < /dev/null & echo $!"
         )
 
         self.log.debug("ADB execute command: %s", launch_command)
@@ -885,6 +892,8 @@ class ADBDriver(AbstractDriver):
             raise OSError(f"Unknown Android process PID: {pid}")
 
         cache = self.output_cache[pid]
+        if cache.get("exited") and "exitcode" in cache:
+            return cache
 
         stdout_full = self._read_remote_text_file(cache["stdout_file"])
         stdout_offset = cache.get("stdout_offset", 0)
