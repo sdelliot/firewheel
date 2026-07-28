@@ -374,6 +374,8 @@ class minimegaAPI:  # noqa: N801
                     )
                     tags = {}
 
+                new_host_vm["tags"] = tags
+                new_host_vm["error"] = tags.get("error", "")
                 new_host_vm["image"] = tags.get("image", "")
                 new_host_vm["control_ip"] = tags.get("control_ip", "")
                 new_host_vm["hostname"] = hostname
