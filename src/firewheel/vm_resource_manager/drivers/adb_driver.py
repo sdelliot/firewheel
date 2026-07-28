@@ -933,15 +933,39 @@ class ADBDriver(AbstractDriver):
                     cache["exitcode"] = 1
         else:
             alive = self._is_pid_alive(pid)
-            cache["exited"] = not alive
 
-            if not alive:
+            if alive:
+                cache["exited"] = False
+                self.log.debug("PID %s is still running and has not written rc file yet.", pid)
+                return cache
+
+            # The process appears to have exited, but Android/ADB file visibility can lag
+            # briefly for very short-lived commands. Do not mark this as failed immediately.
+            age = time.time() - cache.get("start_time", time.time())
+            rc_grace_sec = 2.0
+
+            if age < rc_grace_sec:
+                cache["exited"] = False
+                self.log.debug(
+                    "PID %s is no longer alive, but return-code file %s is not visible yet. "
+                    "Waiting for grace period %.1fs; age=%.3fs.",
+                    pid,
+                    cache["rc_file"],
+                    rc_grace_sec,
+                    age,
+                )
+                return cache
+
+            cache["exited"] = True
+            cache["exitcode"] = 1
+
+            if not cache.get("rc_missing_reported"):
                 cache.setdefault("stderr", "")
                 cache["stderr"] += (
                     f"\nADB process wrapper for PID {pid} exited without writing "
                     f"return-code file {cache['rc_file']}.\n"
                 )
-                cache["exitcode"] = 1
+                cache["rc_missing_reported"] = True
 
         self.log.debug("exec_status of %s: %s", pid, cache)
         return cache
