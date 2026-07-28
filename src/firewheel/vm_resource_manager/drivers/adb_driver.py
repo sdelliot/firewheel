@@ -424,9 +424,11 @@ class ADBDriver(AbstractDriver):
         """
         pattern = self._quote_path(path, allow_glob=True)
         command = (
+            "found=False; "
             f"for i in {pattern}; do "
-            '[ -e "$i" ] && echo True && exit 0; '
-            "done; echo False"
+            'if [ -e "$i" ]; then found=True; break; fi; '
+            "done; "
+            'echo "$found"'
         )
 
         result = self._shell2(command)
