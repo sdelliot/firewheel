@@ -750,22 +750,21 @@ class ADBDriver(AbstractDriver):
             )
 
         return command
-
     def execute(self, path, arg=None, env=None, input_data=None, capture_output=True):
         """
         Run a program asynchronously inside the Android guest.
-
+    
         Instead of keeping a long-lived ADB stream open, the remote process writes
         stdout, stderr, and return code into files under ``PROC_ROOT``. ``exec_status``
         polls those files.
-
+    
         Args:
             path (str): Executable path/name.
             arg (str | list | tuple | None): Arguments.
             env (list[str] | None): Environment assignments.
             input_data (str | bytes | None): stdin content.
             capture_output (bool): Whether to capture stdout/stderr.
-
+    
         Returns:
             int | None: PID on success, None on failure.
         """
@@ -774,75 +773,92 @@ class ADBDriver(AbstractDriver):
         err_file = f"{self.PROC_ROOT}/{token}.stderr"
         rc_file = f"{self.PROC_ROOT}/{token}.rc"
         started_file = f"{self.PROC_ROOT}/{token}.started"
-
+        runner_file = f"{self.PROC_ROOT}/{token}.runner.sh"
+    
         command = self._build_command(path, arg=arg, env=env, input_data=input_data)
-
+    
         if capture_output:
             stdout_target = self._quote_path(out_file)
             stderr_target = self._quote_path(err_file)
         else:
             stdout_target = "/dev/null"
             stderr_target = "/dev/null"
-
-        quoted_started_file = self._quote_path(started_file)
-        quoted_rc_file = self._quote_path(rc_file)
-
-        # The inner command is what actually runs inside a detached Android shell.
-        # It writes a "started" marker first, then runs the requested command, then
-        # records the return code. The started marker lets exec_status distinguish
-        # "wrapper never started" from "wrapper started but failed before rc write".
-        inner_command = (
-            f"echo started > {quoted_started_file}; "
-            f"{command} >> {stdout_target} 2>> {stderr_target}; "
-            "rc=$?; "
-            f"echo $rc > {quoted_rc_file}; "
-            "exit $rc"
+    
+        runner_content = (
+            f"#!{self.ANDROID_SHELL}\n"
+            f"echo started > {self._quote_path(started_file)}\n"
+            f"{command} > {stdout_target} 2> {stderr_target}\n"
+            "rc=$?\n"
+            f"echo $rc > {self._quote_path(rc_file)}\n"
+            "exit $rc\n"
         )
-
-        runner = f"{self.ANDROID_SHELL} -c {shlex.quote(inner_command)}"
-
-        # Capture wrapper-level diagnostics too. If nohup is unavailable or fails,
-        # stderr should land in err_file rather than being discarded.
-        #
-        # Use nohup when available so the background process survives the parent
-        # adb shell session. Fall back to a normal background shell if nohup is not
-        # present on the Android image.
-        launch_command = (
+    
+        cleanup_command = (
             f"mkdir -p {shlex.quote(self.PROC_ROOT)}; "
             f"rm -f {self._quote_path(out_file)} "
             f"{self._quote_path(err_file)} "
             f"{self._quote_path(rc_file)} "
-            f"{self._quote_path(started_file)}; "
-            "if command -v nohup >/dev/null 2>&1; then "
-            f"nohup {runner} >> {stdout_target} 2>> {stderr_target} < /dev/null & "
-            "else "
-            f"{runner} >> {stdout_target} 2>> {stderr_target} < /dev/null & "
-            "fi; "
-            "echo $!"
+            f"{self._quote_path(started_file)} "
+            f"{self._quote_path(runner_file)}"
         )
-
+    
+        cleanup_result = self._shell2(cleanup_command)
+        if cleanup_result.returncode != 0:
+            self.log.error(
+                "Unable to prepare Android proc directory for command %s: %s",
+                command,
+                cleanup_result.output,
+            )
+            return None
+    
+        if not self._write(runner_file, runner_content):
+            self.log.error("Unable to write Android runner script for command: %s", command)
+            return None
+    
+        if not self.make_file_executable(runner_file):
+            self.log.error("Unable to make Android runner script executable: %s", runner_file)
+            return None
+    
+        runner_invocation = (
+            f"{self.ANDROID_SHELL} {self._quote_path(runner_file)} "
+            f">> {self._quote_path(out_file)} "
+            f"2>> {self._quote_path(err_file)} "
+            "< /dev/null"
+        )
+    
+        launch_command = (
+            "if command -v setsid >/dev/null 2>&1; then "
+            f"setsid {runner_invocation} & pid=$!; "
+            "else "
+            f"{runner_invocation} & pid=$!; "
+            "fi; "
+            "sleep 0.25; "
+            "echo $pid"
+        )
+    
         self.log.debug("ADB execute command: %s", launch_command)
-
+    
         try:
             output = self._shell(launch_command)
         except Exception as exc:
             self.log.error("Unable to launch Android command: %s", command)
             self.log.exception(exc)
             return None
-
+    
         first_line = output.strip().splitlines()[0] if output.strip() else ""
-
+    
         try:
             pid = int(first_line)
         except ValueError:
             self.log.error("Unable to parse PID from ADB output: %r", output)
             return None
-
+    
         self.output_cache[pid] = {
             "stdout_file": out_file,
             "stderr_file": err_file,
             "rc_file": rc_file,
             "started_file": started_file,
+            "runner_file": runner_file,
             "stdout_offset": 0,
             "stderr_offset": 0,
             "stdout": "",
@@ -851,9 +867,11 @@ class ADBDriver(AbstractDriver):
             "start_monotonic": time.monotonic(),
             "rc_missing_reported": False,
         }
-
+    
         self.log.debug("Started Android process PID=%s command=%s", pid, command)
         return pid
+
+
 
     def async_exec(
         self, path, arg=None, env=None, input_data=None, capture_output=True
