@@ -6,13 +6,13 @@ It implements the AbstractDriver interface used by VMResourceHandler while avoid
 QGA/Linux-specific assumptions such as /bin/bash, /var/launch, and writable /system.
 """
 
+import re
 import json
 import time
+import uuid
 import shlex
 import base64
 import posixpath
-import re
-import uuid
 from pathlib import Path
 
 import adbutils
@@ -139,7 +139,9 @@ class ADBDriver(AbstractDriver):
     def _wait_for_device_online(self):
         """Wait until the ADB device is online and shell commands work."""
         while not self.ping():
-            self.log.debug("Waiting for Android device %s to come online", self.adb_name)
+            self.log.debug(
+                "Waiting for Android device %s to come online", self.adb_name
+            )
             time.sleep(1)
 
     def _root(self):
@@ -316,7 +318,7 @@ class ADBDriver(AbstractDriver):
 
         cmd = (
             'echo "$(getprop ro.product.brand) Android '
-            '$(getprop ro.build.version.release) '
+            "$(getprop ro.build.version.release) "
             '($(getprop ro.product.model))"'
         )
 
@@ -745,26 +747,25 @@ class ADBDriver(AbstractDriver):
                 raw_input = bytes(input_data)
 
             encoded_input = base64.b64encode(raw_input).decode("ascii")
-            command = (
-                f"printf %s {shlex.quote(encoded_input)} | base64 -d | {command}"
-            )
+            command = f"printf %s {shlex.quote(encoded_input)} | base64 -d | {command}"
 
         return command
+
     def execute(self, path, arg=None, env=None, input_data=None, capture_output=True):
         """
         Run a program asynchronously inside the Android guest.
-    
+
         Instead of keeping a long-lived ADB stream open, the remote process writes
         stdout, stderr, and return code into files under ``PROC_ROOT``. ``exec_status``
         polls those files.
-    
+
         Args:
             path (str): Executable path/name.
             arg (str | list | tuple | None): Arguments.
             env (list[str] | None): Environment assignments.
             input_data (str | bytes | None): stdin content.
             capture_output (bool): Whether to capture stdout/stderr.
-    
+
         Returns:
             int | None: PID on success, None on failure.
         """
@@ -774,16 +775,16 @@ class ADBDriver(AbstractDriver):
         rc_file = f"{self.PROC_ROOT}/{token}.rc"
         started_file = f"{self.PROC_ROOT}/{token}.started"
         runner_file = f"{self.PROC_ROOT}/{token}.runner.sh"
-    
+
         command = self._build_command(path, arg=arg, env=env, input_data=input_data)
-    
+
         if capture_output:
             stdout_target = self._quote_path(out_file)
             stderr_target = self._quote_path(err_file)
         else:
             stdout_target = "/dev/null"
             stderr_target = "/dev/null"
-    
+
         runner_content = (
             f"#!{self.ANDROID_SHELL}\n"
             f"echo started > {self._quote_path(started_file)}\n"
@@ -792,7 +793,7 @@ class ADBDriver(AbstractDriver):
             f"echo $rc > {self._quote_path(rc_file)}\n"
             "exit $rc\n"
         )
-    
+
         cleanup_command = (
             f"mkdir -p {shlex.quote(self.PROC_ROOT)}; "
             f"rm -f {self._quote_path(out_file)} "
@@ -801,7 +802,7 @@ class ADBDriver(AbstractDriver):
             f"{self._quote_path(started_file)} "
             f"{self._quote_path(runner_file)}"
         )
-    
+
         cleanup_result = self._shell2(cleanup_command)
         if cleanup_result.returncode != 0:
             self.log.error(
@@ -810,22 +811,26 @@ class ADBDriver(AbstractDriver):
                 cleanup_result.output,
             )
             return None
-    
+
         if not self._write(runner_file, runner_content):
-            self.log.error("Unable to write Android runner script for command: %s", command)
+            self.log.error(
+                "Unable to write Android runner script for command: %s", command
+            )
             return None
-    
+
         if not self.make_file_executable(runner_file):
-            self.log.error("Unable to make Android runner script executable: %s", runner_file)
+            self.log.error(
+                "Unable to make Android runner script executable: %s", runner_file
+            )
             return None
-    
+
         runner_invocation = (
             f"{self.ANDROID_SHELL} {self._quote_path(runner_file)} "
             f">> {self._quote_path(out_file)} "
             f"2>> {self._quote_path(err_file)} "
             "< /dev/null"
         )
-    
+
         launch_command = (
             "if command -v setsid >/dev/null 2>&1; then "
             f"setsid {runner_invocation} & pid=$!; "
@@ -838,24 +843,24 @@ class ADBDriver(AbstractDriver):
             "sleep 0.25; "
             "echo $pid"
         )
-    
+
         self.log.debug("ADB execute command: %s", launch_command)
-    
+
         try:
             output = self._shell(launch_command)
         except Exception as exc:
             self.log.error("Unable to launch Android command: %s", command)
             self.log.exception(exc)
             return None
-    
+
         first_line = output.strip().splitlines()[0] if output.strip() else ""
-    
+
         try:
             pid = int(first_line)
         except ValueError:
             self.log.error("Unable to parse PID from ADB output: %r", output)
             return None
-    
+
         self.output_cache[pid] = {
             "stdout_file": out_file,
             "stderr_file": err_file,
@@ -871,11 +876,9 @@ class ADBDriver(AbstractDriver):
             "start_monotonic": time.monotonic(),
             "rc_missing_reported": False,
         }
-    
+
         self.log.debug("Started Android process PID=%s command=%s", pid, command)
         return pid
-
-
 
     def async_exec(
         self, path, arg=None, env=None, input_data=None, capture_output=True
@@ -988,7 +991,9 @@ class ADBDriver(AbstractDriver):
 
         if alive:
             cache["exited"] = False
-            self.log.debug("PID %s is still running and has not written rc file yet.", pid)
+            self.log.debug(
+                "PID %s is still running and has not written rc file yet.", pid
+            )
             return cache
 
         # The process appears to have exited, but Android/ADB file visibility can
@@ -1076,5 +1081,7 @@ class ADBDriver(AbstractDriver):
             except ValueError:
                 continue
 
-        self.log.warning("Unable to determine modification time for Android file: %s", filename)
+        self.log.warning(
+            "Unable to determine modification time for Android file: %s", filename
+        )
         return None

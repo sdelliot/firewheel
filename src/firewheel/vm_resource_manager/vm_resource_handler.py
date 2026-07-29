@@ -476,7 +476,7 @@ class VMResourceHandler:
         """
         if hasattr(schedule_entry, "reboot") and schedule_entry.reboot:
             raise RuntimeError("Host-based vm_resources cannot request reboots!")
-        
+
         executable = Path(schedule_entry.executable)
         if executable.is_absolute():
             schedule_entry.exec_path = executable
@@ -593,7 +593,9 @@ class VMResourceHandler:
                         call_arguments.extend(schedule_entry.arguments)
 
                 try:
-                    ret = subprocess.run(call_arguments, capture_output=True, check=True)
+                    ret = subprocess.run(
+                        call_arguments, capture_output=True, check=True
+                    )
                     exitcode = ret.returncode
                 except subprocess.CalledProcessError as e:
                     self.log.error(
@@ -1506,7 +1508,12 @@ class VMResourceHandler:
                 module = importlib.util.module_from_spec(spec)
                 try:
                     spec.loader.exec_module(module)
-                except (FileNotFoundError, SyntaxError, ImportError, ModuleNotFoundError) as exp:
+                except (
+                    FileNotFoundError,
+                    SyntaxError,
+                    ImportError,
+                    ModuleNotFoundError,
+                ) as exp:
                     self.log.warning(
                         "Could not load driver module '%s': %s. Continuing.",
                         module_path,

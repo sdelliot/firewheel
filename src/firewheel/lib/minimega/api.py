@@ -357,9 +357,7 @@ class minimegaAPI:  # noqa: N801
                 if not self.check_host_filter(filter_dict, host_vm):
                     continue
 
-                new_host_vm = {
-                    k: v for k, v in host_vm.items() if k in mm_common_keys
-                }
+                new_host_vm = {k: v for k, v in host_vm.items() if k in mm_common_keys}
 
                 new_host_vm["vnc"] = host_vm.get("vnc_port", "")
 
