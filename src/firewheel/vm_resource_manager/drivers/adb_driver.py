@@ -223,9 +223,7 @@ class ADBDriver(AbstractDriver):
 
             return result.returncode == 0
 
-        except adbutils.errors.AdbError:
-            return False
-        except Exception:
+        except (adbutils.errors.AdbError, OSError):
             return False
 
     def sync(self, timeout=5):
@@ -866,7 +864,6 @@ class ADBDriver(AbstractDriver):
             "stderr_file": err_file,
             "rc_file": rc_file,
             "started_file": started_file,
-            "runner_file": runner_file,
             "runner_file": runner_file,
             "stdout_offset": 0,
             "stderr_offset": 0,
