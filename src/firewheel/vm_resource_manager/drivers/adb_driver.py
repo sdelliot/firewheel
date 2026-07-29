@@ -339,9 +339,6 @@ class ADBDriver(AbstractDriver):
 
         Returns:
             object: Parsed JSON from ``ip -j address``.
-
-        Raises:
-            json.JSONDecodeError: If the image's ``ip`` command lacks JSON support.
         """
         output = self._shell("ip -j address")
         return json.loads(output)
@@ -365,7 +362,7 @@ class ADBDriver(AbstractDriver):
         Flush filesystem buffers on Android.
 
         Args:
-            handle: Unused; present for AbstractDriver compatibility.
+            handle (File): Unused; present for AbstractDriver compatibility.
 
         Returns:
             bool: True on success.
@@ -881,7 +878,19 @@ class ADBDriver(AbstractDriver):
         self, path, arg=None, env=None, input_data=None, capture_output=True
     ):
         """
-        Run a program asynchronously.
+        Execute an ADB command.
+
+        Args:
+            path (str): Path or executable name to execute.
+            arg (str): Argument list to pass to executable. Must
+                be a list or string. Defaults to None.
+            env (list): Environment variables to pass to executable.
+                List of "<key>=<value>" strings. Defaults to None.
+            input_data (str): Data to be passed to process stdin. Defaults to
+                ``None``.
+            capture_output (bool): Flag to enable capture of stdout/stderr.
+                Defaults to True.
+
 
         Returns:
             int | None: PID on success.
