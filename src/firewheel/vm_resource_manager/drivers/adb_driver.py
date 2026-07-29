@@ -831,7 +831,10 @@ class ADBDriver(AbstractDriver):
             f"setsid {runner_invocation} & pid=$!; "
             "else "
             f"{runner_invocation} & pid=$!; "
+            f"{runner_invocation} & pid=$!; "
             "fi; "
+            "sleep 0.25; "
+            "echo $pid"
             "sleep 0.25; "
             "echo $pid"
         )
@@ -858,6 +861,7 @@ class ADBDriver(AbstractDriver):
             "stderr_file": err_file,
             "rc_file": rc_file,
             "started_file": started_file,
+            "runner_file": runner_file,
             "runner_file": runner_file,
             "stdout_offset": 0,
             "stderr_offset": 0,
