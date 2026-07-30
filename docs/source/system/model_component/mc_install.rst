@@ -500,6 +500,7 @@ An example of this configuration is shown below:
 
           file_servers:
             - url: "http://example.com"
+              use_proxy: false
               cache_paths:
                 - ""
 
@@ -510,6 +511,7 @@ An example of this configuration is shown below:
 
           file_servers:
             - url: "http://127.0.0.1:8000"
+              use_proxy: false
               cache_paths:
                 - "firewheel-cache"
 
