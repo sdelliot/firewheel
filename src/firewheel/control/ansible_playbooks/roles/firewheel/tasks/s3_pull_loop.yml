@@ -30,7 +30,7 @@
         aws_access_key: "{{ firewheel_aws_access_key_id }}"
         aws_secret_key: "{{ firewheel_aws_secret_access_key }}"
         endpoint_url: "{{ firewheel_s3_endpoint }}"
-      loop: "{{ required_files }}"
+      loop: "{{ firewheel_cache_files | default(required_files) }}"
       register: s3_download_result
       ignore_errors: true
   rescue:

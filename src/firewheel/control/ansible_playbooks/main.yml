@@ -5,7 +5,7 @@
 #   This Ansible playbook is designed to install extra dependencies for a model component
 #   such as file retrieval or data processing. It does this by first checking if the necessary
 #   files are available via a cache mechanism, including Git, S3, and a standard file server
-#   (via a URL). If a cache is not available, than it provides a naive check for online access
+#   (via a URL). If a cache is not available, then it provides a naive check for online access
 #   and, if needed executes the tasks that are provided in the model component
 #   ``INSTALL/tasks.yml`` file.
 #
@@ -25,17 +25,21 @@
       ansible.builtin.include_vars:
         file: "{{ vars_path }}"
 
+    - name: Build list of files that may be retrieved from cache
+      ansible.builtin.set_fact:
+        firewheel_cache_files: "{{ (required_files | default([])) + (install_inputs | default([])) }}"
+
     - name: Checking for required files
       ansible.builtin.include_role:
         name: firewheel
         tasks_from: check_and_end.yml
 
-    - name: Create all destination directories
+    - name: Create all cache destination directories
       ansible.builtin.file:
         path: "{{ item.destination | dirname }}"
         state: directory
         mode: "0755"
-      loop: "{{ required_files }}"
+      loop: "{{ firewheel_cache_files }}"
 
     - name: Checking git cache
       ansible.builtin.include_role:
@@ -72,16 +76,47 @@
       changed_when: false
       ignore_errors: true
 
+    - name: Initialize install input availability status
+      ansible.builtin.set_fact:
+        all_install_inputs_valid: "{{ (install_inputs | default([]) | length) > 0 }}"
+
+    - name: Inspect install inputs
+      ansible.builtin.stat:
+        path: "{{ item.destination }}"
+        checksum_algorithm: "{{ item.checksum_algorithm | default(item.checksum_algo | default('sha1')) }}"
+        get_checksum: true
+      register: install_inputs_check
+      loop: "{{ install_inputs | default([]) }}"
+      when: install_inputs | default([]) | length > 0
+
+    - name: Mark install inputs invalid if any are missing or checksum-invalid
+      ansible.builtin.set_fact:
+        all_install_inputs_valid: false
+      loop: "{{ install_inputs_check.results | default([]) }}"
+      when: >-
+        (not item.stat.exists) or
+        (
+          item.item.checksum is defined and
+          item.stat.checksum != item.item.checksum
+        )
+
     - name: Final failure message if all attempts fail
       ansible.builtin.fail:
-        msg: "All cache file methods have failed and system does not appear to be online. Please provide valid cache information."
-      when: (ping_result.rc | default(0)) != 0
+        msg: >-
+          Required files are not installed, the system does not appear to be online,
+          and valid install inputs are not available. Provide valid cache information,
+          manually place the required install inputs, or rerun on an online system.
+      when:
+        - (ping_result.rc | default(0)) != 0
+        - not all_install_inputs_valid | default(false)
 
     # If we don't have any cached files and are online
     # then we need to run the MC Install tasks
     - name: "Include tasks (if needed) for: {{ mc_name }}"
       ansible.builtin.include_tasks: "{{ tasks_path }}"
-      when: (ping_result.rc | default(1)) == 0
+      when: >-
+        ((ping_result.rc | default(1)) == 0) or
+        (all_install_inputs_valid | default(false))
 
     - name: Checking for required files
       ansible.builtin.include_role:

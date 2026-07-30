@@ -32,7 +32,7 @@
         mode: "0660"
         use_proxy: "{{ firewheel_use_proxy }}"
         validate_certs: "{{ firewheel_validate_certs }}"
-      loop: "{{ required_files }}"
+      loop: "{{ firewheel_cache_files | default(required_files) }}"
       register: url_download_result
       ignore_errors: true
 
