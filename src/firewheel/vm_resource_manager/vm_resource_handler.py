@@ -592,9 +592,10 @@ class VMResourceHandler:
                     else:
                         call_arguments.extend(schedule_entry.arguments)
 
+                host_env = self._build_host_vm_resource_env()
                 try:
                     ret = subprocess.run(
-                        call_arguments, capture_output=True, check=True
+                        call_arguments, capture_output=True, check=True,env=host_env,
                     )
                     exitcode = ret.returncode
                 except subprocess.CalledProcessError as e:
@@ -817,6 +818,46 @@ class VMResourceHandler:
                 )
                 return
             queue.put(schedule_entry)
+
+    def _build_host_vm_resource_env(self):
+        """
+        Build environment variables for host-side VM resources.
+
+        Host-side VM resources execute on the physical host, but they are invoked
+        by a VM-specific VMResourceHandler. These variables expose that VM-specific
+        runtime context to the host-side resource.
+        """
+        env = os.environ.copy()
+
+        # Make host-side resources inherit the FIREWHEEL Python environment.
+        # This approximates virtualenv activation for non-interactive subprocesses.
+        python_executable = Path(sys.executable).resolve()
+        python_bin_dir = str(python_executable.parent)
+
+        env["PATH"] = python_bin_dir + os.pathsep + env.get("PATH", "")
+        env["FIREWHEEL_PYTHON"] = str(python_executable)
+
+        if sys.prefix != getattr(sys, "base_prefix", sys.prefix):
+            env["VIRTUAL_ENV"] = sys.prefix
+
+        env["FIREWHEEL_VM_NAME"] = str(self.config.get("vm_name", ""))
+        env["FIREWHEEL_VM_UUID"] = str(self.config.get("vm_uuid", ""))
+
+        adb_serial = self.config.get("adb_serial")
+        android_console_port = self.config.get("android_console_port")
+
+        if adb_serial:
+            env["FIREWHEEL_ADB_SERIAL"] = str(adb_serial)
+
+        if android_console_port is not None:
+            env["FIREWHEEL_ANDROID_CONSOLE_PORT"] = str(android_console_port)
+
+            if not adb_serial:
+                env["FIREWHEEL_ADB_SERIAL"] = f"emulator-{android_console_port}"
+
+        env["FIREWHEEL_VM_CONFIG_JSON"] = json.dumps(self.config, separators=(",", ":"))
+
+        return env
 
     def check_for_reboot(self, reboot_filepath):
         """
