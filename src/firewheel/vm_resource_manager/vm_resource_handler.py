@@ -593,6 +593,7 @@ class VMResourceHandler:
                         call_arguments.extend(schedule_entry.arguments)
 
                 host_env = self._build_host_vm_resource_env()
+                self.log.debug("Running command: `%s` with environment `%s`", call_arguments, host_env)
                 try:
                     ret = subprocess.run(
                         call_arguments, capture_output=True, check=True,env=host_env,
@@ -829,16 +830,45 @@ class VMResourceHandler:
         """
         env = os.environ.copy()
 
-        # Make host-side resources inherit the FIREWHEEL Python environment.
-        # This approximates virtualenv activation for non-interactive subprocesses.
-        python_executable = Path(sys.executable).resolve()
-        python_bin_dir = str(python_executable.parent)
+        self.log.debug(
+            "Host resource parent sys.base_prefix=%s",
+            getattr(sys, "base_prefix", sys.prefix),
+        )
 
-        env["PATH"] = python_bin_dir + os.pathsep + env.get("PATH", "")
+        virtual_env = env.get("VIRTUAL_ENV")
+
+        # If VIRTUAL_ENV is not exported, infer it from Python's venv state.
+        if not virtual_env and sys.prefix != getattr(sys, "base_prefix", sys.prefix):
+            virtual_env = sys.prefix
+            env["VIRTUAL_ENV"] = virtual_env
+
+        if virtual_env:
+            python_bin_dir = Path(virtual_env) / "bin"
+
+            python_executable = None
+            for candidate in ("python3", "python"):
+                candidate_path = python_bin_dir / candidate
+                if candidate_path.exists():
+                    python_executable = candidate_path
+                    break
+
+            if python_executable is None:
+                raise RuntimeError(
+                    f"VIRTUAL_ENV is set to {virtual_env}, but no python3/python "
+                    f"was found in {python_bin_dir}"
+                )
+
+        else:
+            # No venv detected. Fall back to the interpreter used by this handler.
+            # Do not call resolve() before taking parent, because that can collapse
+            # venv symlinks to /usr/bin/python.
+            python_executable = Path(sys.executable)
+            python_bin_dir = python_executable.parent
+
+        env["PATH"] = str(python_bin_dir) + os.pathsep + env.get("PATH", "")
         env["FIREWHEEL_PYTHON"] = str(python_executable)
 
-        if sys.prefix != getattr(sys, "base_prefix", sys.prefix):
-            env["VIRTUAL_ENV"] = sys.prefix
+        self.log.debug("Host VM resource PATH=%s", env["PATH"])
 
         env["FIREWHEEL_VM_NAME"] = str(self.config.get("vm_name", ""))
         env["FIREWHEEL_VM_UUID"] = str(self.config.get("vm_uuid", ""))
