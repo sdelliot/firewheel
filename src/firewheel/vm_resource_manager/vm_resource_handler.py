@@ -597,10 +597,17 @@ class VMResourceHandler:
                         call_arguments.extend(schedule_entry.arguments)
 
                 host_env = self._build_host_vm_resource_env()
-                self.log.debug("Running command: `%s` with environment `%s`", call_arguments, host_env)
+                self.log.debug(
+                    "Running command: `%s` with environment `%s`",
+                    call_arguments,
+                    host_env,
+                )
                 try:
                     ret = subprocess.run(
-                        call_arguments, capture_output=True, check=True,env=host_env,
+                        call_arguments,
+                        capture_output=True,
+                        check=True,
+                        env=host_env,
                     )
                     exitcode = ret.returncode
                 except subprocess.CalledProcessError as e:
