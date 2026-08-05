@@ -139,11 +139,10 @@ class QemuGuestAgentDriver(AbstractDriver):
     @staticmethod
     def get_engine():
         """
-        Get the virtualization engine that this driver supports.
+        Get the VM Resource Handler communication engine that this driver supports.
 
         Returns:
-            str: The name of the virtualization engine that this driver supports.
-            Currently this is only 'QemuVM'.
+            str: ``"QemuVM"``.
         """
 
         return "QemuVM"

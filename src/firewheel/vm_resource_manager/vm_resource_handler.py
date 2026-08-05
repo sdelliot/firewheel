@@ -1,9 +1,12 @@
 #!/usr/bin/env python
 
 """
-This module contains the class enable the ``vm_resource_handler`` to
-run. This runs as a process for each VM that is launched with FIREWHEEL and
-controls the interaction with the QEMU Guest Agent.
+This module contains the VM Resource Handler.
+
+A VM Resource Handler runs as a process for each VM that is launched with
+FIREWHEEL and controls the interaction between FIREWHEEL VM resources and the
+guest through a driver-specific communication mechanism, such as the QEMU Guest
+Agent or Android Debug Bridge.
 """
 
 import os
@@ -139,7 +142,7 @@ class VMResourceHandler:
         )
 
         # Make sure the QGA socket path is available for QGA-backed VMs.
-        # AVD/ADB does not use a local QGA socket path.
+        # ADB-backed VMs do not use a local QGA socket path.
         if self.config.get("engine") == "QemuVM":
             socket_path = Path(self.config["path"])
             try:
@@ -163,9 +166,10 @@ class VMResourceHandler:
                 self.config.get("engine"),
             )
 
-        # Load the driver for the virtualization engine.
+        # Load the communication driver for this VM.
         # Individual driver import failures are tolerated inside _import_drivers(),
-        # but if no importable driver matches this VM's engine, this handler cannot run.
+        # but if no importable driver matches this VM's requested communication engine,
+        # this handler cannot run.
         self.driver_class = self.import_driver()
 
         connected = self.connect_to_driver()
@@ -1528,11 +1532,11 @@ class VMResourceHandler:
 
     def import_driver(self):
         """
-        Walk through all the available drivers and find the one that
-        matches the type of VM that has been booted.
+        Walk through all available drivers and find the one that matches this VM's
+        configured VM Resource Handler communication engine.
 
         Returns:
-            object: The driver class that matches the VM's type
+            object: The driver class that matches ``self.config["engine"]``.
         """
         drivers = self._import_drivers()
         if not drivers:
@@ -1545,7 +1549,7 @@ class VMResourceHandler:
             sys.exit(1)
 
         # Walk the drivers looking for the one that has an engine
-        # that matches the config's type (i.e. QemuVM)
+        # that matches the config's type (e.g. QemuVM or ADB)
         for driver in drivers:
             if driver.get_engine() == self.config["engine"]:
                 return driver

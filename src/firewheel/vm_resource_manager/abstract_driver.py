@@ -135,7 +135,7 @@ class AbstractDriver(ABC):
     @abstractmethod
     def get_engine():
         """
-        Get the virtualization engine that this driver supports.
+        Get the VM Resource Handler communication engine that this driver supports.
 
         Raises:
             NotImplementedError: This should be implemented by a subclass.
