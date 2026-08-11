@@ -8,6 +8,7 @@ DONE
 
 RUN Python ON compute
 #!/usr/bin/env python
+import os
 from pathlib import Path
 
 from firewheel.config import config
