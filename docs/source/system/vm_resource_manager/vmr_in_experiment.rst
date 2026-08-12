@@ -254,7 +254,6 @@ For example, if ``set_hostname.sh`` and ``get_stat.py`` both occurred at ``-250`
 .. note::
    To access negative time folders you will likely need to use either a full path (e.g. ``/var/launch/-100`` or a specific relative path ``./-100``. This is because the negative sign (i.e. the hyphen) is typically used to express a CLI option for most shell programs.
 
-Each of the folders with the VMR name contains a file called ``call_arguments.sh`` which is a dynamically-generated script which executes the VMR.
 Each VMR directory contains a dynamically-generated call-arguments file which executes the VMR.
 On Linux and Android guests this is typically ``call_arguments.sh``; on Windows guests this is typically ``call_arguments.bat``.
 Additionally, if there is other data, scripts, etc. which need to be executed for the given VMR, they are also located in this directory.
