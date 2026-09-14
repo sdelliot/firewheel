@@ -36,6 +36,9 @@
       register: url_download_result
       ignore_errors: true
 
+    - name: Check for required files after URL cache attempt
+      ansible.builtin.include_tasks: check_and_end.yml
+
   rescue:
     - name: Handle download failures
       ansible.builtin.debug:
