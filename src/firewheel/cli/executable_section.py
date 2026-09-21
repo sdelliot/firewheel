@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import re
 import importlib
 from uuid import UUID
