@@ -6,26 +6,7 @@
 # If you are using a username or password token, you can specify it in the URL
 # For example: https://user:password@server.com/url/cache/path/file.txt
 # The user will need to provide all relevant information.
-# Note:
-#   The user-facing FIREWHEEL configuration uses the nested structure shown
-#   above. model_component_install.py flattens that structure before passing
-#   file_servers to this Ansible role.
-#
 # An example configuration is shown below:
-#
-# file_servers:
-#   - url: "http://example.com"
-#     use_proxy: False
-#     validate_certs: False
-#     cache_paths:
-#       - "some/intermediate/path"
-#       - "another/path"
-#   - url: "https://user:password@server.com"
-#     use_proxy: True
-#     validate_certs: False
-#     cache_paths:
-#
-# An example configuration:
 #
 # file_servers:
 #   - url: "http://example.com"
