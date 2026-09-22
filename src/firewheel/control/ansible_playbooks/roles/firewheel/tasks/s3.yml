@@ -3,26 +3,7 @@
 # This playbook will loop through configured S3 endpoints and collect
 # cacheable files from S3.
 # The user will need to provide all relevant information.
-# Note:
-#   The user-facing FIREWHEEL configuration uses the nested structure shown
-#   above. model_component_install.py flattens that structure before passing
-#   s3_endpoints to this Ansible role.
-#
 # An example configuration is shown below:
-#
-# s3_endpoints:
-#   - s3_endpoint: "https://s3.us-east-1.amazonaws.com"
-#     aws_access_key_id: "SOME KEY ID"
-#     aws_secret_access_key: "SOME SECRET KEY"
-#     buckets:
-#       - "firewheel_bucket1"
-#       - "firewheel_bucket2"
-#   - s3_endpoint: "https://custom-s3-endpoint:8000"
-#     aws_access_key_id: "SOME KEY ID"
-#     aws_secret_access_key: "SOME SECRET KEY"
-#     buckets:
-#
-# An example configuration:
 #
 # s3_endpoints:
 #   - s3_endpoint: "https://s3.us-east-1.amazonaws.com"
