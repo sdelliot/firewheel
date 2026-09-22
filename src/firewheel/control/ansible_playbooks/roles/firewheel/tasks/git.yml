@@ -4,28 +4,7 @@
 # If you are using an access token, you can specify it in the `server_url`.
 # For example: https://<token>@github.com/user/repo.git
 # The user will need to provide all relevant information.
-# Note:
-#   The user-facing FIREWHEEL configuration uses the nested structure shown
-#   above. model_component_install.py flattens that structure before passing
-#   git_servers to this Ansible role.
-#
 # An example configuration is shown below:
-#
-# git_servers:
-#   - server_url: "https://github.com"
-#     repositories:
-#       - path: "firewheel/mc_repo1"
-#       - path: "firewheel/mc_repo2"
-#         branch: "develop"
-#   - server_url: "ssh://git@gitlab.com"
-#     repositories:
-#       - path: "emulytics/firewheel/mc_repo3"
-#         branch: "feature-branch"
-#   - server_url: "https://user:ACCESS-TOKEN@github.com/"
-#     repositories:
-#       - path: "firewheel/mc_repo4"
-#
-# An example configuration:
 #
 # git_servers:
 #   - server_url: "https://github.com"
