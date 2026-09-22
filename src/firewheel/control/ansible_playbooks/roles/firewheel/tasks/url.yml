@@ -24,7 +24,27 @@
 #     use_proxy: True
 #     validate_certs: False
 #     cache_paths:
+#
+# An example configuration:
+#
+# file_servers:
+#   - url: "http://example.com"
+#     use_proxy: False
+#     validate_certs: False
+#     cache_paths:
+#       - "some/intermediate/path"
+#       - "another/path"
+#   - url: "https://user:password@server.com"
+#     use_proxy: True
+#     validate_certs: False
+#     cache_paths:
 #       - "secondpath/intermediate/path"
+#
+# Note:
+#   The user-facing FIREWHEEL configuration uses the nested structure shown
+#   above. `model_component_install.py` flattens that structure before passing
+#   `file_servers` to this Ansible role.
+#
 ###################################################################################################
 - name: Attempt to pull from URL cache
   block:
