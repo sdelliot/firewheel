@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import random
 import shutil
 import filecmp
@@ -7,7 +5,7 @@ import hashlib
 import tarfile
 import traceback
 from time import sleep
-from typing import Any, Tuple, Optional
+from typing import Any
 from pathlib import Path
 from functools import wraps as _wraps
 
@@ -371,7 +369,7 @@ def hash_file(fname: str) -> str:
 
 def retry(
     num_tries: int,
-    exceptions: Optional[Tuple] = None,
+    exceptions: tuple | None = None,
     base_delay: int = 10,
     exp_factor: int = 2,
 ):
