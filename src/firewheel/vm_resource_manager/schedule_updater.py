@@ -1,13 +1,12 @@
 import sys
 import math
-import pickle
 import random
 from time import sleep
 from queue import PriorityQueue
 from threading import Thread
 
-# pylint: disable=unused-import
 from firewheel.vm_resource_manager import api
+from firewheel.lib.utilities import restricted_pickle_loads
 from firewheel.vm_resource_manager.schedule_entry import ScheduleEntry  # noqa: F401
 from firewheel.vm_resource_manager.schedule_event import (
     ScheduleEvent,
@@ -402,7 +401,7 @@ class ScheduleUpdater(Thread):
         """
         try:
             pickled_schedule = self.schedule_db.get(name)
-            full_schedule = pickle.loads(pickled_schedule)  # nosec
+            full_schedule = restricted_pickle_loads(pickled_schedule)
 
             # It's possible there is not a schedule for this VM
             if not full_schedule:

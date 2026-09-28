@@ -157,7 +157,6 @@ import sys
 import json
 import math
 import base64
-import pickle
 import argparse
 import tempfile
 from typing import Any, Mapping, Iterable
@@ -180,6 +179,8 @@ from firewheel.lib.utilities import (
     escape_embedded_json,
     unescape_embedded_json,
     directories_are_identical,
+    restricted_pickle_loads,
+
 )
 from firewheel.lib.minimega.api import minimegaAPI
 from firewheel.control.image_store import ImageStore
@@ -359,7 +360,7 @@ def _restore_schedule_file(
 
     try:
         decoded_text = base64.b64decode(schedule_obj["text"])
-        schedule = pickle.loads(decoded_text)  # nosec
+        schedule = restricted_pickle_loads(decoded_text)
     except Exception as exc:  # noqa: BLE001
         raise RuntimeError(
             f"Failed to decode schedule payload from {source_path}: {exc}"

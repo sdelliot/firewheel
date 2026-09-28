@@ -136,7 +136,6 @@ import json
 import math
 import time
 import base64
-import pickle
 import shutil
 import argparse
 import subprocess
@@ -163,6 +162,7 @@ from firewheel.lib.utilities import (
     print_success,
     print_result_card,
     print_phase_header,
+    restricted_pickle_loads,
 )
 from firewheel.lib.minimega.api import minimegaAPI
 from firewheel.control.image_store import ImageStore
@@ -341,7 +341,7 @@ def prune_schedule_entries(
         ) from exp
 
     try:
-        cur_schedule: list[ScheduleEntry] = pickle.loads(schedule_obj["text"])
+        cur_schedule: list[ScheduleEntry] = restricted_pickle_loads(schedule_obj["text"])
     except pickle.UnpicklingError as exp:
         print_error(console, f"Error loading schedule file {schedule_path}: {exp}")
         raise RuntimeError(f"Error loading schedule file {schedule_path}: {exp}") from exp

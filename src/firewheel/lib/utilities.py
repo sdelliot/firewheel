@@ -1,5 +1,12 @@
 from __future__ import annotations
 
+
+import builtins
+import io
+import os
+import pickle
+from collections import OrderedDict
+from datetime import date, datetime, time, timedelta, timezone
 import random
 import shutil
 import filecmp
@@ -255,6 +262,87 @@ def render_rich_string(text):
         console.print(text, soft_wrap=True, end="")
     return capture.get()
 
+_ALLOWED_PICKLE_GLOBALS = {
+    ("builtins", "dict"): dict,
+    ("builtins", "list"): list,
+    ("builtins", "set"): set,
+    ("builtins", "tuple"): tuple,
+    ("builtins", "str"): str,
+    ("builtins", "int"): int,
+    ("builtins", "float"): float,
+    ("builtins", "bool"): bool,
+    ("builtins", "bytes"): bytes,
+    ("builtins", "bytearray"): bytearray,
+    ("builtins", "complex"): complex,
+    ("builtins", "slice"): slice,
+    ("collections", "OrderedDict"): OrderedDict,
+    ("datetime", "datetime"): datetime,
+    ("datetime", "date"): date,
+    ("datetime", "time"): time,
+    ("datetime", "timedelta"): timedelta,
+    ("datetime", "timezone"): timezone,
+}
+
+
+class _RestrictedUnpickler(pickle.Unpickler):
+    """Allowlist unpickler for schedule-related data only."""
+
+    def find_class(self, module, name):
+        """Resolve only approved globals during unpickling.
+
+        Args:
+            module (str): The module containing the global.
+            name (str): The global name being loaded.
+
+        Returns:
+            object: The approved class or callable.
+
+        Raises:
+            pickle.UnpicklingError: If the global is not allowlisted.
+        """
+        key = (module, name)
+        if key in _ALLOWED_PICKLE_GLOBALS:
+            return _ALLOWED_PICKLE_GLOBALS[key]
+
+        if module == "firewheel.vm_resource_manager.schedule_entry":
+            from firewheel.vm_resource_manager.schedule_entry import ScheduleEntry
+
+            if name == "ScheduleEntry":
+                return ScheduleEntry
+
+        if module == "firewheel.vm_resource_manager.schedule_event":
+            from firewheel.vm_resource_manager.schedule_event import (
+                ScheduleEvent,
+                ScheduleEventType,
+            )
+
+            if name == "ScheduleEvent":
+                return ScheduleEvent
+            if name == "ScheduleEventType":
+                return ScheduleEventType
+
+        raise pickle.UnpicklingError(
+            f"global '{module}.{name}' is forbidden by restricted unpickler"
+        )
+
+
+def restricted_pickle_loads(data: bytes):
+    """Safely deserialize trusted FIREWHEEL schedule structures only.
+
+    Args:
+        data (bytes): Pickled bytes to deserialize.
+
+    Returns:
+        object: The reconstructed Python object graph.
+
+    Raises:
+        pickle.UnpicklingError: If the pickle references non-allowlisted globals.
+        TypeError: If ``data`` is not bytes-like.
+    """
+    if not isinstance(data, (bytes, bytearray)):
+        raise TypeError("restricted_pickle_loads expects bytes-like input")
+    return _RestrictedUnpickler(io.BytesIO(data)).load()
+
 
 def badpath(path: str, base: Path) -> bool:
     """Check whether a path escapes the provided base directory.
@@ -266,8 +354,14 @@ def badpath(path: str, base: Path) -> bool:
     Returns:
         bool: True if the resolved path escapes the base directory, otherwise False.
     """
-    joint = (base / path).resolve()
-    return not str(joint).startswith(str(base.resolve()))
+    resolved_base = base.resolve()
+    joint = (resolved_base / path).resolve()
+    try:
+        return os.path.commonpath([str(resolved_base), str(joint)]) != str(
+            resolved_base
+        )
+    except ValueError:
+        return True
 
 
 def badlink(info: tarfile.TarInfo, base: Path) -> bool:

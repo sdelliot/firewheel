@@ -30,6 +30,7 @@ from firewheel.lib.utilities import (
     escape_embedded_json,
     unescape_embedded_json,
     get_safe_tarfile_members,
+    restricted_pickle_loads,
     directories_are_identical,
 )
 
@@ -459,3 +460,56 @@ def test_badlink_with_nested_parent_escape(tmp_path: Path) -> None:
     info = tarfile.TarInfo(name="nested/link")
     info.linkname = "../../../etc/passwd"
     assert badlink(info, tmp_path) is True
+
+
+def test_restricted_pickle_loads_allows_basic_builtin_data() -> None:
+    """Verify restricted unpickler accepts simple builtin containers."""
+    import pickle
+
+    payload = pickle.dumps({"a": [1, 2, 3], "b": ("x", True)})
+    result = restricted_pickle_loads(payload)
+
+    assert result == {"a": [1, 2, 3], "b": ("x", True)}
+
+
+def test_restricted_pickle_loads_rejects_forbidden_global() -> None:
+    """Verify restricted unpickler rejects dangerous globals."""
+    import pickle
+
+    class Evil:
+        def __reduce__(self):
+            import os
+
+            return (os.system, ("echo pwned",))
+
+    payload = pickle.dumps(Evil())
+
+    with pytest.raises(pickle.UnpicklingError):
+        restricted_pickle_loads(payload)
+
+def test_badpath_rejects_prefix_bypass(tmp_path: Path) -> None:
+    """Verify prefix-matching siblings do not bypass containment."""
+    base = tmp_path / "extract"
+    base.mkdir()
+
+    # This resolves outside "extract" but shares the same string prefix.
+    escape = base.parent / f"{base.name}-evil" / "file.txt"
+
+    assert badpath(str(escape), base) is True
+
+def test_get_safe_tarfile_members_blocks_prefix_bypass(tmp_path: Path) -> None:
+    """Verify members escaping to a prefix-matching sibling are blocked."""
+    tar_path = tmp_path / "archive.tar"
+
+    with tarfile.open(tar_path, "w") as tar_handle:
+        bad_member = tarfile.TarInfo("../extract-evil/payload.txt")
+        bad_member.size = 0
+        tar_handle.addfile(bad_member)
+
+    extract_base = tmp_path / "extract"
+    extract_base.mkdir()
+
+    with tarfile.open(tar_path, "r") as tar_handle:
+        members = get_safe_tarfile_members(tar_handle, extract_base)
+
+    assert [member.name for member in members] == []

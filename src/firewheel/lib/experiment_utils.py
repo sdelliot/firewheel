@@ -5,7 +5,6 @@ from __future__ import annotations
 import sys
 import json
 import math
-import pickle
 import shutil
 import tarfile
 from typing import Any, Optional
@@ -22,6 +21,7 @@ from firewheel.lib.utilities import (
     print_reused,
     print_success,
     get_safe_tarfile_members,
+    restricted_pickle_loads,
 )
 from firewheel.lib.minimega.file_store import FileStore
 from firewheel.vm_resource_manager.schedule_entry import ScheduleEntry
@@ -493,7 +493,7 @@ def create_resume_schedule_entry(sched_db, con, vm_name):
     if not pickled_schedule:
         con.print(f"[b red]Unable to get schedule for VM: [cyan]{vm_name}")
         sys.exit(1)
-    schedule = pickle.loads(pickled_schedule)
+    schedule = restricted_pickle_loads(pickled_schedule)
 
     # ScheduleEntry will have been loaded prior to this point automatically.
     sched_entry = ScheduleEntry(-math.inf)

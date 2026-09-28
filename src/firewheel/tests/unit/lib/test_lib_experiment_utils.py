@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import io
 import json
 import pickle
 import tarfile
@@ -459,4 +460,35 @@ def test_create_resume_schedule_entry_missing_schedule_exits() -> None:
     console = Console(record=True)
 
     with pytest.raises(SystemExit):
+        create_resume_schedule_entry(sched_db, console, "vm1")
+
+def test_create_resume_schedule_entry_rejects_forbidden_pickle(
+    tmp_path: Path,
+) -> None:
+    """Verify schedule resume loading rejects unsafe pickle payloads."""
+    import base64
+    import pickle
+
+    class Evil:
+        def __reduce__(self):
+            import os
+
+            return (os.system, ("echo pwned",))
+
+    schedule_dir = tmp_path / SCHEDULES_DIRNAME
+    schedule_dir.mkdir()
+
+    payload = {
+        "server_name": "vm1",
+        "text": base64.b64encode(pickle.dumps(Evil())).decode(),
+        "ip": "127.0.0.1",
+    }
+    (schedule_dir / "vm1").write_text(json.dumps(payload), encoding="utf-8")
+
+    sched_db = Mock()
+    sched_db.get.return_value = base64.b64decode(payload["text"])
+
+    console = Console(file=io.StringIO(), force_terminal=False, color_system=None)
+
+    with pytest.raises((RuntimeError, pickle.UnpicklingError, SystemExit)):
         create_resume_schedule_entry(sched_db, console, "vm1")
