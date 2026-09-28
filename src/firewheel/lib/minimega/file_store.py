@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 import time
 import shutil
 import tarfile
@@ -18,6 +19,36 @@ from firewheel.config import config
 from firewheel.lib.log import Log
 from firewheel.lib.utilities import hash_file, get_safe_tarfile_members
 from firewheel.lib.minimega.api import minimegaAPI
+
+# FileStore entries (and the VM names/schedule names built from them) must be
+# simple filenames: no path separators, no leading dots, no traversal.
+_STORE_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+
+
+def validate_store_name(name: str) -> str:
+    """Validate a FileStore entry name (or VM/schedule name) as a safe filename.
+
+    Args:
+        name (str): The proposed entry name.
+
+    Returns:
+        str: The validated name.
+
+    Raises:
+        ValueError: If the name is empty or contains path separators, traversal,
+            leading dots, or characters outside the allowed filename charset.
+    """
+    if not isinstance(name, str) or not name:
+        raise ValueError("Store name must be a non-empty string.")
+    if "/" in name or "\\" in name:
+        raise ValueError(f"Store name contains a path separator: {name!r}")
+    if name in {".", ".."} or name.startswith("."):
+        raise ValueError(f"Store name contains a reserved or hidden prefix: {name!r}")
+    if ".." in name:
+        raise ValueError(f"Store name contains traversal: {name!r}")
+    if not _STORE_NAME_RE.fullmatch(name):
+        raise ValueError(f"Unsafe store name: {name!r}")
+    return name
 
 
 class FileStoreFile:

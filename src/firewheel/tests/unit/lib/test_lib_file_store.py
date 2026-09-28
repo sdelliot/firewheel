@@ -10,7 +10,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from firewheel.lib.minimega.file_store import FileStore, FileStoreFile
+from firewheel.lib.minimega.file_store import FileStore, FileStoreFile, validate_store_name
 
 
 def _build_filestore(tmp_path: Path) -> FileStore:
@@ -794,3 +794,46 @@ def test_broadcast_get_file_raises_non_inflight_exception() -> None:
 
     with pytest.raises(Exception, match="hard failure"):
         store.broadcast_get_file("saved/file")
+
+def test_validate_store_name_allows_safe_names() -> None:
+    """Verify safe store-style names are accepted."""
+    assert validate_store_name("vm1") == "vm1"
+    assert validate_store_name("vm-1.test_name") == "vm-1.test_name"
+    assert validate_store_name("A_1") == "A_1"
+
+
+@pytest.mark.parametrize(
+    "bad_name",
+    [
+        "",
+        ".hidden",
+        ".",
+        "..",
+        "../evil",
+        "subdir/file",
+        r"subdir\file",
+        "name with spaces",
+        "name*glob",
+    ],
+)
+def test_validate_store_name_rejects_unsafe_names(bad_name: str) -> None:
+    """Verify unsafe names are rejected."""
+    with pytest.raises(ValueError):
+        validate_store_name(bad_name)
+
+
+def test_add_file_from_content_allows_dotfile_name(tmp_path: Path, monkeypatch) -> None:
+    """Verify FileStore still allows payload filenames such as dot-files."""
+    from firewheel.config import config
+
+    monkeypatch.setitem(config["minimega"], "files_dir", str(tmp_path))
+    store = _build_filestore(tmp_path)
+    store.store = "saved"
+    store.remove_file = Mock()
+    store.broadcast_get_file = Mock()
+
+    (tmp_path / "saved").mkdir(parents=True, exist_ok=True)
+    store.add_file_from_content(".bashrc contents", ".bashrc", force=False, broadcast=True)
+
+    assert (tmp_path / "saved" / ".bashrc").read_text(encoding="utf-8") == ".bashrc contents"
+    store.broadcast_get_file.assert_called_once_with("saved/.bashrc")

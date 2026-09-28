@@ -82,11 +82,11 @@ def handle_schedule_entry(name, file_name):
         name (str): The name of the VM for which the schedule is being updated.
         file_name (str): The name of the file to be transferred.
     """
-    con = Console()
+    console = Console()
     schedule_db = ScheduleDb()
     pickled_schedule = schedule_db.get(name)
     if not pickled_schedule:
-        con.print(f"[b red]Unable to get schedule for VM: [cyan]{name}")
+        console.print(f"[b red]Unable to get schedule for VM: [cyan]{name}")
         sys.exit(1)
     schedule = pickle.loads(pickled_schedule)
 
@@ -112,7 +112,7 @@ def call_scp(hostname, src, dest, max_attempts=24):
         max_attempts (int, optional): The maximum number of attempts to check
             if the file is ready. Defaults to 24.
     """
-    con = Console()
+    console = Console()
     count = 1
     num_sec = 5
     lockfile = src.parent / f"{src.name}-lock"
@@ -122,7 +122,7 @@ def call_scp(hostname, src, dest, max_attempts=24):
         ),
         SpinnerColumn(spinner_name="line"),
         TimeElapsedColumn(),
-        console=con,
+        console=console,
     ) as progress:
         progress.add_task(description="check file")
         while True:

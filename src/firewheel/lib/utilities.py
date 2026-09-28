@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import random
 import shutil
 import filecmp
@@ -7,11 +8,37 @@ import hashlib
 import tarfile
 import traceback
 from time import sleep
-from typing import Any, Tuple, Optional
+from typing import Any, Tuple, Union, Optional
 from pathlib import Path
 from functools import wraps as _wraps
 
 from rich.console import Console
+
+
+def contained_join(base: Union[str, Path], *parts: Union[str, Path]) -> Path:
+    """Join untrusted path parts onto a base directory, refusing escapes.
+
+    The joined path is resolved and verified (via os.path.commonpath)
+    to remain contained within ``base``. Absolute parts, parts containing
+    ``..`` components, and symlink-based escapes of the resolved candidate's
+    parent directory are all rejected.
+    """
+    base_path = Path(base).resolve()
+    candidate = base_path
+
+    for part in parts:
+        part_path = Path(part)
+        if part_path.is_absolute():
+            raise ValueError(f"Absolute path component is not allowed: {part!s}")
+        if ".." in part_path.parts:
+            raise ValueError(f"Path traversal component is not allowed: {part!s}")
+        candidate = candidate / part_path
+
+    resolved = candidate.parent.resolve() / candidate.name
+    if os.path.commonpath([str(base_path), str(resolved)]) != str(base_path):
+        raise ValueError(f"Path escapes the base directory {base_path}: {resolved}")
+
+    return resolved
 
 
 def unescape_embedded_json(escaped_json: str) -> str:
@@ -369,7 +396,12 @@ def hash_file(fname: str) -> str:
     return hash_func.hexdigest()
 
 
-def retry(num_tries: int, exceptions: Optional[Tuple] = None, base_delay: int = 10, exp_factor: int = 2):
+def retry(
+    num_tries: int,
+    exceptions: Optional[Tuple] = None,
+    base_delay: int = 10,
+    exp_factor: int = 2,
+):
     """
     This function provides a decorator which enables automatic retrying of
     functions which make connections to the FileStore and fail due to timeout errors.

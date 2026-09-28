@@ -31,6 +31,7 @@ from firewheel.lib.utilities import (
     unescape_embedded_json,
     get_safe_tarfile_members,
     directories_are_identical,
+    contained_join,
 )
 
 
@@ -284,6 +285,48 @@ def test_get_safe_tarfile_members_blocks_unsafe_members(tmp_path: Path) -> None:
     assert "safe.txt" in names
     assert "../evil.txt" not in names
     assert "link.txt" not in names
+
+
+def test_contained_join_allows_normal_relative_path(tmp_path: Path) -> None:
+    """Verify contained_join permits safe relative paths under the base."""
+    base = tmp_path / "base"
+    base.mkdir()
+
+    result = contained_join(base, "logs/output.txt")
+
+    assert result == base / "logs" / "output.txt"
+
+
+def test_contained_join_rejects_parent_traversal(tmp_path: Path) -> None:
+    """Verify contained_join rejects paths containing parent traversal."""
+    base = tmp_path / "base"
+    base.mkdir()
+
+    with pytest.raises(ValueError):
+        contained_join(base, "../../evil.txt")
+
+
+def test_contained_join_rejects_absolute_path(tmp_path: Path) -> None:
+    """Verify contained_join rejects absolute untrusted paths."""
+    base = tmp_path / "base"
+    base.mkdir()
+
+    with pytest.raises(ValueError):
+        contained_join(base, "/etc/passwd")
+
+
+def test_contained_join_rejects_symlink_escape(tmp_path: Path) -> None:
+    """Verify contained_join rejects paths that escape via symlink resolution."""
+    base = tmp_path / "base"
+    base.mkdir()
+
+    outside = tmp_path / "outside"
+    outside.mkdir()
+
+    (base / "link").symlink_to(outside, target_is_directory=True)
+
+    with pytest.raises(ValueError):
+        contained_join(base, "link/evil.txt")
 
 
 @pytest.mark.parametrize(

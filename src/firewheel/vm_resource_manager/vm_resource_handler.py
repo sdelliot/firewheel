@@ -25,9 +25,11 @@ from threading import Timer, Thread, Condition
 
 from firewheel.config import config as global_config
 from firewheel.lib.log import UTCLog
+from firewheel.lib.utilities import contained_join
 from firewheel.lib.minimega.api import minimegaAPI
 from firewheel.vm_resource_manager import api, utils
 from firewheel.control.repository_db import RepositoryDb
+from firewheel.lib.minimega.file_store import validate_store_name
 from firewheel.vm_resource_manager.vm_mapping import VMState, VMMapping
 from firewheel.vm_resource_manager.schedule_db import ScheduleDb
 from firewheel.vm_resource_manager.schedule_event import (
@@ -68,6 +70,10 @@ class VMResourceHandler:
         self.log_directory.mkdir(exist_ok=True, parents=True)
 
         self.config = config
+
+        # Validate the VM name before it is used to build privileged file
+        # paths (log files, schedule lookups, etc.).
+        validate_store_name(self.config["vm_name"])
 
         # Set up the logging file
         self.log_filename = self.log_directory / (f"{self.config['vm_name']}.log")
@@ -885,25 +891,42 @@ class VMResourceHandler:
             for filename in filenames:
                 if "Windows" in self.target_os:
                     # Make a legitimate posix path using the windows path
-                    fname = Path(local_path) / PureWindowsPath(filename).as_posix()
+                    guest_relative_name = (
+                        PureWindowsPath(filename).as_posix().strip("/")
+                    )
                 else:
-                    fname = Path(local_path) / filename.strip("/")
+                    guest_relative_name = filename.strip("/")
+
+                # The filename is guest-controlled: refuse (and log) any name
+                # which would escape the transfer destination directory.
+                try:
+                    fname = contained_join(local_path, guest_relative_name)
+                except ValueError:
+                    self.log.error(
+                        "Skipping transfer of guest file with unsafe name: %s",
+                        filename,
+                    )
+                    continue
+
                 # Only pull files if they've changed
                 success = self.driver.read_file(filename, fname)
                 if not success or not fname.exists():
                     continue
+
                 # Set permissions on all the directories and files that
                 # have been pulled from the VM so the user doesn't have
-                # to be root to read them
+                # to be root to read them. Only paths strictly below the
+                # destination directory are ever touched.
+                destination_resolved = destination.resolve()
                 touched = fname
-                while str(touched) != "/":
+                while destination_resolved in touched.parents:
                     if touched.is_dir():
-                        self.log.debug("Changing permissions for '%s' to 777.", touched)
-                        touched.chmod(0o777)
+                        self.log.debug("Changing permissions for '%s' to 755.", touched)
+                        touched.chmod(0o755)
                     else:
-                        self.log.debug("Changing permissions for '%s' to 666.", touched)
-                        touched.chmod(0o666)
-                    if touched.parent == destination:
+                        self.log.debug("Changing permissions for '%s' to 644.", touched)
+                        touched.chmod(0o644)
+                    if touched.parent == destination_resolved:
                         self.log.debug("Finished changing permissions")
                         break
                     touched = touched.parent
