@@ -1,3 +1,4 @@
+import collections
 from datetime import timezone
 
 import grpc
@@ -6,7 +7,72 @@ from google.protobuf.timestamp_pb2 import Timestamp  # pylint: disable=no-name-i
 from firewheel.config import config
 from firewheel.lib.log import Log
 from firewheel.lib.grpc import firewheel_grpc_pb2, firewheel_grpc_pb2_grpc
-from firewheel.lib.grpc.firewheel_grpc_resources import msg_to_dict
+from firewheel.lib.grpc.firewheel_grpc_resources import (
+    GRPC_TOKEN_METADATA_KEY,
+    msg_to_dict,
+)
+
+
+class _ClientCallDetails(
+    collections.namedtuple(
+        "_ClientCallDetails",
+        (
+            "method",
+            "timeout",
+            "metadata",
+            "credentials",
+            "wait_for_ready",
+            "compression",
+        ),
+    ),
+    grpc.ClientCallDetails,
+):
+    """Concrete ClientCallDetails for interceptor metadata rewriting."""
+
+
+class TokenAuthClientInterceptor(grpc.UnaryUnaryClientInterceptor):
+    """Attach a shared authentication token to outgoing gRPC requests.
+
+    This interceptor appends the configured FIREWHEEL gRPC token to the
+    metadata of unary-unary RPC calls using the
+    ``firewheel-grpc-token`` metadata key.
+    """
+
+    def __init__(self, token: str):
+        """Initialize the interceptor with a shared authentication token.
+
+        Args:
+            token (str): The configured shared token to attach to outgoing
+                gRPC request metadata.
+        """
+        self.token = token
+
+    def intercept_unary_unary(self, continuation, client_call_details, request):
+        """Append token metadata to an outgoing unary-unary RPC.
+
+        Args:
+            continuation: Callable that invokes the next interceptor or the
+                underlying RPC with updated call details.
+            client_call_details: The original RPC call details, including
+                method name, timeout, credentials, and metadata.
+            request: The outbound RPC request object.
+
+        Returns:
+            Any: The result returned by the downstream interceptor chain or
+            underlying gRPC call.
+        """
+        metadata = list(client_call_details.metadata or [])
+        metadata.append((GRPC_TOKEN_METADATA_KEY, self.token))
+
+        new_details = _ClientCallDetails(
+            method=client_call_details.method,
+            timeout=client_call_details.timeout,
+            metadata=metadata,
+            credentials=client_call_details.credentials,
+            wait_for_ready=getattr(client_call_details, "wait_for_ready", None),
+            compression=getattr(client_call_details, "compression", None),
+        )
+        return continuation(new_details, request)
 
 
 class FirewheelGrpcClient:
@@ -41,6 +107,14 @@ class FirewheelGrpcClient:
         self.db = db
         self.server_addr = f"{hostname}:{port}"
         self.chan = grpc.insecure_channel(self.server_addr)
+
+        # If a shared token is configured, present it with every RPC.
+        token = config["grpc"].get("token")
+        if token:
+            self.chan = grpc.intercept_channel(
+                self.chan, TokenAuthClientInterceptor(token)
+            )
+
         self.stub = firewheel_grpc_pb2_grpc.FirewheelStub(self.chan)
         if log:
             self.log = log

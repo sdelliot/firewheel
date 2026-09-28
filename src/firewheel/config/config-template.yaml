@@ -17,6 +17,7 @@ grpc:
     port: 50051
     root_dir: ""
     threads: 2
+    token: ""
 logging:
     cli_log: cli.log
     discovery_log: discovery.log

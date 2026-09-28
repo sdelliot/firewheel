@@ -15,6 +15,87 @@ from firewheel.config import Config
 from firewheel.lib.log import Log
 from firewheel.lib.grpc import firewheel_grpc_pb2, firewheel_grpc_pb2_grpc
 from firewheel.vm_resource_manager.vm_mapping import VMState
+from firewheel.lib.grpc.firewheel_grpc_resources import GRPC_TOKEN_METADATA_KEY
+
+
+class TokenAuthInterceptor(grpc.ServerInterceptor):
+    """Enforce shared-token authentication for incoming gRPC requests.
+
+    This interceptor checks incoming RPC metadata for the configured
+    FIREWHEEL gRPC authentication token. Requests with missing or invalid
+    tokens are rejected with ``grpc.StatusCode.UNAUTHENTICATED``.
+    """
+
+    def __init__(self, token: str):
+        """Initialize the interceptor with the expected shared token.
+
+        Args:
+            token (str): The configured shared token that incoming requests
+                must present in their gRPC metadata.
+        """
+        self.token = token
+
+    def intercept_service(self, continuation, handler_call_details):
+        """Intercept an incoming RPC and enforce shared-token authentication.
+
+        When the provided metadata does not include the expected
+        ``firewheel-grpc-token`` value, this replaces the downstream RPC
+        handler with one that aborts the call using
+        ``grpc.StatusCode.UNAUTHENTICATED``. If the token matches, the original
+        handler returned by ``continuation`` is used.
+
+        Args:
+            continuation: Callable that returns the next RPC handler in the
+                interceptor chain for the provided call details.
+            handler_call_details: The incoming RPC metadata and method details.
+
+        Returns:
+            grpc.RpcMethodHandler | None: The original RPC handler when
+            authentication succeeds, a replacement aborting handler when
+            authentication fails, or ``None`` if no downstream handler exists.
+        """
+        metadata = dict(handler_call_details.invocation_metadata or [])
+        provided = metadata.get(GRPC_TOKEN_METADATA_KEY)
+
+        if provided != self.token:
+            handler = continuation(handler_call_details)
+            if handler is None:
+                return None
+
+            def abort_behavior(_request, context):
+                context.abort(
+                    grpc.StatusCode.UNAUTHENTICATED,
+                    "Missing or invalid FIREWHEEL gRPC authentication token.",
+                )
+
+            if handler.unary_unary:
+                return grpc.unary_unary_rpc_method_handler(
+                    abort_behavior,
+                    request_deserializer=handler.request_deserializer,
+                    response_serializer=handler.response_serializer,
+                )
+            if handler.unary_stream:
+                return grpc.unary_stream_rpc_method_handler(
+                    abort_behavior,
+                    request_deserializer=handler.request_deserializer,
+                    response_serializer=handler.response_serializer,
+                )
+            if handler.stream_unary:
+                return grpc.stream_unary_rpc_method_handler(
+                    abort_behavior,
+                    request_deserializer=handler.request_deserializer,
+                    response_serializer=handler.response_serializer,
+                )
+            if handler.stream_stream:
+                return grpc.stream_stream_rpc_method_handler(
+                    abort_behavior,
+                    request_deserializer=handler.request_deserializer,
+                    response_serializer=handler.response_serializer,
+                )
+
+            return handler
+
+        return continuation(handler_call_details)
 
 
 class FirewheelServicer(firewheel_grpc_pb2_grpc.FirewheelServicer):
@@ -441,9 +522,18 @@ def serve():
             threads,
         )
 
+    # If a shared token is configured, require it on every RPC.
+    interceptors = []
+    token = config["grpc"].get("token")
+    if token:
+        interceptors.append(TokenAuthInterceptor(token))
+        servicer.log.info("gRPC shared-token authentication is enabled.")
+
     # pylint: disable=consider-using-with
     server = grpc.server(
-        futures.ThreadPoolExecutor(max_workers=threads), options=options
+        futures.ThreadPoolExecutor(max_workers=threads),
+        options=options,
+        interceptors=interceptors,
     )
 
     firewheel_grpc_pb2_grpc.add_FirewheelServicer_to_server(servicer, server)

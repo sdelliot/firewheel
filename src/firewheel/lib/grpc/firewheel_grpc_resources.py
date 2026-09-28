@@ -1,5 +1,9 @@
 from google.protobuf.json_format import MessageToDict
 
+# Metadata key used for the optional shared-token gRPC authentication.
+# This is NOT the actual token, just the name of the token metadata field
+GRPC_TOKEN_METADATA_KEY = "firewheel-grpc-token"  # noqa: S105
+
 
 def msg_to_dict(msg):
     """

@@ -9,7 +9,11 @@ from unittest.mock import Mock, patch
 import grpc
 import pytest
 
-from firewheel.lib.grpc.firewheel_grpc_server import FirewheelServicer
+from firewheel.lib.grpc.firewheel_grpc_server import (
+    FirewheelServicer,
+    TokenAuthInterceptor,
+)
+from firewheel.lib.grpc.firewheel_grpc_resources import GRPC_TOKEN_METADATA_KEY
 
 
 class _AbortContext:
@@ -327,3 +331,145 @@ def test_serve_returns_when_bind_fails() -> None:
 
     assert result is None
     servicer_cls.return_value.log.warning.assert_called_once()
+
+def test_token_auth_interceptor_allows_matching_token() -> None:
+    """Verify matching token metadata allows the RPC through."""
+    interceptor = TokenAuthInterceptor("secret-token")
+
+    handler_call_details = Mock()
+    handler_call_details.invocation_metadata = [
+        (GRPC_TOKEN_METADATA_KEY, "secret-token")
+    ]
+
+    sentinel_handler = Mock()
+    continuation = Mock(return_value=sentinel_handler)
+
+    result = interceptor.intercept_service(continuation, handler_call_details)
+
+    assert result is sentinel_handler
+    continuation.assert_called_once_with(handler_call_details)
+
+
+def test_token_auth_interceptor_rejects_missing_token() -> None:
+    """Verify missing token metadata is rejected."""
+    interceptor = TokenAuthInterceptor("secret-token")
+
+    handler_call_details = Mock()
+    handler_call_details.invocation_metadata = []
+
+    downstream_handler = grpc.unary_unary_rpc_method_handler(lambda req, ctx: "ok")
+    continuation = Mock(return_value=downstream_handler)
+
+    handler = interceptor.intercept_service(continuation, handler_call_details)
+
+    context = Mock()
+    context.abort.side_effect = RuntimeError("aborted")
+
+    with pytest.raises(RuntimeError, match="aborted"):
+        handler.unary_unary(object(), context)
+
+    context.abort.assert_called_once()
+    args, _ = context.abort.call_args
+    assert args[0] == grpc.StatusCode.UNAUTHENTICATED
+
+
+def test_token_auth_interceptor_rejects_wrong_token() -> None:
+    """Verify wrong token metadata is rejected."""
+    interceptor = TokenAuthInterceptor("secret-token")
+
+    handler_call_details = Mock()
+    handler_call_details.invocation_metadata = [
+        (GRPC_TOKEN_METADATA_KEY, "wrong-token")
+    ]
+
+    downstream_handler = grpc.unary_unary_rpc_method_handler(lambda req, ctx: "ok")
+    continuation = Mock(return_value=downstream_handler)
+
+    handler = interceptor.intercept_service(continuation, handler_call_details)
+
+    context = Mock()
+    context.abort.side_effect = RuntimeError("aborted")
+
+    with pytest.raises(RuntimeError, match="aborted"):
+        handler.unary_unary(object(), context)
+
+    context.abort.assert_called_once()
+    args, _ = context.abort.call_args
+    assert args[0] == grpc.StatusCode.UNAUTHENTICATED
+
+
+def test_serve_enables_token_auth_when_configured() -> None:
+    """Verify serve installs the token interceptor when configured."""
+    server = Mock()
+    with (
+        patch(
+            "firewheel.lib.grpc.firewheel_grpc_server.FirewheelServicer"
+        ) as servicer_cls,
+        patch("firewheel.lib.grpc.firewheel_grpc_server.Config") as config_cls,
+        patch(
+            "firewheel.lib.grpc.firewheel_grpc_server.grpc.server",
+            return_value=server,
+        ) as grpc_server,
+        patch(
+            "firewheel.lib.grpc.firewheel_grpc_server.firewheel_grpc_pb2_grpc.add_FirewheelServicer_to_server"
+        ),
+        patch(
+            "firewheel.lib.grpc.firewheel_grpc_server.time.sleep",
+            side_effect=KeyboardInterrupt,
+        ),
+    ):
+        config_cls.return_value.get_config.return_value = {
+            "grpc": {
+                "hostname": "127.0.0.1",
+                "port": "50051",
+                "threads": 2,
+                "token": "secret-token",
+            }
+        }
+        __import__(
+            "firewheel.lib.grpc.firewheel_grpc_server",
+            fromlist=["serve"],
+        ).serve()
+
+    _, kwargs = grpc_server.call_args
+    assert "interceptors" in kwargs
+    assert len(kwargs["interceptors"]) == 1
+    assert isinstance(kwargs["interceptors"][0], TokenAuthInterceptor)
+
+
+def test_serve_disables_token_auth_when_not_configured() -> None:
+    """Verify serve does not install token auth when no token is configured."""
+    server = Mock()
+    with (
+        patch(
+            "firewheel.lib.grpc.firewheel_grpc_server.FirewheelServicer"
+        ) as servicer_cls,
+        patch("firewheel.lib.grpc.firewheel_grpc_server.Config") as config_cls,
+        patch(
+            "firewheel.lib.grpc.firewheel_grpc_server.grpc.server",
+            return_value=server,
+        ) as grpc_server,
+        patch(
+            "firewheel.lib.grpc.firewheel_grpc_server.firewheel_grpc_pb2_grpc.add_FirewheelServicer_to_server"
+        ),
+        patch(
+            "firewheel.lib.grpc.firewheel_grpc_server.time.sleep",
+            side_effect=KeyboardInterrupt,
+        ),
+    ):
+        config_cls.return_value.get_config.return_value = {
+            "grpc": {
+                "hostname": "127.0.0.1",
+                "port": "50051",
+                "threads": 2,
+                "token": "",
+            }
+        }
+        __import__(
+            "firewheel.lib.grpc.firewheel_grpc_server",
+            fromlist=["serve"],
+        ).serve()
+
+    _, kwargs = grpc_server.call_args
+    assert "interceptors" in kwargs
+    assert kwargs["interceptors"] == []

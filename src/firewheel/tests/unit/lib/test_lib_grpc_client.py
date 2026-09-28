@@ -9,7 +9,12 @@ from unittest.mock import Mock, patch
 import grpc
 import pytest
 
-from firewheel.lib.grpc.firewheel_grpc_client import FirewheelGrpcClient
+from firewheel.lib.grpc.firewheel_grpc_resources import GRPC_TOKEN_METADATA_KEY
+from firewheel.lib.grpc.firewheel_grpc_client import (
+    FirewheelGrpcClient,
+    TokenAuthClientInterceptor,
+    _ClientCallDetails,
+)
 
 
 class _RpcException(grpc.RpcError):
@@ -403,3 +408,118 @@ def test_set_vm_state_by_uuid_logs_unexpected_rpc_error() -> None:
 
     assert client.set_vm_state_by_uuid({"server_uuid": "u", "state": "READY"}) is None
     assert client.log.exception.called
+
+def test_token_auth_client_interceptor_adds_metadata() -> None:
+    """Verify the client interceptor appends the shared token metadata."""
+    interceptor = TokenAuthClientInterceptor("secret-token")
+
+    call_details = _ClientCallDetails(
+        method="/firewheel.Service/Method",
+        timeout=10,
+        metadata=[("existing", "value")],
+        credentials=None,
+        wait_for_ready=None,
+        compression=None,
+    )
+
+    captured = {}
+
+    def continuation(new_details, request):
+        captured["metadata"] = new_details.metadata
+        return "ok"
+
+    result = interceptor.intercept_unary_unary(
+        continuation,
+        call_details,
+        object(),
+    )
+
+    assert result == "ok"
+    assert ("existing", "value") in captured["metadata"]
+    assert (GRPC_TOKEN_METADATA_KEY, "secret-token") in captured["metadata"]
+
+
+def test_init_with_token_wraps_channel(monkeypatch) -> None:
+    """Verify constructor wraps the gRPC channel when a token is configured."""
+    fake_channel = Mock()
+    wrapped_channel = Mock()
+    fake_stub = Mock()
+
+    from firewheel.config import config
+
+    monkeypatch.setitem(config["grpc"], "hostname", "127.0.0.1")
+    monkeypatch.setitem(config["grpc"], "port", "50051")
+    monkeypatch.setitem(config["grpc"], "db", "prod")
+    monkeypatch.setitem(config["grpc"], "token", "secret-token")
+
+    import firewheel.lib.grpc.firewheel_grpc_client as module
+
+    original_check = module.FirewheelGrpcClient.check_connection
+    module.FirewheelGrpcClient.check_connection = lambda self, error=True: False
+    try:
+        import unittest.mock as umock
+
+        with (
+            umock.patch(
+                "firewheel.lib.grpc.firewheel_grpc_client.grpc.insecure_channel",
+                return_value=fake_channel,
+            ),
+            umock.patch(
+                "firewheel.lib.grpc.firewheel_grpc_client.grpc.intercept_channel",
+                return_value=wrapped_channel,
+            ) as intercept_channel,
+            umock.patch(
+                "firewheel.lib.grpc.firewheel_grpc_client.firewheel_grpc_pb2_grpc.FirewheelStub",
+                return_value=fake_stub,
+            ),
+        ):
+            client = FirewheelGrpcClient(require_connection=False)
+    finally:
+        module.FirewheelGrpcClient.check_connection = original_check
+
+    intercept_channel.assert_called_once()
+    args = intercept_channel.call_args[0]
+    assert args[0] is fake_channel
+    assert isinstance(args[1], TokenAuthClientInterceptor)
+    assert args[1].token == "secret-token"
+    assert client.chan is wrapped_channel
+
+
+def test_init_without_token_does_not_wrap_channel(monkeypatch) -> None:
+    """Verify constructor leaves the channel unwrapped when no token is set."""
+    fake_channel = Mock()
+    fake_stub = Mock()
+
+    from firewheel.config import config
+
+    monkeypatch.setitem(config["grpc"], "hostname", "127.0.0.1")
+    monkeypatch.setitem(config["grpc"], "port", "50051")
+    monkeypatch.setitem(config["grpc"], "db", "prod")
+    monkeypatch.setitem(config["grpc"], "token", "")
+
+    import firewheel.lib.grpc.firewheel_grpc_client as module
+
+    original_check = module.FirewheelGrpcClient.check_connection
+    module.FirewheelGrpcClient.check_connection = lambda self, error=True: False
+    try:
+        import unittest.mock as umock
+
+        with (
+            umock.patch(
+                "firewheel.lib.grpc.firewheel_grpc_client.grpc.insecure_channel",
+                return_value=fake_channel,
+            ),
+            umock.patch(
+                "firewheel.lib.grpc.firewheel_grpc_client.grpc.intercept_channel",
+            ) as intercept_channel,
+            umock.patch(
+                "firewheel.lib.grpc.firewheel_grpc_client.firewheel_grpc_pb2_grpc.FirewheelStub",
+                return_value=fake_stub,
+            ),
+        ):
+            client = FirewheelGrpcClient(require_connection=False)
+    finally:
+        module.FirewheelGrpcClient.check_connection = original_check
+
+    intercept_channel.assert_not_called()
+    assert client.chan is fake_channel
