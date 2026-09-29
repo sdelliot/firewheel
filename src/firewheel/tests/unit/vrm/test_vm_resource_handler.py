@@ -227,7 +227,7 @@ class TestVMRHandler:
         assert output == {"fd": "stderr", "output": stream}
         vmr_handler.log.info.assert_called_once_with(stream)
         vmr_handler.log_json.assert_called_once_with(
-            stream.encode("utf-8", errors="backslashreplace")
+            stream
         )
 
     def test_best_effort_set_failed_state_marks_vm_failed(self, vmr_handler):
