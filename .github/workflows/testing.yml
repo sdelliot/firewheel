@@ -42,7 +42,7 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y tar net-tools procps uml-utilities \
-                                openvswitch-switch qemu-kvm qemu-utils dnsmasq \
+                                openvswitch-switch qemu-system-x86 qemu-utils dnsmasq \
                                 ntfs-3g iproute2 libpcap-dev
     - name: Prepare minimega
       # zizmor: ignore[unpinned-uses] sandialabs/firewheel_ci is org-controlled; v1 is the intentionally maintained stable interface for FIREWHEEL consumers.
